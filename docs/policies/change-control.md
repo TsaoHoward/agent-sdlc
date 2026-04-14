@@ -37,11 +37,14 @@ Changes that modify:
 - update roadmap and/or WBS
 - explain the reason for the planning shift
 - ensure roadmap and WBS still map correctly
+- update the decision backlog when the planning shift introduces, resolves, or narrows a meaningful decision item
 
 ### Category C
 - write or update an ADR before implementation
 - update relevant architecture docs
 - update policies if governance changes
+- update the decision backlog to show promotion status and remaining detail decisions, if any
+- move the promoted item out of the active decision backlog once the durable ADR link exists
 
 ## 3. Mandatory Re-Alignment Triggers
 Return to roadmap/WBS/ADR review when:

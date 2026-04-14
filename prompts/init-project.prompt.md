@@ -62,6 +62,7 @@ Use this order when reporting back:
 ## Document Maintenance Rules
 - `docs/roadmap.md` must follow `docs/templates/roadmap.template.md`.
 - `docs/wbs.md` must follow `docs/templates/wbs.template.md`.
+- `docs/decisions/decision-backlog.md` must follow `docs/templates/decision-backlog.template.md`.
 - If template changes are required, update the template first, then update the generated document.
 - If an architecture-level change is needed, create or update an ADR before implementing it.
 
@@ -81,3 +82,5 @@ This initialization run should avoid:
 
 ## Final Task
 Scan the repository state, identify the current gap between the repo and the intended baseline, then update the smallest set of files needed to make the project more maintainable and less likely to drift.
+
+When you encounter a meaningful pending decision, update `docs/decisions/decision-backlog.md` rather than leaving the decision context only in chat.

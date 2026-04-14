@@ -61,6 +61,14 @@ This document defines how humans and agents collaborate in this repository.
 - governance or control-plane assumptions shift
 - verification or deployment ownership changes
 
+### Update decision backlog when:
+- a meaningful unresolved decision is discovered
+- candidate directions are narrowed
+- a direction is selected but not yet promoted to ADR
+- a backlog item is promoted to ADR, deferred, or closed
+
+When a backlog item is promoted to ADR or fully closed, move it out of the active dashboard so the backlog stays current-state oriented.
+
 ## 5. Human Approval Points
 Human approval is required before:
 - major scope expansion
@@ -75,6 +83,7 @@ Agents should:
 - keep durable logic in repo documents where possible
 - not treat recent chat context as the only authority
 - not implement broad product features during planning phases
+- use `docs/decisions/decision-backlog.md` as the durable dashboard for near-term decision state
 
 ## 7. Early-Phase Bias
 In early phases, prefer:

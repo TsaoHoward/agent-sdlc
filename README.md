@@ -39,6 +39,7 @@ Use these files as the primary planning sources of truth:
 - `docs/wbs.md`: current work breakdown structure
 - `docs/architecture/`: system boundaries, context, task lifecycle
 - `docs/decisions/`: architecture decisions
+- `docs/decisions/decision-backlog.md`: decision dashboard for pending and recently selected choices
 - `docs/policies/`: intake and change-control rules
 - `docs/templates/`: formatting templates for AI-maintained planning docs
 - `prompts/init-project.prompt.md`: initialization prompt for Codex or similar agents
@@ -74,4 +75,5 @@ This initialization package does **not** assume:
 3. Read `docs/roadmap.md` and `docs/wbs.md`
 4. Read `AGENTS.md`
 5. Use `prompts/init-project.prompt.md` to initialize future agent runs
-6. Update roadmap/WBS through the templates when scope changes
+6. Review `docs/decisions/decision-backlog.md` for pending and recently selected decisions
+7. Update roadmap/WBS and decision docs through their templates when scope changes
