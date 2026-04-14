@@ -55,17 +55,57 @@ Reject or escalate when:
 - security-sensitive or secret-handling changes
 - actions that expand the system boundary
 
-## 7. Routing Guidance
+## 7. Early-Phase Execution Profiles
+### Profile A - Documentation Safe
+- intended for documentation, planning, prompt, and repository-guidance updates
+- may edit durable text artifacts and run low-risk repository-local checks
+- should not modify deploy/release paths, secret-handling behavior, or system boundaries
+
+### Profile B - Bounded Change
+- intended for small code, config, or documentation changes inside approved roadmap/WBS scope
+- may use the allowed repository-local verification commands for the task
+- should not change architecture boundaries, policy ownership, CI ownership, or deploy authority without escalation
+
+### Profile C - Investigation Only
+- intended for reproduction, inspection, CI-failure investigation, and evidence gathering
+- may collect logs, produce analysis, and propose next steps
+- should avoid durable code changes unless a follow-up task explicitly allows them
+
+### Profile D - Escalation Required
+- used when the task touches architecture, policy, security-sensitive behavior, secrets, deployment/release, or boundary expansion
+- should stop before execution beyond assessment until explicit human approval exists
+
+## 8. Routing Guidance
 Task intake should decide:
 - whether the task is executable
 - which policy profile applies
 - which runtime capability set applies
 - whether a human approval checkpoint is required before execution
 
-## 8. Traceability Rule
+The routing decision should produce or reference at least:
+- normalized task class
+- selected execution profile
+- approval state or escalation requirement
+- applicable policy and ADR references
+- runtime capability set
+- traceability identifiers needed by downstream layers
+
+## 9. Minimum Traceability Fields
+The durable task record should preserve at least these linkable fields:
+- `source_event_id` or equivalent source event reference
+- `task_request_id`
+- `execution_profile_id` or equivalent policy profile reference
+- `agent_session_id` when a session starts
+- `proposal_ref` when a reviewable change is created
+- `ci_run_ref` when independent verification runs
+- `review_decision_ref` when a human approval or rejection is recorded
+
+## 10. Traceability Rule
 Each task should be traceable from:
 - raw event
 - normalized task request
 - execution session
 - resulting proposal
 - CI result
+
+These references should survive handoff across logs, proposal text, or machine-readable metadata so downstream review does not depend on chat history alone.

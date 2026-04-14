@@ -9,12 +9,13 @@ Before doing anything substantial, read in this order:
 1. `README.md`
 2. `AGENTS.md`
 3. `docs/project-overview.md`
-4. `docs/architecture/overview.md`
-5. `docs/architecture/task-lifecycle.md`
-6. `docs/roadmap.md`
-7. `docs/wbs.md`
-8. `docs/decisions/*.md`
-9. `docs/policies/*.md`
+4. `docs/operating-model.md`
+5. `docs/architecture/overview.md`
+6. `docs/architecture/task-lifecycle.md`
+7. `docs/roadmap.md`
+8. `docs/wbs.md`
+9. `docs/decisions/*.md`
+10. `docs/policies/*.md`
 
 ## Your Immediate Goal
 Strengthen or initialize the repository baseline for an **agent-oriented SDLC system** whose target experience is:

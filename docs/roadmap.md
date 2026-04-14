@@ -3,7 +3,7 @@
 ## Document Metadata
 - Version: 0.1
 - Status: Draft
-- Last Updated: 2026-04-13
+- Last Updated: 2026-04-14
 - Owner: Project Maintainer
 - Source Template: docs/templates/roadmap.template.md
 
@@ -46,6 +46,7 @@ Create durable planning, architecture, and operating documents that can guide fu
 - architecture boundaries
 - roadmap/WBS format
 - initial ADRs and policy docs
+- early execution profiles and traceability conventions
 - initialization prompt(s)
 
 ### Deliverables
@@ -56,6 +57,7 @@ Create durable planning, architecture, and operating documents that can guide fu
 - roadmap and WBS
 - initial ADRs
 - intake and change-control policies
+- documented execution profiles and lifecycle traceability guidance
 - initialization prompt
 
 ### Entry Criteria
@@ -66,6 +68,7 @@ Create durable planning, architecture, and operating documents that can guide fu
 - durable documentation baseline exists
 - roadmap and WBS are internally consistent
 - architecture boundaries are documented
+- minimum execution profiles and lifecycle identifiers are documented in durable repo docs
 - future agents can bootstrap from repository docs instead of conversation memory alone
 
 ### Dependencies
@@ -89,6 +92,7 @@ Implement the smallest working path from task trigger to independently verified 
 ### Scope
 - one trigger path
 - one normalized task request path
+- one traceability contract across lifecycle handoffs
 - one agent control integration
 - one isolated execution runtime
 - one PR creation flow
@@ -97,12 +101,12 @@ Implement the smallest working path from task trigger to independently verified 
 
 ### Deliverables
 - task intake adapter
-- normalized task request model
+- normalized task request model with stable identifiers and policy references
 - agent session starter
 - isolated worker runtime scaffold
 - branch/PR proposal path
 - CI workflow skeleton
-- traceable task lifecycle logging (minimal)
+- traceable task lifecycle contract and minimal logging
 
 ### Entry Criteria
 - Phase 0 baseline completed
@@ -116,6 +120,8 @@ Implement the smallest working path from task trigger to independently verified 
 
 ### Dependencies
 - task model definition
+- execution-profile policy definition
+- traceability contract
 - runtime isolation model
 - forge integration target
 - CI integration target
@@ -123,6 +129,7 @@ Implement the smallest working path from task trigger to independently verified 
 ### Risks
 - hidden coupling between intake and agent runtime
 - weak task normalization
+- policy or traceability logic being buried in prompts or code
 - CI treated as an afterthought instead of an independent boundary
 
 ### Notes
@@ -219,7 +226,7 @@ This phase should only proceed when prior boundaries are understood and defended
 | Milestone ID | Name | Related Phase | Output | Validation |
 |---|---|---|---|---|
 | M0 | Baseline Repository | Phase 0 | durable initialization docs and templates | document review and internal consistency |
-| M1 | First Closed Loop | Phase 1 | issue/event to PR proposal path | successful end-to-end dry run with independent CI |
+| M1 | First Closed Loop | Phase 1 | issue/event to PR proposal path | traceable end-to-end dry run with independent CI |
 | M2 | Controlled Expansion Pack | Phase 2 | additional adapters and policy packs | repeated use without boundary collapse |
 | M3 | Governance Evolution | Phase 3 | stronger policy, audit, and source diversity | reviewable governance and maintainable extension model |
 
@@ -230,3 +237,4 @@ This phase should only proceed when prior boundaries are understood and defended
 
 ## Change Log
 - 2026-04-13: Initial version
+- 2026-04-14: Refined baseline planning to externalize execution profiles and lifecycle traceability expectations.

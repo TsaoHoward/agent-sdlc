@@ -10,12 +10,13 @@ Before planning or implementation, read these files in order:
 
 1. `README.md`
 2. `docs/project-overview.md`
-3. `docs/architecture/overview.md`
-4. `docs/architecture/task-lifecycle.md`
-5. `docs/roadmap.md`
-6. `docs/wbs.md`
-7. `docs/decisions/*.md`
-8. `docs/policies/*.md`
+3. `docs/operating-model.md`
+4. `docs/architecture/overview.md`
+5. `docs/architecture/task-lifecycle.md`
+6. `docs/roadmap.md`
+7. `docs/wbs.md`
+8. `docs/decisions/*.md`
+9. `docs/policies/*.md`
 
 ## Core Working Rules
 1. Plan before implementation.

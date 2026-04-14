@@ -3,7 +3,7 @@
 ## Document Metadata
 - Version: 0.1
 - Status: Draft
-- Last Updated: 2026-04-13
+- Last Updated: 2026-04-14
 - Owner: Project Maintainer
 - Source Template: docs/templates/wbs.template.md
 
@@ -23,18 +23,20 @@
 | 1.1 | Repository Guide Set | 1 | Phase 0 | README and AGENTS.md |
 | 1.2 | Planning Document Set | 1 | Phase 0 | roadmap, WBS, prompt, operating model |
 | 1.3 | Architecture Document Set | 1 | Phase 0 | architecture overview, context, lifecycle |
-| 1.4 | Governance Document Set | 1 | Phase 0 | ADRs and policies |
+| 1.4 | Governance Document Set | 1 | Phase 0 | ADRs and policies with execution profiles and approval rules |
 | 2 | Minimum Closed Loop Design | - | Phase 1 | design-ready interfaces and workflow definition |
-| 2.1 | Task Intake Contract | 2 | Phase 1 | normalized task request definition |
+| 2.1 | Task Intake Contract | 2 | Phase 1 | normalized task request definition with identifiers and policy refs |
 | 2.2 | Agent Control Integration Plan | 2 | Phase 1 | control-plane interface plan |
 | 2.3 | Execution Isolation Plan | 2 | Phase 1 | isolated runtime design |
 | 2.4 | PR and CI Path Definition | 2 | Phase 1 | proposal and verification path definition |
+| 2.5 | Lifecycle Traceability Contract | 2 | Phase 1 | cross-layer identifier and handoff definition |
 | 3 | Minimum Closed Loop Implementation | - | Phase 1 | first working end-to-end path |
 | 3.1 | Trigger Adapter Implementation | 3 | Phase 1 | one working trigger path |
 | 3.2 | Agent Session Starter | 3 | Phase 1 | working session launch path |
 | 3.3 | Worker Runtime Scaffold | 3 | Phase 1 | isolated execution scaffold |
-| 3.4 | PR Proposal Path | 3 | Phase 1 | branch/PR proposal flow |
-| 3.5 | CI Verification Skeleton | 3 | Phase 1 | independent CI workflow |
+| 3.4 | PR Proposal Path | 3 | Phase 1 | branch/PR proposal flow with task/session linkage |
+| 3.5 | CI Verification Skeleton | 3 | Phase 1 | independent CI workflow with proposal/task linkage |
+| 3.6 | Lifecycle Traceability Scaffold | 3 | Phase 1 | minimal end-to-end traceability record |
 | 4 | Controlled Expansion | - | Phase 2 | structured expansion without boundary collapse |
 | 4.1 | Additional Intake Paths | 4 | Phase 2 | more adapters |
 | 4.2 | Policy Pack Expansion | 4 | Phase 2 | richer policy definitions |
@@ -55,7 +57,7 @@
 - Deliverable: Initialized core document set and templates.
 - Dependencies:
 - Critical-Path-Candidate: Yes
-- Status: In Progress
+- Status: Done
 - Notes: This is the foundation for all later work.
 
 ### WBS 1.1 — Repository Guide Set
@@ -65,7 +67,7 @@
 - Deliverable: `README.md`, `AGENTS.md`
 - Dependencies:
 - Critical-Path-Candidate: Yes
-- Status: In Progress
+- Status: Done
 - Notes:
 
 ### WBS 1.2 — Planning Document Set
@@ -75,7 +77,7 @@
 - Deliverable: `docs/roadmap.md`, `docs/wbs.md`, `docs/operating-model.md`, `prompts/init-project.prompt.md`
 - Dependencies: 1.1
 - Critical-Path-Candidate: Yes
-- Status: In Progress
+- Status: Done
 - Notes:
 
 ### WBS 1.3 — Architecture Document Set
@@ -85,17 +87,17 @@
 - Deliverable: `docs/architecture/overview.md`, `docs/architecture/system-context.md`, `docs/architecture/task-lifecycle.md`
 - Dependencies: 1.1
 - Critical-Path-Candidate: Yes
-- Status: In Progress
+- Status: Done
 - Notes:
 
 ### WBS 1.4 — Governance Document Set
 - Parent: 1
 - Related Phase: Phase 0
-- Description: Record initial boundary decisions and project governance rules.
-- Deliverable: `docs/decisions/ADR-0001-system-boundaries.md`, policy docs
+- Description: Record initial boundary decisions, intake rules, approval rules, and execution-profile guidance.
+- Deliverable: `docs/decisions/ADR-0001-system-boundaries.md`, policy docs with execution profiles and traceability rules
 - Dependencies: 1.1, 1.3
 - Critical-Path-Candidate: Yes
-- Status: In Progress
+- Status: Done
 - Notes:
 
 ### WBS 2 — Minimum Closed Loop Design
@@ -111,8 +113,8 @@
 ### WBS 2.1 — Task Intake Contract
 - Parent: 2
 - Related Phase: Phase 1
-- Description: Define the normalized task request model, required metadata, and acceptance constraints.
-- Deliverable: task request schema/spec
+- Description: Define the normalized task request model, required metadata, stable identifiers, and acceptance constraints.
+- Deliverable: task request schema/spec with policy references and execution-profile linkage
 - Dependencies: 1.3, 1.4
 - Critical-Path-Candidate: Yes
 - Status: Not Started
@@ -141,9 +143,19 @@
 ### WBS 2.4 — PR and CI Path Definition
 - Parent: 2
 - Related Phase: Phase 1
-- Description: Define how proposed changes are surfaced and verified.
+- Description: Define how proposed changes are surfaced, linked to their source task/session, and verified.
 - Deliverable: PR/CI path definition
 - Dependencies: 2.2, 2.3
+- Critical-Path-Candidate: Yes
+- Status: Not Started
+- Notes:
+
+### WBS 2.5 — Lifecycle Traceability Contract
+- Parent: 2
+- Related Phase: Phase 1
+- Description: Define the minimum identifiers and handoff metadata that connect event, task, session, proposal, CI, and review records.
+- Deliverable: cross-layer traceability contract
+- Dependencies: 2.1, 2.2, 2.4
 - Critical-Path-Candidate: Yes
 - Status: Not Started
 - Notes:
@@ -191,8 +203,8 @@
 ### WBS 3.4 — PR Proposal Path
 - Parent: 3
 - Related Phase: Phase 1
-- Description: Surface the agent's bounded change as a branch and PR or equivalent proposal.
-- Deliverable: working proposal path
+- Description: Surface the agent's bounded change as a branch and PR or equivalent proposal with source-task linkage.
+- Deliverable: working proposal path with task/session references
 - Dependencies: 3.1, 3.2, 3.3
 - Critical-Path-Candidate: Yes
 - Status: Not Started
@@ -201,9 +213,19 @@
 ### WBS 3.5 — CI Verification Skeleton
 - Parent: 3
 - Related Phase: Phase 1
-- Description: Independently validate the proposed change through CI.
-- Deliverable: working CI skeleton
+- Description: Independently validate the proposed change through CI and retain linkage to the proposal and originating task.
+- Deliverable: working CI skeleton with proposal/task linkage
 - Dependencies: 2.4, 3.4
+- Critical-Path-Candidate: Yes
+- Status: Not Started
+- Notes:
+
+### WBS 3.6 — Lifecycle Traceability Scaffold
+- Parent: 3
+- Related Phase: Phase 1
+- Description: Implement the minimum record or metadata path that preserves traceability from event intake through human review.
+- Deliverable: minimal end-to-end traceability scaffold
+- Dependencies: 2.5, 3.2, 3.4, 3.5
 - Critical-Path-Candidate: Yes
 - Status: Not Started
 - Notes:
@@ -301,12 +323,14 @@
 | 2.2 | 2.1 | control integration depends on task model |
 | 2.3 | 2.1 | runtime boundary depends on task model |
 | 2.4 | 2.2, 2.3 | proposal/CI path depends on control and runtime design |
+| 2.5 | 2.1, 2.2, 2.4 | traceability depends on task, control, and proposal/verification seams |
 | 3 | 2 | implementation follows design |
 | 3.1 | 2.1 | intake implementation depends on intake contract |
 | 3.2 | 2.2 | session starter depends on control plan |
 | 3.3 | 2.3 | runtime scaffold depends on isolation plan |
 | 3.4 | 3.1, 3.2, 3.3 | proposal path depends on intake, control, and runtime |
 | 3.5 | 2.4, 3.4 | CI path depends on proposal definition and working proposal path |
+| 3.6 | 2.5, 3.2, 3.4, 3.5 | traceability scaffold depends on designed identifiers and working lifecycle checkpoints |
 | 4 | 3 | expansion should follow first working loop |
 | 5 | 4 | governance evolution should follow practical expansion experience |
 
@@ -321,12 +345,14 @@
 - 2.2
 - 2.3
 - 2.4
+- 2.5
 - 3
 - 3.1
 - 3.2
 - 3.3
 - 3.4
 - 3.5
+- 3.6
 
 ## Open Questions
 - Which first forge target should be assumed in phase 1?
@@ -335,3 +361,4 @@
 
 ## Change Log
 - 2026-04-13: Initial version
+- 2026-04-14: Marked phase-0 baseline items done and added explicit phase-1 traceability planning work.

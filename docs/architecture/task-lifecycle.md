@@ -116,9 +116,49 @@ Responsibilities:
 Output:
 - approved changes enter release flow
 
+## Cross-Layer Artifacts
+The lifecycle should preserve a small set of stable artifacts so layers stay replaceable without losing traceability.
+
+### Normalized Task Request
+Minimum contents:
+- `task_request_id`
+- source event reference
+- repository and branch context
+- task class
+- execution profile reference
+- policy and ADR references when applicable
+
+### Agent Session Record
+Minimum contents:
+- `agent_session_id`
+- `task_request_id`
+- selected runtime capability set
+- session status and timestamps
+
+### Change Proposal Record
+Minimum contents:
+- proposal reference
+- branch reference
+- `task_request_id`
+- `agent_session_id`
+
+### Verification Record
+Minimum contents:
+- `ci_run_ref`
+- proposal reference
+- verification status and supporting artifact links
+
+### Human Review Record
+Minimum contents:
+- review decision reference
+- proposal reference
+- decision outcome
+- approving or rejecting actor reference
+
 ## Lifecycle Rules
 - Normalization must happen before agent execution.
 - Policy must be applied before runtime execution.
+- Named identifiers should survive handoff across layers.
 - CI must remain independent.
 - Deploy is downstream and separate.
 - Traceability should be preserved from event -> task -> proposal -> validation.
