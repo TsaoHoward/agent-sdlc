@@ -1,0 +1,232 @@
+# Roadmap
+
+## Document Metadata
+- Version: 0.1
+- Status: Draft
+- Last Updated: 2026-04-13
+- Owner: Project Maintainer
+- Source Template: docs/templates/roadmap.template.md
+
+## Planning Principles
+- This roadmap must align with `docs/project-overview.md`.
+- This roadmap must be consistent with `docs/architecture/overview.md`.
+- Each phase should map to one or more WBS sections in `docs/wbs.md`.
+- Assumptions and open questions must remain explicit.
+
+## Scope Summary
+### Goals
+- Establish a maintainable baseline for an agent-oriented SDLC system.
+- Deliver a minimum closed loop from task intake to verified PR proposal.
+- Preserve replaceability across forge, agent, runtime, CI, and deploy concerns.
+
+### Non-Goals
+- Full production platform in the first delivery.
+- Full multi-agent orchestration in phase 1.
+- Direct production deployment by the agent runtime.
+
+### Current Assumptions
+- The initial implementation will likely start with a single forge target.
+- The early execution runtime will likely use isolated containers.
+- CI remains independent and outside the agent control plane.
+- Human review remains a required merge control point.
+
+### Key Constraints
+- Avoid premature lock-in to a single tool.
+- Keep planning documents stable enough for future agent runs.
+- Separate architecture, policy, planning, and implementation concerns.
+
+---
+
+## Phase 0 — Initialization / Baseline
+### Objective
+Create durable planning, architecture, and operating documents that can guide future agent and human work.
+
+### Scope
+- repository baseline
+- architecture boundaries
+- roadmap/WBS format
+- initial ADRs and policy docs
+- initialization prompt(s)
+
+### Deliverables
+- README
+- AGENTS.md
+- project overview
+- architecture overview, context, and task lifecycle docs
+- roadmap and WBS
+- initial ADRs
+- intake and change-control policies
+- initialization prompt
+
+### Entry Criteria
+- repository exists
+- project direction is clear enough to define target experience and boundaries
+
+### Exit Criteria
+- durable documentation baseline exists
+- roadmap and WBS are internally consistent
+- architecture boundaries are documented
+- future agents can bootstrap from repository docs instead of conversation memory alone
+
+### Dependencies
+- agreement on high-level experience target
+- agreement on layered architecture principle
+
+### Risks
+- over-specifying too early
+- leaving documents too abstract to guide actual implementation
+- failing to separate stable doctrine from editable planning artifacts
+
+### Notes
+This phase intentionally prioritizes structure over deep implementation.
+
+---
+
+## Phase 1 — Minimum Closed Loop
+### Objective
+Implement the smallest working path from task trigger to independently verified change proposal.
+
+### Scope
+- one trigger path
+- one normalized task request path
+- one agent control integration
+- one isolated execution runtime
+- one PR creation flow
+- one CI verification flow
+- one human review point
+
+### Deliverables
+- task intake adapter
+- normalized task request model
+- agent session starter
+- isolated worker runtime scaffold
+- branch/PR proposal path
+- CI workflow skeleton
+- traceable task lifecycle logging (minimal)
+
+### Entry Criteria
+- Phase 0 baseline completed
+- chosen first forge and runtime assumptions documented
+- ADRs written for first implementation target if needed
+
+### Exit Criteria
+- a supported task trigger can produce a bounded agent-run change proposal
+- CI validates the proposed change independently
+- human review remains the merge gate
+
+### Dependencies
+- task model definition
+- runtime isolation model
+- forge integration target
+- CI integration target
+
+### Risks
+- hidden coupling between intake and agent runtime
+- weak task normalization
+- CI treated as an afterthought instead of an independent boundary
+
+### Notes
+Keep the first closed loop narrow. Solve one path well before broad expansion.
+
+---
+
+## Phase 2 — Controlled Expansion
+### Objective
+Add breadth without collapsing system boundaries.
+
+### Scope
+- more task sources
+- richer policy packs
+- improved observability
+- stronger repository conventions
+- better error handling and retry behavior
+- initial governance tooling
+
+### Deliverables
+- more adapters
+- richer policy/context definition
+- lifecycle visibility and audit trail improvements
+- reusable task templates
+- failure classification and handling rules
+
+### Entry Criteria
+- Phase 1 closed loop is stable enough to demonstrate repeated use
+- key interfaces have held up through initial implementation
+
+### Exit Criteria
+- system supports more than one intake pattern or more than one supported work profile
+- governance and failure handling are explicit
+- replaceability assumptions remain intact
+
+### Dependencies
+- stable task request contract
+- stable agent/runtime handoff contract
+- logging and audit strategy
+
+### Risks
+- scaling ad hoc rules faster than architecture
+- expanding without strengthening policy boundaries
+- accidental platform coupling
+
+### Notes
+Expansion should be driven by clear value, not by feature accumulation.
+
+---
+
+## Phase 3 — Multi-source / Governance Evolution
+### Objective
+Evolve from a narrow closed loop into a platform with better governance, source diversity, and longer-term replaceability.
+
+### Scope
+- additional source systems
+- broader orchestration policies
+- stronger governance and audit structures
+- optional multi-agent or multi-profile support
+- stronger release handoff patterns
+
+### Deliverables
+- adapter abstraction maturity
+- governance model refinement
+- more formal policy store or policy representation
+- stronger approval and escalation patterns
+- broader lifecycle reporting
+
+### Entry Criteria
+- earlier phases proved useful in practice
+- major interface boundaries are stable enough to extend
+
+### Exit Criteria
+- the system can grow beyond a single path without losing control of architecture
+- governance is explicit and maintainable
+- component replacement paths are clearer and better tested
+
+### Dependencies
+- interface stability
+- policy model maturity
+- maintainable audit and review approach
+
+### Risks
+- governance sprawl
+- abstraction drift
+- replacing clarity with complexity
+
+### Notes
+This phase should only proceed when prior boundaries are understood and defended.
+
+---
+
+## Milestone Mapping
+| Milestone ID | Name | Related Phase | Output | Validation |
+|---|---|---|---|---|
+| M0 | Baseline Repository | Phase 0 | durable initialization docs and templates | document review and internal consistency |
+| M1 | First Closed Loop | Phase 1 | issue/event to PR proposal path | successful end-to-end dry run with independent CI |
+| M2 | Controlled Expansion Pack | Phase 2 | additional adapters and policy packs | repeated use without boundary collapse |
+| M3 | Governance Evolution | Phase 3 | stronger policy, audit, and source diversity | reviewable governance and maintainable extension model |
+
+## Open Questions
+- Which forge should be targeted first for the minimum closed loop?
+- How should policies be represented in the first implementation?
+- What observability is essential in phase 1 versus phase 2?
+
+## Change Log
+- 2026-04-13: Initial version

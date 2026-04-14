@@ -1,0 +1,84 @@
+# Operating Model
+
+## Purpose
+This document defines how humans and agents collaborate in this repository.
+
+## 1. Roles
+### Human Owner / Maintainer
+- approves direction
+- approves architecture-level changes
+- decides merge and release boundaries
+- resolves ambiguous goals and scope conflicts
+
+### Agent
+- reads repository guidance
+- proposes plans, updates documents, and implements bounded tasks
+- does not silently redefine architecture or governance
+- does not assume permanent authority over deployment or verification
+
+### CI System
+- validates builds, tests, lint, and other objective checks
+- acts as an independent verifier
+
+## 2. Work Sequence
+1. A task is proposed or triggered.
+2. Relevant documents are reviewed.
+3. The task is mapped to roadmap/WBS.
+4. If needed, an ADR is written or updated.
+5. The agent works within the allowed boundary.
+6. CI validates results.
+7. A human reviews and decides next action.
+
+## 3. Document Lifecycle
+### Documents that should change often
+- `docs/roadmap.md`
+- `docs/wbs.md`
+- task-specific implementation notes if later added
+
+### Documents that should change less often
+- `docs/project-overview.md`
+- `docs/architecture/*.md`
+- `docs/policies/*.md`
+
+### Documents that should change only on meaningful architecture decisions
+- `docs/decisions/*.md`
+
+## 4. When to Update What
+### Update roadmap when:
+- phase meaning changes
+- milestone scope changes
+- a new phase is introduced
+- a previously deferred capability is pulled forward
+
+### Update WBS when:
+- work items are created, split, merged, blocked, or completed
+- dependencies change
+- work ownership or deliverable meaning changes
+
+### Update ADRs when:
+- architecture boundaries shift
+- replaceability assumptions shift
+- governance or control-plane assumptions shift
+- verification or deployment ownership changes
+
+## 5. Human Approval Points
+Human approval is required before:
+- major scope expansion
+- architecture boundary changes
+- new durable policies
+- changes in source-of-truth ownership
+- deploy/release automation that affects production
+
+## 6. Agent Guardrails
+Agents should:
+- prefer explicit assumptions over silent inference
+- keep durable logic in repo documents where possible
+- not treat recent chat context as the only authority
+- not implement broad product features during planning phases
+
+## 7. Early-Phase Bias
+In early phases, prefer:
+- architecture clarity
+- interfaces over deep implementation
+- scaffolding over heavy integration
+- replaceable adapters over direct lock-in

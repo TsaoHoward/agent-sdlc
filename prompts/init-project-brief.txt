@@ -1,0 +1,25 @@
+Scan the repository first. Then improve the project baseline instead of building broad product functionality.
+
+Priority order:
+1. repo assessment
+2. assumptions and unknowns
+3. roadmap update
+4. WBS update
+5. architecture-boundary update
+6. ADR/policy update if needed
+7. only then minimal scaffolding
+
+Read:
+README.md
+AGENTS.md
+docs/project-overview.md
+docs/architecture/overview.md
+docs/architecture/task-lifecycle.md
+docs/roadmap.md
+docs/wbs.md
+docs/decisions/*.md
+docs/policies/*.md
+
+Keep forge, task gateway, policy, agent control, runtime, CI, and deploy clearly separated.
+Do not put durable policy only in prompts.
+Do not let CI or deploy collapse into the agent layer.
