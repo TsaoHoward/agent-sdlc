@@ -37,7 +37,7 @@ Changes that modify:
 - update roadmap and/or WBS
 - explain the reason for the planning shift
 - ensure roadmap and WBS still map correctly
-- update the decision backlog when the planning shift introduces, resolves, or narrows a meaningful decision item
+- update the decision backlog when the planning shift introduces, resolves, or narrows a meaningful major decision item
 
 ### Category C
 - write or update an ADR before implementation

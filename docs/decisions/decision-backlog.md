@@ -8,9 +8,14 @@
 - Source Template: docs/templates/decision-backlog.template.md
 
 ## Purpose
-This document is the durable dashboard for near-term decision items.
+This document is the durable dashboard for near-term major decision items.
 
-It is not an ADR. It tracks active, narrowed, recently selected, and deferred decisions so humans and AI agents can understand project state without relying on chat history.
+It is not an ADR. It tracks active, narrowed, recently selected, and deferred major decisions so humans and AI agents can understand project state without relying on chat history.
+
+## Decision Classification
+- include only major decisions here
+- keep detail decisions in supporting design or implementation notes
+- a major decision is one that blocks progress, affects architecture/governance/ownership/security/runtime/CI/deploy assumptions, or materially changes feature/workflow implementation
 
 ## Status Model
 - `Open`
@@ -25,34 +30,17 @@ It is not an ADR. It tracks active, narrowed, recently selected, and deferred de
 - keep only active or near-term items in this document
 - move `Promoted To ADR` or `Closed` items out at the next document maintenance pass
 - record moved-out items in `docs/decisions/decision-archive.md` when a lightweight history entry is still useful
+- move detail-only items out when they no longer qualify as major dashboard items
 
 ## Dashboard
 | Decision ID | Title | Status | Related Docs / WBS | Next Action |
 |---|---|---|---|---|
-| D-001 | First Gitea Trigger Path | Decided | WBS 3.1, task-intake-contract | define exact issue comment command syntax |
 | D-002 | Minimum Machine-Readable Policy Schema | Decided | WBS 2.1, policy-representation | define exact field schema for first policy files |
 | D-003 | Agent Control Integration Plan | Decided | WBS 2.2, agent-control-integration-plan | choose concrete session-starter interface shape |
 | D-004 | PR And CI Path Definition | Decided | WBS 2.4, pr-and-ci-path-definition | define exact PR body and CI trigger conventions |
 | D-006 | Traceability Display Strategy | Decided | WBS 2.5, lifecycle-traceability-contract | define exact PR traceability block and metadata artifact format |
 
 ## Decision Items
-
-### D-001 — First Gitea Trigger Path
-- Status: Decided
-- Related Docs / WBS: WBS `3.1`, `docs/architecture/task-intake-contract.md`
-- Why It Matters: It defines the first adapter entry point and the first human trigger surface.
-- Background: The intake contract needs one explicit, auditable, low-ambiguity path for the first closed loop.
-- Candidate Directions:
-  Option A: issue comment command.
-  Option B: issue label trigger.
-  Option C: PR comment command.
-- Selected Direction: Option A - `Gitea issue comment command`
-- Remaining Detail Decisions:
-  exact command form;
-  membership/permission rule;
-  whether free-form instructions are allowed.
-- ADR Promotion Check: No, unless the trigger model changes ownership or routing assumptions.
-- Notes: The source-normalized task contract must remain adapter-owned, not Gitea-payload-owned.
 
 ### D-002 — Minimum Machine-Readable Policy Schema
 - Status: Decided
@@ -127,3 +115,6 @@ It is not an ADR. It tracks active, narrowed, recently selected, and deferred de
 - 2026-04-14: Initial version.
 - 2026-04-14: Standardized as a durable decision dashboard with status model, summary table, and structured decision items.
 - 2026-04-14: Added move-out rule and removed ADR-promoted items from the active dashboard.
+- 2026-04-14: Moved the resolved top-level trigger-family item out of the active dashboard and added D-007 for the remaining command-design decision.
+- 2026-04-14: Moved the decided D-007 trigger-design item out of the active dashboard and added D-008 for token and input-bound details.
+- 2026-04-14: Narrowed the active dashboard to major decisions only and moved D-008 out as a supporting design note.

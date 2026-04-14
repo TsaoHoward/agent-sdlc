@@ -56,18 +56,18 @@ Before coding:
 - identify the relevant WBS item(s)
 - confirm whether an ADR is required
 - confirm whether the change belongs to architecture, policy, or implementation
-- identify whether any open or newly discovered decision item must be added or updated in `docs/decisions/decision-backlog.md`
+- identify whether any open or newly discovered major decision item must be added or updated in `docs/decisions/decision-backlog.md`
 
 During coding:
 - avoid adding hidden coupling between layers
 - avoid silently changing operating assumptions
 - avoid placing durable policy only in prompt text
-- avoid leaving meaningful decision context only in chat when it affects future work
+- avoid leaving meaningful major decision context only in chat when it affects future work
 
 After coding:
 - update WBS item status
 - update roadmap if scope or milestone meaning changed
-- update `docs/decisions/decision-backlog.md` when decisions were discovered, narrowed, selected, deferred, or promoted
+- update `docs/decisions/decision-backlog.md` when major decisions were discovered, narrowed, selected, deferred, or promoted
 - move ADR-promoted or closed items out of the active decision backlog when they no longer need dashboard visibility
 - update architecture docs if boundaries changed
 - update or create ADRs for architecture-level shifts

@@ -13,13 +13,13 @@ Chat may summarize a decision or ask for input, but the repository is the durabl
 ## 2. Primary Decision Surfaces
 
 ### 2.1 Decision Backlog
-`docs/decisions/decision-backlog.md` is the primary dashboard for near-term decision items.
+`docs/decisions/decision-backlog.md` is the primary dashboard for near-term major decision items.
 
 Use it for:
-- open decisions
-- narrowed decisions with candidate directions
-- recently selected decisions not yet promoted into ADRs or other durable docs
-- deferred or blocked decision items
+- open major decisions
+- narrowed major decisions with candidate directions
+- recently selected major decisions not yet promoted into ADRs or other durable docs
+- deferred or blocked major decision items
 
 It should not become a permanent historical ledger.
 
@@ -37,6 +37,17 @@ Move it to:
 ### 2.1.2 Active Dashboard Rule
 The dashboard table in `docs/decisions/decision-backlog.md` should show only active or near-term items that still deserve operator attention.
 
+### 2.1.3 Classification Rule
+Use the active decision backlog only for major decisions.
+
+A decision is major when it materially:
+- blocks implementation progress
+- affects architecture, governance, ownership, security posture, runtime assumptions, CI, or deploy boundaries
+- changes whether or how an important feature/workflow can be implemented
+- needs explicit human choice among consequential alternatives
+
+If a decision is detail-level rather than major, document it in a supporting design note or implementation note instead of the active dashboard.
+
 ### 2.2 ADRs
 Use ADRs for accepted decisions that affect:
 - architecture boundaries
@@ -49,7 +60,7 @@ Use ADRs for accepted decisions that affect:
 When a decision is selected, related policies and design specs should be updated so the selected direction becomes operationally useful.
 
 ## 3. Required Decision Item Fields
-Each decision item in the backlog should include at least:
+Each major decision item in the backlog should include at least:
 - decision title
 - current status
 - why the decision matters
@@ -72,13 +83,17 @@ Use one of these statuses:
 `Promoted To ADR` and `Closed` are transition-end statuses and should usually trigger move-out from the active backlog.
 
 ## 5. Agent Workflow Requirements
-When an AI agent encounters a meaningful unresolved decision, the agent should:
+When an AI agent encounters a meaningful unresolved major decision, the agent should:
 1. add or update the item in `docs/decisions/decision-backlog.md`
 2. record the relevant context, options, and recommendation
 3. mark whether ADR promotion may be required
 4. update related docs after the user selects a direction
 
-Do not leave meaningful decision discovery only in chat if it affects future work.
+When an AI agent encounters a detail decision, the agent should:
+1. document it in the relevant supporting design note or implementation note
+2. avoid promoting it into the active backlog unless it becomes major or blocking
+
+Do not leave meaningful major decision discovery only in chat if it affects future work.
 
 ## 6. Human Workflow Guidance
 Humans may use the backlog as a dashboard to:
@@ -86,6 +101,8 @@ Humans may use the backlog as a dashboard to:
 - understand why a choice matters
 - choose among candidate directions
 - confirm what still needs a formal ADR
+
+Humans may use supporting design notes to inspect lower-level decisions without expanding the dashboard.
 
 ## 7. Decision Promotion Rule
 Promote a backlog item to an ADR when the selected direction changes:
@@ -106,6 +123,7 @@ A useful dashboard view should let a reader answer:
 - what needs ADR promotion
 
 If the dashboard starts reading like a historical ledger, items should be moved out.
+If the dashboard starts reading like a design notebook, detail decisions should be moved out as well.
 
 ## 9. Anti-Patterns
 Do not:
@@ -114,3 +132,4 @@ Do not:
 - leave decided directions unreflected in roadmap, WBS, policy, or design docs
 - let the backlog become an unstructured scratchpad
 - keep promoted or closed items in the active dashboard indefinitely
+- put low-level detail decisions into the active dashboard when they do not materially affect progress or architecture

@@ -103,6 +103,15 @@ Why this path was chosen:
 - lower ambiguity than passive label-driven execution
 - easier auditability for the first closed loop
 
+Recommended first comment form:
+
+```text
+@agent run <task-class>
+summary: <short human intent>
+```
+
+The `summary:` line should remain bounded in length and should not become an unbounded multi-line prompt surface.
+
 ## 9. Policy Resolution Requirements
 Before the task request is accepted for execution, the task gateway must resolve:
 - `task_class`
@@ -120,6 +129,7 @@ The task gateway must reject or escalate when:
 - the request exceeds the selected execution profile
 - the request implies architecture, policy, security-sensitive, or deploy authority without approval
 - policy lookup fails in a way that prevents a safe decision
+- the issue comment command exceeds the allowed bounded summary format for the selected trigger contract
 
 ## 11. Traceability Requirements
 The normalized task request must seed downstream traceability by carrying:
@@ -139,6 +149,7 @@ A practical first-phase approach is:
 - carry `task_request_id` into proposal, CI, and review surfaces
 
 ## 13. Open Questions
-- what exact issue-comment command syntax should Gitea use first?
+- what exact user-facing task-class tokens should the first command support?
+- what exact maximum length should apply to `summary:`?
 - should `repository_ref` be forge-local only or include a globally unique namespaced form?
 - when source events lack a stable event ID, which adapter-generated fallback ID format should be used?

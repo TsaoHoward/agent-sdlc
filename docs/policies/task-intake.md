@@ -15,6 +15,9 @@ Possible sources include:
 - PR comments
 - explicit task submissions from later adapters
 
+For the first Gitea trigger path, the preferred source is:
+- issue comment command using a bounded mention-style command format
+
 ## 3. Minimum Required Task Metadata
 A normalized task request should include at least:
 - source system
@@ -25,6 +28,11 @@ A normalized task request should include at least:
 - allowed execution profile or capability set
 - relevant branch context
 - links to applicable policy/context references
+
+If the task was triggered by a bounded comment command, intake should also preserve:
+- the recognized command form
+- the parsed task class token
+- the bounded summary text when present
 
 ## 4. Early-Phase Task Classes
 Suggested early task classes:
@@ -41,6 +49,7 @@ Reject or escalate when:
 - the requested action exceeds allowed capability boundaries
 - the task would bypass required human approval
 - the request implies direct production deployment authority without explicit approval model
+- the issue comment command exceeds the allowed bounded free-form format
 
 ## 6. Approval Guidance
 ### Can proceed automatically in early phases

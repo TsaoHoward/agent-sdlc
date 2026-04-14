@@ -62,12 +62,13 @@ This document defines how humans and agents collaborate in this repository.
 - verification or deployment ownership changes
 
 ### Update decision backlog when:
-- a meaningful unresolved decision is discovered
-- candidate directions are narrowed
-- a direction is selected but not yet promoted to ADR
+- a meaningful unresolved major decision is discovered
+- candidate directions for a major decision are narrowed
+- a major direction is selected but not yet promoted to ADR
 - a backlog item is promoted to ADR, deferred, or closed
 
 When a backlog item is promoted to ADR or fully closed, move it out of the active dashboard so the backlog stays current-state oriented.
+Keep detail decisions in supporting design or implementation notes unless they become major or blocking.
 
 ## 5. Human Approval Points
 Human approval is required before:

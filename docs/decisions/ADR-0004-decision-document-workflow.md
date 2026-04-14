@@ -17,12 +17,33 @@ The project needs a durable decision-management workflow that works for both hum
 ## Decision
 The repository will standardize on a decision-document workflow with these rules:
 
-1. `docs/decisions/decision-backlog.md` is the durable dashboard for active near-term decision items.
+1. `docs/decisions/decision-backlog.md` is the durable dashboard for active near-term major decision items.
 2. New or changed decision items should be added or updated in repository docs, not only described in chat.
-3. Each decision item should follow a standard structure and status model.
-4. When a decision changes architecture, source-of-truth ownership, runtime isolation assumptions, CI ownership, deploy ownership, or cross-cutting governance, it must be promoted to an ADR.
-5. Promoted or fully closed items should be moved out of the active decision backlog so the dashboard remains concise.
-6. AI agents should update the decision backlog as part of normal work when they encounter unresolved decisions, newly narrowed options, or selected directions.
+3. Only major decisions should enter the active decision backlog.
+4. Detail decisions may be implemented and documented in supporting design notes or implementation notes without occupying the active dashboard.
+5. Each decision item should follow a standard structure and status model.
+6. When a decision changes architecture, source-of-truth ownership, runtime isolation assumptions, CI ownership, deploy ownership, or cross-cutting governance, it must be promoted to an ADR.
+7. Promoted or fully closed items should be moved out of the active decision backlog so the dashboard remains concise.
+8. AI agents should update the decision backlog as part of normal work when they encounter unresolved major decisions, newly narrowed major options, or selected major directions.
+
+## Decision Classification Rule
+
+### Major Decision
+A decision belongs in the active backlog when it materially does one or more of the following:
+- blocks or meaningfully gates implementation progress
+- affects architecture boundaries or durable ownership
+- affects governance, policy, security posture, runtime assumptions, CI ownership, or deploy ownership
+- materially changes whether a feature or workflow can be implemented, or how it fundamentally works
+- requires explicit human selection among consequential directions
+
+### Detail Decision
+A decision should usually stay out of the active backlog when it is primarily:
+- a field-level or syntax-level refinement inside an already chosen approach
+- an implementation-facing parameter choice
+- a naming, formatting, or low-level validation detail
+- a detail that can be safely documented and revisited later without blocking major progress
+
+Detail decisions should still be documented, but in supporting design docs rather than the dashboard.
 
 ## Rationale
 
@@ -35,6 +56,11 @@ The repository will standardize on a decision-document workflow with these rules
 - prevents the dashboard from becoming a permanent dumping ground
 - keeps attention on active or near-term choices
 - lets ADRs and archival references own resolved history
+
+### Why Classification Is Required
+- prevents low-level detail from flooding the dashboard
+- keeps the backlog useful as an operator-facing overview
+- lets humans and AI distinguish between true blockers and normal design elaboration
 
 ### Why Standardized Status and Structure
 - keeps decision progress legible
