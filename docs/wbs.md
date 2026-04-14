@@ -107,8 +107,8 @@
 - Deliverable: design-level contracts and path definitions
 - Dependencies: 1
 - Critical-Path-Candidate: Yes
-- Status: In Progress
-- Notes:
+- Status: Done
+- Notes: Phase 1 design baseline now includes task intake, runtime isolation, agent-control integration, PR/CI path, and lifecycle traceability.
 
 ### WBS 2.1 — Task Intake Contract
 - Parent: 2
@@ -127,8 +127,8 @@
 - Deliverable: control-plane interface plan
 - Dependencies: 2.1
 - Critical-Path-Candidate: Yes
-- Status: Not Started
-- Notes:
+- Status: Done
+- Notes: Spec is documented in `docs/architecture/agent-control-integration-plan.md`.
 
 ### WBS 2.3 — Execution Isolation Plan
 - Parent: 2
@@ -147,8 +147,8 @@
 - Deliverable: PR/CI path definition
 - Dependencies: 2.2, 2.3
 - Critical-Path-Candidate: Yes
-- Status: Not Started
-- Notes:
+- Status: Done
+- Notes: Spec is documented in `docs/architecture/pr-and-ci-path-definition.md`.
 
 ### WBS 2.5 — Lifecycle Traceability Contract
 - Parent: 2
@@ -355,11 +355,12 @@
 - 3.6
 
 ## Open Questions
-- Which Gitea event path should be assumed first in phase 1?
-- What minimum machine-readable policy schema should be used first?
+- What exact issue comment command syntax should be used first in phase 1?
+- What exact field schema should the first machine-readable policy files use?
 - What is the smallest sufficient CI policy for first-loop validation?
 
 ## Change Log
 - 2026-04-13: Initial version
 - 2026-04-14: Marked phase-0 baseline items done and added explicit phase-1 traceability planning work.
 - 2026-04-14: Marked runtime isolation strategy as designed and aligned phase-1 assumptions to ADR-0002.
+- 2026-04-14: Marked agent control and PR/CI design items done and aligned remaining open questions to implementation detail.

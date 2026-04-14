@@ -15,10 +15,14 @@ Before planning or implementation, read these files in order:
 5. `docs/architecture/task-lifecycle.md`
 6. `docs/architecture/policy-representation.md`
 7. `docs/architecture/runtime-isolation.md`
-8. `docs/roadmap.md`
-9. `docs/wbs.md`
-10. `docs/decisions/*.md`
-11. `docs/policies/*.md`
+8. `docs/architecture/task-intake-contract.md`
+9. `docs/architecture/agent-control-integration-plan.md`
+10. `docs/architecture/pr-and-ci-path-definition.md`
+11. `docs/architecture/lifecycle-traceability-contract.md`
+12. `docs/roadmap.md`
+13. `docs/wbs.md`
+14. `docs/decisions/*.md`
+15. `docs/policies/*.md`
 
 ## Core Working Rules
 1. Plan before implementation.

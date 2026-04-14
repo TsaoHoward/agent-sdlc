@@ -14,10 +14,14 @@ Before doing anything substantial, read in this order:
 6. `docs/architecture/task-lifecycle.md`
 7. `docs/architecture/policy-representation.md`
 8. `docs/architecture/runtime-isolation.md`
-9. `docs/roadmap.md`
-10. `docs/wbs.md`
-11. `docs/decisions/*.md`
-12. `docs/policies/*.md`
+9. `docs/architecture/task-intake-contract.md`
+10. `docs/architecture/agent-control-integration-plan.md`
+11. `docs/architecture/pr-and-ci-path-definition.md`
+12. `docs/architecture/lifecycle-traceability-contract.md`
+13. `docs/roadmap.md`
+14. `docs/wbs.md`
+15. `docs/decisions/*.md`
+16. `docs/policies/*.md`
 
 ## Your Immediate Goal
 Strengthen or initialize the repository baseline for an **agent-oriented SDLC system** whose target experience is:

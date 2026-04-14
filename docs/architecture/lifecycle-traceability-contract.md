@@ -126,13 +126,22 @@ The minimum viable persistence model is:
 - review decision reference preserved in the forge review surface
 
 ## 8. First-Phase Display Surfaces
+Phase 1 uses:
+- PR body summary for reviewer-facing traceability
+- linked metadata artifact for machine-readable detail
+
 The first closed loop should make it practical for a reviewer to recover:
 - what source event started the work
 - which task request was accepted
 - which agent session produced the proposal
 - which CI run verified it
 
-A practical first-phase approach is to include `task_request_id` and `agent_session_id` in proposal text or machine-readable metadata linked from the proposal.
+The PR body should show at least:
+- `task_request_id`
+- `agent_session_id`
+- source issue or PR reference when applicable
+
+The linked metadata artifact may carry fuller machine-readable linkage.
 
 ## 9. Failure Handling Rule
 If a downstream record cannot link back to its required upstream reference, the system should treat that state as degraded traceability and either:

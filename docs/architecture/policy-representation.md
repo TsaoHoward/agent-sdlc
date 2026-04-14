@@ -84,6 +84,12 @@ The Phase 1 repository layout should reserve:
 
 The machine-readable layer should be versioned in the same repository as the code and docs it governs.
 
+Phase 1 chooses a split-by-policy-unit layout. A practical first layout is:
+- `config/policy/task-classes.yaml`
+- `config/policy/execution-profiles.yaml`
+- `config/policy/approval-rules.yaml`
+- `config/policy/runtime-capability-sets.yaml`
+
 ## 8. Enforcement Points
 
 ### Task Gateway
@@ -105,6 +111,6 @@ Changes to policy representation should be handled as follows:
 - changes to policy ownership or source-of-truth model require ADR review
 
 ## 10. Open Questions
-- what is the minimum viable schema for `config/policy/`?
+- what exact field schema should each Phase 1 policy file use?
 - which rules should remain doc-only in Phase 1?
 - how much source-specific mapping belongs in config versus adapter code?

@@ -28,6 +28,11 @@
 - The first forge target for Phase 1 is Gitea.
 - The first policy representation uses docs plus machine-readable repository config.
 - The early execution runtime uses isolated ephemeral containers.
+- The first trigger path is a Gitea issue comment command.
+- The first machine-readable policy layout is split by policy unit.
+- The first agent control integration uses a direct session starter interface.
+- The first PR path creates the branch and PR immediately.
+- The first traceability display uses a PR body summary plus linked metadata artifact.
 - CI remains independent and outside the agent control plane.
 - Human review remains a required merge control point.
 
@@ -232,12 +237,13 @@ This phase should only proceed when prior boundaries are understood and defended
 | M3 | Governance Evolution | Phase 3 | stronger policy, audit, and source diversity | reviewable governance and maintainable extension model |
 
 ## Open Questions
-- Which Gitea event path should be implemented first for the minimum closed loop?
-- What is the minimum viable machine-readable policy schema for `config/policy/`?
+- What exact issue comment command syntax should Gitea use first?
+- What exact field schema should the first `config/policy/` files use?
 - What observability is essential in phase 1 versus phase 2?
-- What exact network and secret allowances are needed by the first runtime profile?
+- What exact secret model and future egress-tightening plan should apply to the first runtime profile?
 
 ## Change Log
 - 2026-04-13: Initial version
 - 2026-04-14: Refined baseline planning to externalize execution profiles and lifecycle traceability expectations.
 - 2026-04-14: Documented first-target assumptions for Gitea, policy representation, and runtime isolation.
+- 2026-04-14: Recorded selected Phase 1 directions for trigger path, policy layout, agent control, PR path, runtime egress, and traceability display.

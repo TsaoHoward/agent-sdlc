@@ -94,11 +94,11 @@ The adapter may support multiple Gitea events over time, but the normalized cont
 - `pull_request_comment`
 - `manual_submission`
 
-### Recommended First Trigger Path
-For Phase 1, the recommended first executable trigger path is:
+### First Trigger Path
+For Phase 1, the first executable trigger path is:
 - `Gitea issue comment command -> normalized task request`
 
-Reason:
+Why this path was chosen:
 - explicit human intent
 - lower ambiguity than passive label-driven execution
 - easier auditability for the first closed loop

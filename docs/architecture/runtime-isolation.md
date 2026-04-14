@@ -40,9 +40,10 @@ This means:
 - do not grant runtime access beyond the selected capability set
 
 ### 4.4 Network Model
-- restricted by default
-- allow only the network paths needed for the supported workflow
-- do not assume unrestricted access to internal or production systems
+- the long-term preferred posture is explicit and narrower egress
+- the initial Phase 1 implementation default uses broad egress for simplicity
+- do not treat broad egress as equivalent to broad secret access
+- do not assume unrestricted access to internal or production systems is acceptable long term
 
 ### 4.5 Secret Model
 - inject only the minimum secrets required for the selected workflow
@@ -81,9 +82,11 @@ Unless a later decision overrides them, Phase 1 should assume:
 - containerized worker
 - non-root execution
 - session-local checkout
-- restricted egress
+- broad egress for the initial implementation profile
 - minimal secret injection
 - explicit artifact export
+
+See also: `docs/decisions/ADR-0003-phase1-runtime-egress-and-secret-defaults.md`
 
 ## 7. Open Questions
 - which container runner should be used first?
