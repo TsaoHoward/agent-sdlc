@@ -71,6 +71,8 @@ This layer should remain under project control and should not be irreversibly co
 **Key design requirement**
 Durable policy should not exist only in ephemeral prompts.
 
+See also: `docs/architecture/policy-representation.md`
+
 ### 2.4 Agent Control Plane Layer
 **Responsibilities**
 - start agent sessions
@@ -102,6 +104,8 @@ This layer may use a specific agent product initially, but its responsibility sh
 
 **Key design requirement**
 Runtime should be isolated from the host environment by default.
+
+See also: `docs/architecture/runtime-isolation.md`
 
 ### 2.6 Verification / CI Layer
 **Responsibilities**

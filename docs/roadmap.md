@@ -25,8 +25,9 @@
 - Direct production deployment by the agent runtime.
 
 ### Current Assumptions
-- The initial implementation will likely start with a single forge target.
-- The early execution runtime will likely use isolated containers.
+- The first forge target for Phase 1 is Gitea.
+- The first policy representation uses docs plus machine-readable repository config.
+- The early execution runtime uses isolated ephemeral containers.
 - CI remains independent and outside the agent control plane.
 - Human review remains a required merge control point.
 
@@ -110,7 +111,7 @@ Implement the smallest working path from task trigger to independently verified 
 
 ### Entry Criteria
 - Phase 0 baseline completed
-- chosen first forge and runtime assumptions documented
+- chosen first forge, policy, and runtime assumptions documented
 - ADRs written for first implementation target if needed
 
 ### Exit Criteria
@@ -123,7 +124,7 @@ Implement the smallest working path from task trigger to independently verified 
 - execution-profile policy definition
 - traceability contract
 - runtime isolation model
-- forge integration target
+- forge integration target documentation
 - CI integration target
 
 ### Risks
@@ -231,10 +232,12 @@ This phase should only proceed when prior boundaries are understood and defended
 | M3 | Governance Evolution | Phase 3 | stronger policy, audit, and source diversity | reviewable governance and maintainable extension model |
 
 ## Open Questions
-- Which forge should be targeted first for the minimum closed loop?
-- How should policies be represented in the first implementation?
+- Which Gitea event path should be implemented first for the minimum closed loop?
+- What is the minimum viable machine-readable policy schema for `config/policy/`?
 - What observability is essential in phase 1 versus phase 2?
+- What exact network and secret allowances are needed by the first runtime profile?
 
 ## Change Log
 - 2026-04-13: Initial version
 - 2026-04-14: Refined baseline planning to externalize execution profiles and lifecycle traceability expectations.
+- 2026-04-14: Documented first-target assumptions for Gitea, policy representation, and runtime isolation.

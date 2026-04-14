@@ -107,7 +107,7 @@
 - Deliverable: design-level contracts and path definitions
 - Dependencies: 1
 - Critical-Path-Candidate: Yes
-- Status: Not Started
+- Status: In Progress
 - Notes:
 
 ### WBS 2.1 — Task Intake Contract
@@ -117,8 +117,8 @@
 - Deliverable: task request schema/spec with policy references and execution-profile linkage
 - Dependencies: 1.3, 1.4
 - Critical-Path-Candidate: Yes
-- Status: Not Started
-- Notes:
+- Status: Done
+- Notes: Spec is documented in `docs/architecture/task-intake-contract.md` and aligned to ADR-0002.
 
 ### WBS 2.2 — Agent Control Integration Plan
 - Parent: 2
@@ -137,8 +137,8 @@
 - Deliverable: runtime isolation design
 - Dependencies: 2.1
 - Critical-Path-Candidate: Yes
-- Status: Not Started
-- Notes:
+- Status: Done
+- Notes: First-phase runtime isolation strategy is documented in ADR-0002 and `docs/architecture/runtime-isolation.md`.
 
 ### WBS 2.4 — PR and CI Path Definition
 - Parent: 2
@@ -157,8 +157,8 @@
 - Deliverable: cross-layer traceability contract
 - Dependencies: 2.1, 2.2, 2.4
 - Critical-Path-Candidate: Yes
-- Status: Not Started
-- Notes:
+- Status: Done
+- Notes: Spec is documented in `docs/architecture/lifecycle-traceability-contract.md`.
 
 ### WBS 3 — Minimum Closed Loop Implementation
 - Parent:
@@ -355,10 +355,11 @@
 - 3.6
 
 ## Open Questions
-- Which first forge target should be assumed in phase 1?
-- Which runtime isolation method should be used first?
+- Which Gitea event path should be assumed first in phase 1?
+- What minimum machine-readable policy schema should be used first?
 - What is the smallest sufficient CI policy for first-loop validation?
 
 ## Change Log
 - 2026-04-13: Initial version
 - 2026-04-14: Marked phase-0 baseline items done and added explicit phase-1 traceability planning work.
+- 2026-04-14: Marked runtime isolation strategy as designed and aligned phase-1 assumptions to ADR-0002.

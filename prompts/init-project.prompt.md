@@ -12,10 +12,12 @@ Before doing anything substantial, read in this order:
 4. `docs/operating-model.md`
 5. `docs/architecture/overview.md`
 6. `docs/architecture/task-lifecycle.md`
-7. `docs/roadmap.md`
-8. `docs/wbs.md`
-9. `docs/decisions/*.md`
-10. `docs/policies/*.md`
+7. `docs/architecture/policy-representation.md`
+8. `docs/architecture/runtime-isolation.md`
+9. `docs/roadmap.md`
+10. `docs/wbs.md`
+11. `docs/decisions/*.md`
+12. `docs/policies/*.md`
 
 ## Your Immediate Goal
 Strengthen or initialize the repository baseline for an **agent-oriented SDLC system** whose target experience is:
