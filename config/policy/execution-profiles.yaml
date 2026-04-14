@@ -1,0 +1,35 @@
+version: 1
+executionProfiles:
+  - id: documentation-safe
+    description: Documentation-safe edits and low-risk repository-local checks.
+    taskClassIds:
+      - documentation_update
+    runtimeCapabilitySetId: docs-safe
+    approvalRuleId: auto-documentation-safe
+    policyRefs:
+      - docs/policies/task-intake.md
+  - id: bounded-change
+    description: Small scoped code, config, or documentation changes within approved project boundaries.
+    taskClassIds:
+      - bounded_code_change
+      - review_follow_up
+    runtimeCapabilitySetId: bounded-change
+    approvalRuleId: auto-bounded-change
+    policyRefs:
+      - docs/policies/task-intake.md
+  - id: investigation-only
+    description: Evidence gathering, reproduction, and CI-failure analysis without broad durable changes.
+    taskClassIds:
+      - ci_failure_investigation
+    runtimeCapabilitySetId: investigation-only
+    approvalRuleId: auto-investigation
+    policyRefs:
+      - docs/policies/task-intake.md
+  - id: escalation-required
+    description: Tasks that require human approval before execution beyond assessment.
+    taskClassIds:
+      - unsafe_or_high_risk
+    runtimeCapabilitySetId: escalation-hold
+    approvalRuleId: explicit-escalation
+    policyRefs:
+      - docs/policies/task-intake.md

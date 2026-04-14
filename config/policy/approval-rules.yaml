@@ -1,0 +1,50 @@
+version: 1
+approvalRules:
+  - id: auto-documentation-safe
+    description: Auto-approve low-risk documentation and planning work.
+    defaultApprovalState: auto-approved
+    escalateOn:
+      - architecture_change
+      - policy_change
+      - deployment_change
+      - secret_handling_change
+    rejectOn: []
+    policyRefs:
+      - docs/policies/task-intake.md
+  - id: auto-bounded-change
+    description: Auto-approve bounded implementation work that stays within approved scope.
+    defaultApprovalState: auto-approved
+    escalateOn:
+      - architecture_change
+      - policy_change
+      - deployment_change
+      - security_sensitive_change
+      - boundary_expansion
+    rejectOn: []
+    policyRefs:
+      - docs/policies/task-intake.md
+  - id: auto-investigation
+    description: Auto-approve bounded investigation work when it stays within the investigation profile.
+    defaultApprovalState: auto-approved
+    escalateOn:
+      - durable_code_change_requested
+      - secret_handling_change
+      - deployment_change
+    rejectOn: []
+    policyRefs:
+      - docs/policies/task-intake.md
+  - id: explicit-escalation
+    description: Require explicit human approval or reject unsafe requests before execution.
+    defaultApprovalState: approval-required
+    escalateOn:
+      - architecture_change
+      - policy_change
+      - deployment_change
+      - security_sensitive_change
+      - secret_handling_change
+      - boundary_expansion
+    rejectOn:
+      - unsupported_task_class
+      - malformed_command
+    policyRefs:
+      - docs/policies/task-intake.md

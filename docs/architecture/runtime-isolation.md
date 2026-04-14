@@ -86,9 +86,14 @@ Unless a later decision overrides them, Phase 1 should assume:
 - minimal secret injection
 - explicit artifact export
 
+Recommended concrete defaults for the first implementation are:
+- first runner: local Docker-compatible container runner invoked from the orchestration host
+- no dependency cache mounts in Phase 1; prefer clean session-local dependency installation over shared mutable caches
+- no destination allowlist in the initial implementation profile; broad egress remains a temporary default under ADR-0003
+- review before Phase 2 or before enabling broader task classes should decide whether destination allowlists or read-only caches are introduced
+
 See also: `docs/decisions/ADR-0003-phase1-runtime-egress-and-secret-defaults.md`
 
-## 7. Open Questions
-- which container runner should be used first?
-- what exact network destinations must be allowed for the first closed loop?
-- how should dependency caching be handled without weakening isolation too far?
+## 7. Future Evolution Questions
+- when should the first runner move from host-local container execution to a remote worker model?
+- what narrower egress and caching controls should be introduced after the first closed loop is stable?

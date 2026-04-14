@@ -46,10 +46,29 @@ The PR body should show at least:
 
 The linked metadata artifact may carry fuller machine-readable fields, including CI linkage.
 
+### 5.1 Concrete Proposal Conventions
+The first proposal path should use these conventions:
+- branch name: `agent/<task_request_id>`
+- PR title: `agent: <summary-or-derived-task-label>`
+- append source issue reference in the title when available, for example `agent: refresh architecture wording (#123)`
+- PR body should include a dedicated `## Agent Traceability` block before the free-form rationale
+- the linked metadata artifact should be committed in the proposal branch at `.agent-sdlc/traceability/<task_request_id>.json`
+
 ## 6. CI Trigger Rule
 CI should run from the proposal path and remain independent of agent-owned local checks.
 
 Local runtime checks may still run, but they do not replace CI as the decision-quality verifier.
+
+The first CI trigger should run on:
+- PR open
+- PR update / synchronize
+- PR reopen
+
+The smallest sufficient Phase 1 CI policy is:
+- every agent-opened PR must have at least one required CI workflow attached to the PR head
+- that workflow must publish an objective pass/fail result in the PR surface
+- the workflow should run the repository-local verification appropriate to the selected execution profile
+- merge should remain blocked when the required CI result is missing, pending, or failing
 
 ## 7. Branch And PR Responsibilities
 
@@ -75,7 +94,5 @@ If CI fails:
 - the PR remains the review surface
 - the result should be visible without requiring hidden runtime logs
 
-## 9. Open Questions
-- what exact PR title and body conventions should Phase 1 use?
-- should the first CI trigger run on PR open only, or also on updates?
-- where should the linked metadata artifact be stored and referenced from?
+## 9. Future Evolution Questions
+- when should CI attach richer artifact links or structured annotations beyond the PR body traceability block?

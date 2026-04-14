@@ -1,0 +1,65 @@
+version: 1
+commandContract:
+  mention: "@agent"
+  verb: run
+  tokenCase: case-insensitive
+  maxSummaryLength: 280
+  rejectUnsupportedFields: true
+taskClasses:
+  - id: documentation_update
+    description: Documentation, planning, prompt, or repository-guidance updates.
+    commandTokens:
+      - docs
+    summaryRequired: false
+    allowedSourceEventTypes:
+      - issue_comment
+    defaultExecutionProfileId: documentation-safe
+    approvalRuleId: auto-documentation-safe
+    policyRefs:
+      - docs/policies/task-intake.md
+  - id: bounded_code_change
+    description: Small code, config, or scoped documentation changes within approved scope.
+    commandTokens:
+      - code
+    summaryRequired: true
+    allowedSourceEventTypes:
+      - issue_comment
+    defaultExecutionProfileId: bounded-change
+    approvalRuleId: auto-bounded-change
+    policyRefs:
+      - docs/policies/task-intake.md
+  - id: review_follow_up
+    description: Follow-up changes requested through an existing review conversation.
+    commandTokens:
+      - review
+    summaryRequired: false
+    allowedSourceEventTypes:
+      - issue_comment
+    defaultExecutionProfileId: bounded-change
+    approvalRuleId: auto-bounded-change
+    policyRefs:
+      - docs/policies/task-intake.md
+  - id: ci_failure_investigation
+    description: Reproduction and investigation work for a CI failure or verification problem.
+    commandTokens:
+      - ci
+    summaryRequired: true
+    allowedSourceEventTypes:
+      - issue_comment
+    defaultExecutionProfileId: investigation-only
+    approvalRuleId: auto-investigation
+    policyRefs:
+      - docs/policies/task-intake.md
+  - id: unsafe_or_high_risk
+    description: Internal classification outcome for tasks that require rejection or escalation.
+    commandTokens: []
+    summaryRequired: false
+    allowedSourceEventTypes:
+      - issue_comment
+      - issue_label
+      - pull_request_comment
+      - manual_submission
+    defaultExecutionProfileId: escalation-required
+    approvalRuleId: explicit-escalation
+    policyRefs:
+      - docs/policies/task-intake.md

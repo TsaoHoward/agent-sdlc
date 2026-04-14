@@ -18,6 +18,20 @@ Possible sources include:
 For the first Gitea trigger path, the preferred source is:
 - issue comment command using a bounded mention-style command format
 
+The Phase 1 issue comment command contract is:
+
+```text
+@agent run <task-token>
+summary: <short human intent>
+```
+
+With these defaults:
+- `<task-token>` is case-insensitive and must normalize to one of `docs`, `code`, `review`, or `ci`
+- `summary:` is required for `code` and `ci`
+- `summary:` is optional for `docs` and `review`
+- `summary:` must be at most 280 characters when present
+- unsupported extra fields cause rejection with visible guidance rather than partial execution
+
 ## 3. Minimum Required Task Metadata
 A normalized task request should include at least:
 - source system
@@ -69,20 +83,24 @@ Reject or escalate when:
 - intended for documentation, planning, prompt, and repository-guidance updates
 - may edit durable text artifacts and run low-risk repository-local checks
 - should not modify deploy/release paths, secret-handling behavior, or system boundaries
+- machine-readable ID: `documentation-safe`
 
 ### Profile B - Bounded Change
 - intended for small code, config, or documentation changes inside approved roadmap/WBS scope
 - may use the allowed repository-local verification commands for the task
 - should not change architecture boundaries, policy ownership, CI ownership, or deploy authority without escalation
+- machine-readable ID: `bounded-change`
 
 ### Profile C - Investigation Only
 - intended for reproduction, inspection, CI-failure investigation, and evidence gathering
 - may collect logs, produce analysis, and propose next steps
 - should avoid durable code changes unless a follow-up task explicitly allows them
+- machine-readable ID: `investigation-only`
 
 ### Profile D - Escalation Required
 - used when the task touches architecture, policy, security-sensitive behavior, secrets, deployment/release, or boundary expansion
 - should stop before execution beyond assessment until explicit human approval exists
+- machine-readable ID: `escalation-required`
 
 ## 8. Routing Guidance
 Task intake should decide:

@@ -25,6 +25,8 @@ The repository will standardize on a decision-document workflow with these rules
 6. When a decision changes architecture, source-of-truth ownership, runtime isolation assumptions, CI ownership, deploy ownership, or cross-cutting governance, it must be promoted to an ADR.
 7. Promoted or fully closed items should be moved out of the active decision backlog so the dashboard remains concise.
 8. AI agents should update the decision backlog as part of normal work when they encounter unresolved major decisions, newly narrowed major options, or selected major directions.
+9. When a major or detail decision is selected in a backlog item or supporting note, the same change set must update every directly affected architecture, policy, roadmap, WBS, or supporting design document so stale open questions do not remain as if the decision were still unresolved.
+10. If a previously listed open question remains intentionally unresolved after a related document is updated, that document must explicitly narrow or restate the question rather than silently leaving the older wording in place.
 
 ## Decision Classification Rule
 
@@ -67,6 +69,11 @@ Detail decisions should still be documented, but in supporting design docs rathe
 - makes handoff easier
 - prevents each agent run from inventing its own decision format
 
+### Why Synchronized Write-Back Is Required
+- prevents supporting notes from drifting away from architecture or planning docs
+- keeps backlog and source docs aligned on what is still actually unresolved
+- reduces false blockers caused by stale open-question lists
+
 ### Why Promote Some Decisions to ADRs
 - preserves the distinction between pending choices and accepted durable decisions
 - avoids treating a backlog entry as equivalent to a ratified architectural decision
@@ -77,6 +84,7 @@ Detail decisions should still be documented, but in supporting design docs rathe
 - simpler AI/human collaboration flow
 - better visibility into blocked or pending items
 - stronger durable project memory
+- lower risk that design notes and planning docs drift out of sync
 
 ### Negative
 - more discipline is required during planning and implementation

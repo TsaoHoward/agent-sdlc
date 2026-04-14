@@ -120,10 +120,15 @@ Phase 1 does not require a single centralized traceability database.
 
 The minimum viable persistence model is:
 - source and proposal identifiers in Gitea
-- normalized task request artifact or structured metadata record produced by the task gateway
-- agent session metadata record produced by agent control
+- normalized task request record at `.agent-sdlc/state/task-requests/<task_request_id>.json`
+- agent session metadata record at `.agent-sdlc/state/agent-sessions/<agent_session_id>.json`
 - CI artifact or CI metadata carrying `task_request_id` and `proposal_ref`
 - review decision reference preserved in the forge review surface
+
+Task-request and session records should be retained for at least:
+- the lifetime of the open proposal, when a PR exists
+- 30 days after the final PR close or merge state
+- 30 days after session completion when no PR is created
 
 ## 8. First-Phase Display Surfaces
 Phase 1 uses:
@@ -143,6 +148,21 @@ The PR body should show at least:
 
 The linked metadata artifact may carry fuller machine-readable linkage.
 
+The recommended PR block format is:
+
+```markdown
+## Agent Traceability
+- Task Request: `<task_request_id>`
+- Agent Session: `<agent_session_id>`
+- Source: `<issue-or-pr-ref>`
+- Execution Profile: `<execution_profile_id>`
+- Runtime Capability Set: `<runtime_capability_set_id>`
+- Metadata: `.agent-sdlc/traceability/<task_request_id>.json`
+- CI: `pending` or `<ci_run_ref/link>`
+```
+
+`agent_session_id` should remain visible in the reviewer-facing block so a reviewer can correlate the PR with the session record without opening backend-only storage.
+
 ## 9. Failure Handling Rule
 If a downstream record cannot link back to its required upstream reference, the system should treat that state as degraded traceability and either:
 - fail closed for automated continuation, or
@@ -150,7 +170,5 @@ If a downstream record cannot link back to its required upstream reference, the 
 
 Silent unlinking is not acceptable.
 
-## 10. Open Questions
-- should the first proposal surface use PR body text, structured comment metadata, or an attached artifact for traceability fields?
-- should `agent_session_id` be visible directly to reviewers or only in linked metadata?
-- what minimum retention period should apply to task-request and session artifacts in Phase 1?
+## 10. Future Evolution Questions
+- when should the project promote traceability storage from file-backed records to a dedicated service or audit store?

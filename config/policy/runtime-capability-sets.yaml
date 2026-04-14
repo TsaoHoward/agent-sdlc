@@ -1,0 +1,67 @@
+version: 1
+runtimeCapabilitySets:
+  - id: docs-safe
+    description: Repository-write access for low-risk documentation updates.
+    filesystem:
+      mode: repo-write
+    network:
+      mode: broad-egress
+    secrets:
+      mode: none
+    git:
+      allowBranchPush: true
+      allowPrCreate: true
+    commandCategories:
+      - repo-local-low-risk
+    policyRefs:
+      - docs/architecture/runtime-isolation.md
+      - docs/decisions/ADR-0003-phase1-runtime-egress-and-secret-defaults.md
+  - id: bounded-change
+    description: Repository-write access for bounded code or config changes.
+    filesystem:
+      mode: repo-write
+    network:
+      mode: broad-egress
+    secrets:
+      mode: scoped
+    git:
+      allowBranchPush: true
+      allowPrCreate: true
+    commandCategories:
+      - repo-local-low-risk
+      - repo-local-build-test
+    policyRefs:
+      - docs/architecture/runtime-isolation.md
+      - docs/decisions/ADR-0003-phase1-runtime-egress-and-secret-defaults.md
+  - id: investigation-only
+    description: Read-oriented investigation with optional scoped verification commands.
+    filesystem:
+      mode: repo-write
+    network:
+      mode: broad-egress
+    secrets:
+      mode: scoped
+    git:
+      allowBranchPush: false
+      allowPrCreate: false
+    commandCategories:
+      - repo-read
+      - repo-local-build-test
+    policyRefs:
+      - docs/architecture/runtime-isolation.md
+      - docs/decisions/ADR-0003-phase1-runtime-egress-and-secret-defaults.md
+  - id: escalation-hold
+    description: No execution beyond assessment until explicit approval exists.
+    filesystem:
+      mode: read-only
+    network:
+      mode: none
+    secrets:
+      mode: none
+    git:
+      allowBranchPush: false
+      allowPrCreate: false
+    commandCategories:
+      - repo-read
+    policyRefs:
+      - docs/policies/task-intake.md

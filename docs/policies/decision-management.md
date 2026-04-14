@@ -59,6 +59,11 @@ Use ADRs for accepted decisions that affect:
 ### 2.3 Policies and Design Specs
 When a decision is selected, related policies and design specs should be updated so the selected direction becomes operationally useful.
 
+This write-back requirement also applies to:
+- architecture specs that still describe the item as open
+- roadmap or WBS open-question lists that still present the resolved item as unresolved
+- supporting notes that should now carry the concrete selected defaults
+
 ## 3. Required Decision Item Fields
 Each major decision item in the backlog should include at least:
 - decision title
@@ -92,6 +97,12 @@ When an AI agent encounters a meaningful unresolved major decision, the agent sh
 When an AI agent encounters a detail decision, the agent should:
 1. document it in the relevant supporting design note or implementation note
 2. avoid promoting it into the active backlog unless it becomes major or blocking
+
+When an AI agent records a selected direction in either a major-decision item or a detail note, the agent should:
+1. update the directly affected architecture, policy, roadmap, WBS, and supporting design docs in the same maintenance pass
+2. remove or narrow stale open-question bullets that the selected direction already resolved
+3. move the decision out of the active backlog when it no longer deserves operator attention
+4. leave an explicit note when a related question is intentionally still open
 
 Do not leave meaningful major decision discovery only in chat if it affects future work.
 
@@ -130,6 +141,7 @@ Do not:
 - keep important decision context only in chat
 - treat backlog notes as implicit ADR approval
 - leave decided directions unreflected in roadmap, WBS, policy, or design docs
+- let supporting design notes quietly diverge from the architecture or planning docs they refine
 - let the backlog become an unstructured scratchpad
 - keep promoted or closed items in the active dashboard indefinitely
 - put low-level detail decisions into the active dashboard when they do not materially affect progress or architecture

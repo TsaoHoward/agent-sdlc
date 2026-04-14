@@ -106,11 +106,30 @@ Why this path was chosen:
 Recommended first comment form:
 
 ```text
-@agent run <task-class>
+@agent run <task-token>
 summary: <short human intent>
 ```
 
 The `summary:` line should remain bounded in length and should not become an unbounded multi-line prompt surface.
+
+### Phase 1 Command Contract Defaults
+The first command contract uses these concrete defaults:
+- `<task-token>` is case-insensitive and must normalize to one of `docs`, `code`, `review`, or `ci`
+- token mapping is:
+  - `docs` -> `documentation_update`
+  - `code` -> `bounded_code_change`
+  - `review` -> `review_follow_up`
+  - `ci` -> `ci_failure_investigation`
+- `summary:` is required for `code` and `ci`
+- `summary:` is optional for `docs` and `review`
+- `summary:` must be at most 280 characters when present
+- unsupported extra fields cause rejection rather than partial parsing
+
+### Phase 1 Field Normalization Defaults
+For Phase 1, the task gateway should normalize these fields as follows:
+- `repository_ref` uses a namespaced forge form: `gitea:<forge-host>/<owner>/<repo>`
+- if the upstream source lacks a stable event identifier, `source_event_id` should use `generated:<source_system>:<source_event_type>:<hash>`
+- the `<hash>` should be computed from a canonical serialization of the available repository, scope, actor, command, and timestamp fields so retries derive the same fallback identifier from the same retained event evidence
 
 ## 9. Policy Resolution Requirements
 Before the task request is accepted for execution, the task gateway must resolve:
@@ -145,11 +164,5 @@ These references become the stable handoff point for agent control, proposal gen
 Phase 1 should preserve the normalized task request in a machine-readable record that can be referenced by downstream layers.
 
 A practical first-phase approach is:
-- store the normalized request as a session artifact or structured metadata record
+- store the normalized request at `.agent-sdlc/state/task-requests/<task_request_id>.json`
 - carry `task_request_id` into proposal, CI, and review surfaces
-
-## 13. Open Questions
-- what exact user-facing task-class tokens should the first command support?
-- what exact maximum length should apply to `summary:`?
-- should `repository_ref` be forge-local only or include a globally unique namespaced form?
-- when source events lack a stable event ID, which adapter-generated fallback ID format should be used?

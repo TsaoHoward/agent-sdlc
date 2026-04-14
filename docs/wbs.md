@@ -355,12 +355,11 @@
 - 3.6
 
 ## Open Questions
-- What exact issue comment command syntax should be used first in phase 1?
-- What exact field schema should the first machine-readable policy files use?
-- What is the smallest sufficient CI policy for first-loop validation?
+- No current WBS-level open questions block WBS 3 start.
 
 ## Change Log
 - 2026-04-13: Initial version
 - 2026-04-14: Marked phase-0 baseline items done and added explicit phase-1 traceability planning work.
 - 2026-04-14: Marked runtime isolation strategy as designed and aligned phase-1 assumptions to ADR-0002.
 - 2026-04-14: Marked agent control and PR/CI design items done and aligned remaining open questions to implementation detail.
+- 2026-04-14: Cleared the remaining WBS-level pre-implementation detail blockers after selecting the command contract, policy schema, and minimum CI policy defaults.

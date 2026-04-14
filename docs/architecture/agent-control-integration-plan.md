@@ -49,6 +49,20 @@ The session starter should return at least:
 - runtime handoff status or failure reason
 - timestamps for session start
 
+### 5.1 Concrete Phase 1 Starter Shape
+Phase 1 should use a CLI boundary for the direct session starter.
+
+Recommended form:
+
+```text
+agent-control start-session --task-request <path>
+```
+
+Where:
+- `<path>` points to `.agent-sdlc/state/task-requests/<task_request_id>.json`
+- the command reads the normalized task request and resolved policy references from that record
+- the command returns JSON to stdout with at least `agent_session_id`, `status`, `runtime_handoff_status`, and `session_record_path`
+
 ## 6. Minimum Session State Model
 Phase 1 should track at least these session states:
 - `pending`
@@ -79,6 +93,18 @@ Phase 1 should preserve a machine-readable session record that includes:
 
 This record does not require a separate service database in Phase 1, but it must survive beyond in-memory runtime state.
 
+The recommended Phase 1 storage path is:
+- `.agent-sdlc/state/agent-sessions/<agent_session_id>.json`
+
+The minimum failure taxonomy preserved in that record should include:
+- `policy_resolution_failed`
+- `context_assembly_failed`
+- `runtime_start_failed`
+- `runtime_execution_failed`
+- `proposal_creation_failed`
+- `traceability_persistence_failed`
+- `cancelled`
+
 ## 9. Future Evolution Path
 The direct session starter interface should be designed so it can later move behind:
 - an internal queue
@@ -87,7 +113,6 @@ The direct session starter interface should be designed so it can later move beh
 
 The contract should be stable enough that downstream runtime and proposal logic do not depend on whether startup is direct or queued.
 
-## 10. Open Questions
-- what is the exact session-starter interface shape: CLI, API, or internal module boundary?
-- where should the first session record be stored?
-- what minimum failure taxonomy should be preserved in Phase 1?
+## 10. Future Evolution Questions
+- when should the CLI boundary move behind an internal queue or service API?
+- which additional session states become necessary once retries and resumable workflows exist?

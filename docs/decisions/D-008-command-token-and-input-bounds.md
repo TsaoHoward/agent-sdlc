@@ -180,11 +180,18 @@ summary: <up to 280 characters>
 
 With these rules:
 - `<task-token>` must be one of `docs`, `code`, `review`, or `ci`
-- `summary:` may be optional, but when present must be at most 280 characters
+- `summary:` is required for `code` and `ci`
+- `summary:` is optional for `docs` and `review`
+- `summary:` must be at most 280 characters when present
 - malformed commands fail closed with visible guidance
 - extra unsupported fields are treated as malformed input rather than ignored silently
+- aliases should be accepted case-insensitively and normalized to lowercase before policy lookup
+- visible failure guidance should use a standard rejection comment template so parse failures are consistent and auditable
 
-## Open Questions
-- should `summary:` be required for `code` but optional for `docs` and `review`?
-- should visible failure guidance be written as a standard comment template?
-- should aliases be case-insensitive in Phase 1?
+## Selected Phase 1 Defaults
+- token aliases: `docs`, `code`, `review`, `ci`
+- token parsing: case-insensitive, normalized to lowercase
+- summary requirement: required for `code` and `ci`, optional for `docs` and `review`
+- summary bound: 280 characters
+- malformed-input behavior: fail closed
+- operator feedback: standard visible rejection comment template

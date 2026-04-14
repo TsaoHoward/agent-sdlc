@@ -77,6 +77,62 @@ Phase 1 should support at least these machine-readable units:
 
 The exact schema may evolve, but these concepts should remain explicit.
 
+### 6.1 Exact Phase 1 File Schema Defaults
+Phase 1 uses these concrete top-level keys:
+
+#### `config/policy/task-classes.yaml`
+- `version`
+- `commandContract`
+- `taskClasses`
+
+Each `taskClass` entry should include:
+- `id`
+- `description`
+- `commandTokens`
+- `summaryRequired`
+- `allowedSourceEventTypes`
+- `defaultExecutionProfileId`
+- `approvalRuleId`
+- `policyRefs`
+
+#### `config/policy/execution-profiles.yaml`
+- `version`
+- `executionProfiles`
+
+Each `executionProfile` entry should include:
+- `id`
+- `description`
+- `taskClassIds`
+- `runtimeCapabilitySetId`
+- `approvalRuleId`
+- `policyRefs`
+
+#### `config/policy/approval-rules.yaml`
+- `version`
+- `approvalRules`
+
+Each `approvalRule` entry should include:
+- `id`
+- `description`
+- `defaultApprovalState`
+- `escalateOn`
+- `rejectOn`
+- `policyRefs`
+
+#### `config/policy/runtime-capability-sets.yaml`
+- `version`
+- `runtimeCapabilitySets`
+
+Each `runtimeCapabilitySet` entry should include:
+- `id`
+- `description`
+- `filesystem`
+- `network`
+- `secrets`
+- `git`
+- `commandCategories`
+- `policyRefs`
+
 ## 7. Repository Layout Guidance
 The Phase 1 repository layout should reserve:
 - `docs/policies/` for human-readable governance
@@ -89,6 +145,11 @@ Phase 1 chooses a split-by-policy-unit layout. A practical first layout is:
 - `config/policy/execution-profiles.yaml`
 - `config/policy/approval-rules.yaml`
 - `config/policy/runtime-capability-sets.yaml`
+
+Source-specific mapping should be split as follows:
+- config owns bounded mapping knobs such as allowed source event families, command tokens, summary requirements, and profile/capability selection
+- adapter code owns raw webhook parsing, payload authentication, and source-specific field extraction
+- docs own the rationale for why those mappings and approvals exist
 
 ## 8. Enforcement Points
 
@@ -110,7 +171,9 @@ Changes to policy representation should be handled as follows:
 - schema additions or non-boundary config refinements are usually planning or implementation work
 - changes to policy ownership or source-of-truth model require ADR review
 
-## 10. Open Questions
-- what exact field schema should each Phase 1 policy file use?
-- which rules should remain doc-only in Phase 1?
-- how much source-specific mapping belongs in config versus adapter code?
+### 9.1 Phase 1 Doc-Only Rules
+The following rules remain doc-owned in Phase 1 and should not be duplicated as the primary source of truth in config:
+- architecture boundary change approval requirements
+- ADR promotion requirements
+- human merge and release ownership
+- cross-cutting rationale for why a task class is allowed or disallowed

@@ -280,9 +280,6 @@ It tries to combine:
 - explicit task classification for policy clarity
 - bounded free-form intent for human usability without allowing unbounded prompt growth
 
-## Open Questions
-- what exact list of task-class tokens should be user-facing in the first command?
-- what exact maximum length should apply to `summary:`?
-- should `summary:` be optional or required for some task classes?
-- should malformed extra fields fail closed or be ignored with a visible warning?
-- should issue comments and later PR comments intentionally use different interaction styles?
+## Follow-Up Questions
+- issue-comment initiation remains intentionally more explicit than possible later PR-comment follow-up
+- a future PR-comment interaction model may still choose a different, more conversational style once the first closed loop exists

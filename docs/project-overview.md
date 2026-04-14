@@ -77,11 +77,12 @@ The project is expected to separate at least these layers:
 See `docs/architecture/overview.md` for details.
 
 ## 9. Open Questions
-- Which forge should be the first implementation target?
+The first Phase 1 target choices for forge, policy representation, runtime isolation, and minimum CI gating are now documented in ADR-0002, ADR-0003, and the Phase 1 design specs.
+
+Remaining higher-level questions include:
 - How much of task routing should live in repo config versus service config?
-- What is the first isolated runtime implementation: local Docker, remote worker, or Kubernetes job?
-- What policy representation is sufficient for early phases?
-- What is the minimum useful CI signal for the first closed loop?
+- What observability beyond minimum traceability should remain deferred until Phase 2?
+- When should the runtime move from the first host-local container runner to a remote worker model?
 
 ## 10. Success Criteria for This Repository Baseline
 This initialization baseline is successful if it provides:
