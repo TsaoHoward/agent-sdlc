@@ -12,6 +12,7 @@ It complements `docs/environment-requirements.md` by describing how maintainers 
 - use explicit host-port forwarding on non-common ports so local startup stays conflict-resistant and easier to translate into `docker compose` or Kubernetes manifests later
 - keep bootstrap entrypoints stable even if the underlying implementation later moves to `docker compose` or another one-command launcher
 - defer a full single-file orchestration package until the active service mix is stable enough to justify it
+- converge the platform's growing control-plane logic toward the selected `TypeScript` / `Node.js LTS` / `npm` stack while allowing temporary bootstrap wrappers to stay in PowerShell
 
 ## Current Bootstrap Surfaces
 | Environment ID | Current Bootstrap Path | Current Posture |
@@ -113,4 +114,5 @@ Starting the containers is no longer the only bootstrap step, but several workfl
 - Keep using repository-local bootstrap entrypoints as the stable operator surface.
 - Expand the script or replace its internals as WBS `3.1` through `3.5` land.
 - Re-evaluate whether `docker compose` or an equivalent one-command launcher is the right consolidation step once the actual service topology is no longer speculative.
-- Treat the current Node.js control-host CLIs as replaceable implementation scaffolding rather than as a durable architecture commitment.
+- Treat the current Node.js control-host CLIs as the first slice on the selected platform stack, then move them under npm and TypeScript as the control plane grows.
+- Add repo-owned Dockerfiles for the control-plane and worker runtime before consolidating them into a repo-owned compose package.

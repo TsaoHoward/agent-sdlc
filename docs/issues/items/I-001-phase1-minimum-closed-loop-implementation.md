@@ -23,7 +23,11 @@ The repository is intentionally still in an early-phase, structure-first posture
 - A first bounded implementation slice now exists:
   - `node scripts/task-gateway.js normalize-gitea-issue-comment --event <path>` can parse the selected `@agent run <token>` contract against `config/policy/*.yaml` and persist normalized task requests under `.agent-sdlc/state/task-requests/`.
   - `node scripts/agent-control.js start-session --task-request <path>` can create pending session records under `.agent-sdlc/state/agent-sessions/` for auto-approved task requests.
-  - the current control-host implementation uses repo-local Node.js CLIs as replaceable scaffolding rather than as a new architecture commitment.
+  - the current control-host implementation uses repo-local Node.js CLIs as the first slice on the selected platform-stack convergence path rather than as a new architecture boundary by itself.
+- The platform stack is now selected in ADR-0006:
+  - the platform core should converge on `TypeScript` / `Node.js LTS` with `npm`
+  - repo-owned Dockerfiles should package the control-plane and worker runtime before later compose consolidation
+  - PowerShell remains acceptable for local operator wrappers without becoming the main control-plane implementation language
 - The repo still lacks actual webhook delivery into the task gateway, worker runtime handoff, proposal path, CI workflow, and end-to-end traceability implementation.
 
 ## Dependencies And Constraints
@@ -44,7 +48,10 @@ The repository is intentionally still in an early-phase, structure-first posture
 5. Attach CI and lifecycle linkage:
    create the PR-triggered CI skeleton and carry `task_request_id` / proposal references through proposal and verification surfaces.
 
-Steps 1 and 2 are now in progress with working file-backed CLI scaffolds. The next packaging boundary is between step 2 and step 3: convert the pending session-start placeholder into real runtime handoff without collapsing task gateway, agent control, and worker responsibilities together.
+Steps 1 and 2 are now in progress with working file-backed CLI scaffolds. ADR-0006 now narrows the next packaging boundary further:
+- first bring the growing platform code under the selected npm-managed stack
+- then convert the pending session-start placeholder into real runtime handoff
+- and do that without collapsing task gateway, agent control, and worker responsibilities together
 
 ## Exit Path
 This issue exits the active dashboard when the first implementation slice is underway and the remaining implementation work has either:
@@ -54,6 +61,8 @@ This issue exits the active dashboard when the first implementation slice is und
 If implementation uncovers a major unresolved decision, the issue should stay active until the decision is captured in `docs/decisions/decision-backlog.md` and, if needed, promoted to an ADR.
 
 ## Next Actions
+- add the first repo-owned Node package baseline for platform code and use it as the home for the control-plane growth path
+- add the first worker-runtime Dockerfile so WBS `3.3` has a concrete packaging boundary
 - replace the current file-based event input with actual webhook or equivalent adapter delivery into the task gateway path
 - turn the pending-only session starter placeholder into a runtime handoff path for the worker scaffold
 - expand the current project-local bootstrap entrypoints as those WBS 3 interfaces become real services or commands
@@ -67,3 +76,4 @@ If implementation uncovers a major unresolved decision, the issue should stay ac
 - 2026-04-15: Verified the local bootstrap against a clean Gitea/PostgreSQL data set with automated admin-user creation and sign-in-page readiness.
 - 2026-04-15: Captured the bootstrap fix that reapplies the tracked admin `mustChangePassword` setting during password refresh for existing data sets.
 - 2026-04-15: Recorded the first working task-intake normalization and pending session-start CLI scaffolds for WBS 3.1 and 3.2.
+- 2026-04-15: Added the selected platform-stack and packaging baseline after promoting it to ADR-0006.

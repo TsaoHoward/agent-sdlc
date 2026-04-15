@@ -35,6 +35,8 @@
 - The first PR path creates the branch and PR immediately.
 - The first traceability display uses a PR body summary plus linked metadata artifact.
 - The first traceability and session records use file-backed JSON records under `.agent-sdlc/`.
+- The platform's core control-plane implementation converges toward `TypeScript` on `Node.js LTS` with `npm` as the package surface.
+- Repo-owned Dockerfiles should define the control-plane and worker packaging baseline before the project consolidates into a repo-owned `docker compose` package.
 - CI remains independent and outside the agent control plane.
 - Human review remains a required merge control point.
 
@@ -255,3 +257,4 @@ This phase should only proceed when prior boundaries are understood and defended
 - 2026-04-14: Recorded selected Phase 1 directions for trigger path, policy layout, agent control, PR path, runtime egress, and traceability display.
 - 2026-04-14: Synchronized selected Phase 1 detail defaults for command parsing, policy file schema, session record storage, and PR traceability conventions.
 - 2026-04-15: Added a durable issue dashboard, archive, and supporting-note workflow to the Phase 0 baseline.
+- 2026-04-15: Recorded the platform implementation-stack baseline for TypeScript/Node.js, npm, repo-owned Dockerfiles, and later compose packaging.

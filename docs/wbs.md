@@ -190,7 +190,7 @@
 - Dependencies: 2
 - Critical-Path-Candidate: Yes
 - Status: In Progress
-- Notes: Project-local environment bootstrap now includes repo-owned config, explicit high-port forwarding, non-interactive local Gitea initialization, and admin-password refresh behavior that preserves the tracked forced-password-change setting so the first implementation slice can start without unstable manual forge setup. The current implementation slice now also includes repo-local task-gateway and agent-control CLI scaffolds that write file-backed task and session records; these CLIs are a replaceable implementation choice rather than a new architecture boundary.
+- Notes: Project-local environment bootstrap now includes repo-owned config, explicit high-port forwarding, non-interactive local Gitea initialization, and admin-password refresh behavior that preserves the tracked forced-password-change setting so the first implementation slice can start without unstable manual forge setup. The current implementation slice now also includes repo-local task-gateway and agent-control CLI scaffolds that write file-backed task and session records. ADR-0006 now sets the platform-stack convergence path to TypeScript/Node.js plus npm, with repo-owned Dockerfiles as the packaging baseline before later compose consolidation.
 
 ### WBS 3.1 — Trigger Adapter Implementation
 - Parent: 3
@@ -210,7 +210,7 @@
 - Dependencies: 2.2
 - Critical-Path-Candidate: Yes
 - Status: In Progress
-- Notes: A direct session-start CLI now exists at `node scripts/agent-control.js start-session --task-request <path>` and writes pending session records under `.agent-sdlc/state/agent-sessions/`. Remaining work is to assemble fuller session context and hand off into the worker runtime scaffold.
+- Notes: A direct session-start CLI now exists at `node scripts/agent-control.js start-session --task-request <path>` and writes pending session records under `.agent-sdlc/state/agent-sessions/`. Remaining work is to assemble fuller session context, move the control-plane code under the selected npm-managed platform stack, and hand off into the worker runtime scaffold.
 
 ### WBS 3.3 — Worker Runtime Scaffold
 - Parent: 3
@@ -220,7 +220,7 @@
 - Dependencies: 2.3
 - Critical-Path-Candidate: Yes
 - Status: Not Started
-- Notes:
+- Notes: This item should now include the first repo-owned worker-runtime Dockerfile so the runtime boundary becomes packageable before later compose consolidation.
 
 ### WBS 3.4 — PR Proposal Path
 - Parent: 3
@@ -394,3 +394,4 @@
 - 2026-04-15: Expanded the WBS 3 bootstrap note to reflect repo-owned config, explicit high-port forwarding, and non-interactive local Gitea initialization.
 - 2026-04-15: Updated the WBS 3 bootstrap note to capture the admin-password refresh fix that keeps manual Gitea sign-in out of the forced password-change flow unless configured.
 - 2026-04-15: Marked WBS 3.1 and 3.2 in progress after adding repo-local task-gateway and session-starter CLI scaffolds for file-backed task and session records.
+- 2026-04-15: Recorded ADR-0006 implications for the platform stack, npm management path, and worker Dockerfile expectations in WBS 3.

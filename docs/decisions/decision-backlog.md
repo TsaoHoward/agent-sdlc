@@ -49,3 +49,4 @@ No active major decision items are currently tracked here. Resolved major items 
 - 2026-04-14: Narrowed the active dashboard to major decisions only and moved D-008 out as a supporting design note.
 - 2026-04-14: Closed and moved out D-002, D-003, D-004, and D-006 after writing their selected defaults back into architecture and planning docs.
 - 2026-04-15: Moved the issue-document workflow choice directly to ADR-0005 and kept the active dashboard empty because no unresolved major decision remains.
+- 2026-04-15: Promoted the platform implementation stack and packaging baseline directly to ADR-0006 and kept the active dashboard empty because no unresolved major decision remains.

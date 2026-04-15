@@ -78,9 +78,13 @@ See `docs/environment-bootstrap.md` for the current bootstrap entrypoints and th
   - run the direct session starter
   - persist task and session records outside transient memory
   - hand off selected capability sets into runtime
+- Implementation-stack baseline:
+  - the platform control host should converge on `TypeScript` running on `Node.js LTS`
+  - repo-owned Node-based platform code should move under `npm` management as the current CLI scaffolds become a formal package
+  - local bootstrap wrappers may remain in PowerShell without redefining the platform's primary service stack
 - Current bootstrap posture:
   - repo-local CLI scaffolds now exist at `node scripts/task-gateway.js normalize-gitea-issue-comment --event <path>` and `node scripts/agent-control.js start-session --task-request <path>`
-  - the current implementation uses Node.js as a replaceable control-host implementation detail rather than as an architecture boundary choice
+  - the current implementation uses plain Node.js CLI scaffolds as an early slice on the selected TypeScript/Node.js convergence path
   - webhook delivery, approval handling beyond auto-approved tasks, and runtime handoff remain later slices
 - Minimum requirements:
   - ability to run the task gateway implementation
@@ -101,6 +105,9 @@ See `docs/environment-bootstrap.md` for the current bootstrap entrypoints and th
   - prepare fresh session-local checkout/workspace
   - execute bounded commands under the selected capability set
   - export approved artifacts only
+- Packaging baseline:
+  - the first worker runtime should become a repo-owned container image defined by a Dockerfile
+  - worker packaging should remain separate from the control-plane image so runtime isolation stays reviewable and explicit
 - Minimum requirements:
   - container runner available to the control host
   - non-root execution inside the worker
@@ -211,3 +218,4 @@ Environment requirements are centralized here, but implementation responsibility
 - 2026-04-15: Added repo-owned bootstrap config, explicit high-port forwarding, and non-interactive local Gitea installation guidance.
 - 2026-04-15: Clarified that the bootstrap password-refresh path reapplies the tracked admin `mustChangePassword` setting to keep manual sign-in stable.
 - 2026-04-15: Marked ENV-002 partially scaffolded after adding repo-local task-gateway and agent-control CLI entrypoints for file-backed task and session records.
+- 2026-04-15: Recorded the selected platform implementation stack and packaging baseline for the control host and worker runtime.

@@ -27,8 +27,10 @@ This is not a substitute for ADRs. It is only the move-out surface for items tha
 | D-004 | PR And CI Path Definition | Closed | `docs/architecture/pr-and-ci-path-definition.md` | 2026-04-14 | PR conventions, CI trigger timing, and metadata artifact location were operationalized in the design docs. |
 | D-006 | Traceability Display Strategy | Closed | `docs/architecture/lifecycle-traceability-contract.md` | 2026-04-14 | Reviewer-facing traceability block, metadata path, and retention defaults were written into the lifecycle contract. |
 | D-009 | Issue Document Workflow | Promoted To ADR | `ADR-0005` | 2026-04-15 | Added a durable issue dashboard, archive, and supporting-note workflow without replacing forge issue ownership. |
+| D-010 | Platform Implementation Stack And Packaging Baseline | Promoted To ADR | `ADR-0006` | 2026-04-15 | Selected TypeScript/Node.js plus npm as the platform core, kept docs/config multi-format by design, and set Dockerfile plus later compose packaging as the self-hosted path. |
 
 ## Change Log
 - 2026-04-14: Initial version.
 - 2026-04-14: Archived D-002, D-003, D-004, and D-006 after their selected defaults were synchronized into the architecture and planning docs.
 - 2026-04-15: Archived D-009 after promoting the issue-document workflow choice to ADR-0005.
+- 2026-04-15: Archived D-010 after promoting the platform implementation stack and packaging baseline to ADR-0006.
