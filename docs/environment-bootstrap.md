@@ -18,8 +18,8 @@ It complements `docs/environment-requirements.md` by describing how maintainers 
 | Environment ID | Current Bootstrap Path | Current Posture |
 |---|---|---|
 | ENV-001 | `scripts/dev/manage-dev-environment.ps1 -Command up` | Starts a local Gitea development stack from repo-owned config. The default local path uses PostgreSQL-backed Gitea, explicit high-port forwarding, and non-interactive installation with an admin user bootstrap. |
-| ENV-002 | `npm install`; `npm run validate:platform`; `node scripts/task-gateway.js ...`; `node scripts/agent-control.js ...` | Prepares the npm-managed control-plane baseline and file-backed task/session records from repo-local CLI entrypoints. The current slice supports file-based Gitea issue-comment normalization and direct session-start placeholders, while webhook delivery and runtime handoff remain pending under WBS `3.1` and `3.2`. |
-| ENV-003 | `docker build -f docker/worker-runtime/Dockerfile ...` | Builds the first repo-owned worker-runtime image scaffold on top of the host-local Docker-compatible runner. Runtime handoff and session workspace launch remain pending under WBS `3.3`. |
+| ENV-002 | `npm install`; `npm run validate:platform`; `npm run task-gateway:webhook`; `node scripts/agent-control.js ...` | Prepares the npm-managed control-plane baseline and exposes a repo-local webhook listener plus direct session-start CLI. The current slice supports actual Gitea issue-comment webhook delivery, source-event retention, normalized task-request persistence, and direct handoff into the worker runtime scaffold. |
+| ENV-003 | `docker build -f docker/worker-runtime/Dockerfile ...`; `node scripts/agent-control.js ...` | Builds and exercises the first repo-owned worker-runtime image scaffold on top of the host-local Docker-compatible runner. The current runtime handoff launches a per-session container, prepares a fresh workspace checkout, and exports runtime launch artifacts under `.agent-sdlc/runtime/`. |
 | ENV-004 | Not bootstrapped locally yet | CI stays an independent verifier and will be attached after the PR path exists. |
 | ENV-005 | `scripts/dev/manage-dev-environment.ps1 -Command init` | Creates the `.agent-sdlc/state/` and `.agent-sdlc/traceability/` surfaces used by the first implementation slice. |
 | ENV-006 | Operator-provided environment variables or secret injection | Secrets remain scoped and profile-specific; no broad bootstrap helper is introduced yet. |
@@ -37,6 +37,7 @@ powershell -File scripts/dev/manage-dev-environment.ps1 -Command down
 npm install
 npm run validate:platform
 npm run typecheck
+npm run task-gateway:webhook
 node scripts/task-gateway.js normalize-gitea-issue-comment --event docs/examples/gitea-issue-comment-event.example.json
 node scripts/agent-control.js start-session --task-request .agent-sdlc/state/task-requests/<task_request_id>.json
 docker build -f docker/worker-runtime/Dockerfile -t agent-sdlc-worker-runtime:test .
@@ -52,8 +53,9 @@ Command behavior:
 - `npm install` installs the selected npm-managed control-plane baseline for platform code
 - `npm run validate:platform` performs syntax validation for the current platform CLI scaffolds
 - `npm run typecheck` runs the selected TypeScript baseline in no-emit mode across the current platform package
+- `npm run task-gateway:webhook` starts the Phase 1 webhook listener at `http://127.0.0.1:4010/hooks/gitea/issue-comment`
 - `node scripts/task-gateway.js normalize-gitea-issue-comment --event <path>` normalizes one file-backed Gitea issue-comment event into `.agent-sdlc/state/task-requests/<task_request_id>.json`
-- `node scripts/agent-control.js start-session --task-request <path>` creates `.agent-sdlc/state/agent-sessions/<agent_session_id>.json` for an auto-approved task request and returns the pending session metadata
+- `node scripts/agent-control.js start-session --task-request <path>` creates `.agent-sdlc/state/agent-sessions/<agent_session_id>.json`, launches the worker-runtime container, and prepares a session-local workspace plus runtime artifacts under `.agent-sdlc/runtime/`
 - `docker build -f docker/worker-runtime/Dockerfile -t agent-sdlc-worker-runtime:test .` builds the first worker-runtime image scaffold defined in the repository
 
 ## Repo-Owned Bootstrap Inputs
@@ -75,7 +77,9 @@ The local forge bootstrap config currently owns:
 The package and runtime files currently own:
 - the selected npm-managed platform package baseline
 - the TypeScript no-emit validation baseline for platform code
+- the first webhook-listener command surface for Gitea issue-comment delivery
 - the first repo-owned worker-runtime image definition
+- the current per-session runtime-launch behavior and exported runtime-launch artifacts
 
 ## Configuration Knobs
 The current bootstrap script supports these optional environment variables:
@@ -90,6 +94,7 @@ The current bootstrap script supports these optional environment variables:
 - `AGENT_SDLC_GITEA_POSTGRES_DB`
 - `AGENT_SDLC_GITEA_POSTGRES_USER`
 - `AGENT_SDLC_GITEA_POSTGRES_PASSWORD`
+- `AGENT_SDLC_WORKER_IMAGE`
 
 ## Why PostgreSQL Is The Default Local Path
 Gitea does not strictly require PostgreSQL for a local development bootstrap. SQLite is still a valid lighter-weight option for a narrow single-container bring-up.
@@ -112,15 +117,15 @@ The bootstrap script now covers:
 Starting the containers is no longer the only bootstrap step, but several workflow-specific initialization tasks still remain:
 - create an API token for later branch, PR, or webhook automation
 - create the dev repository and enable issue / PR usage
-- replace the current file-based task gateway input with actual webhook delivery and adapter wiring
-- replace the current pending-only session starter placeholder with runtime handoff into the worker scaffold
 - add webhook and branch-protection setup when the task gateway and PR path are implemented
+- connect the prepared worker workspace to the branch/PR proposal flow
+- add CI and `.agent-sdlc/traceability/` persistence once the PR path exists
 - attach CI or runner integration later during WBS `3.5`
 
 ## Known Local Friction Points
 - the rootless Gitea image expects writable data and config mounts; if host-mounted directories behave badly on Windows, switch the service data to named Docker volumes before spending time on deeper debugging
 - the first PostgreSQL bring-up can take noticeably longer than a normal restart because the database has to initialize before Gitea can connect
-- the stack only covers forge and state scaffolding right now; webhook registration, automation users, runner wiring, and CI protection are still later-slice work
+- webhook registration, automation users, PR wiring, runner wiring, and CI protection are still later-slice work
 - if an older local data set was created before this bootstrap synced the admin `mustChangePassword` flag during password refresh, run `powershell -File scripts/dev/manage-dev-environment.ps1 -Command up` once to reconcile the existing admin account with the tracked bootstrap setting
 
 ## Non-Goals
@@ -134,3 +139,8 @@ Starting the containers is no longer the only bootstrap step, but several workfl
 - Re-evaluate whether `docker compose` or an equivalent one-command launcher is the right consolidation step once the actual service topology is no longer speculative.
 - Treat the current Node.js control-host CLIs as the first slice on the selected platform stack, then move them under npm and TypeScript as the control plane grows.
 - Add repo-owned Dockerfiles for the control-plane and worker runtime before consolidating them into a repo-owned compose package.
+
+## Change Log
+- 2026-04-15: Initial version.
+- 2026-04-15: Recorded the repo-owned bootstrap config, npm baseline, and worker-runtime Dockerfile scaffold.
+- 2026-04-15: Updated the control-host and worker-runtime bootstrap posture after landing webhook intake, source-event retention, and per-session runtime handoff.

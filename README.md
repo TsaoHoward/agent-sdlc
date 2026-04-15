@@ -105,6 +105,7 @@ Current platform package commands:
 npm install
 npm run validate:platform
 npm run typecheck
+npm run task-gateway:webhook
 docker build -f docker/worker-runtime/Dockerfile -t agent-sdlc-worker-runtime:test .
 ```
 

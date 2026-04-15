@@ -199,8 +199,8 @@
 - Deliverable: working intake adapter
 - Dependencies: 2.1
 - Critical-Path-Candidate: Yes
-- Status: In Progress
-- Notes: A repo-local file-based Gitea issue-comment normalization CLI now exists at `node scripts/task-gateway.js normalize-gitea-issue-comment --event <path>`. Remaining work is to replace file input with actual webhook/event delivery and broaden the adapter from normalization-only to a working trigger path.
+- Status: Done
+- Notes: A working Gitea issue-comment trigger path now exists. The repo-local task gateway still supports file-backed normalization for examples, and it now also exposes `node scripts/task-gateway.js serve-gitea-webhook ...` for actual webhook delivery, retained source-event evidence, normalized task-request persistence, and direct session-start handoff for auto-approved requests.
 
 ### WBS 3.2 — Agent Session Starter
 - Parent: 3
@@ -210,7 +210,7 @@
 - Dependencies: 2.2
 - Critical-Path-Candidate: Yes
 - Status: In Progress
-- Notes: A direct session-start CLI now exists at `node scripts/agent-control.js start-session --task-request <path>` and writes pending session records under `.agent-sdlc/state/agent-sessions/`. A repo-owned npm baseline now also exists via `package.json`, `package-lock.json`, and `tsconfig.json`. Remaining work is to assemble fuller session context, migrate the growing control-plane code onto the selected package-managed path more fully, and hand off into the worker runtime scaffold.
+- Notes: A direct session-start CLI now exists at `node scripts/agent-control.js start-session --task-request <path>`, writes session records under `.agent-sdlc/state/agent-sessions/`, and now performs runtime handoff into the worker container scaffold. A repo-owned npm baseline also exists via `package.json`, `package-lock.json`, and `tsconfig.json`. Remaining work is to assemble fuller session context for actual agent execution and carry the session forward into proposal creation.
 
 ### WBS 3.3 — Worker Runtime Scaffold
 - Parent: 3
@@ -220,7 +220,7 @@
 - Dependencies: 2.3
 - Critical-Path-Candidate: Yes
 - Status: In Progress
-- Notes: The first repo-owned worker-runtime Dockerfile now exists at `docker/worker-runtime/Dockerfile` and has been built locally as `agent-sdlc-worker-runtime:test`. Remaining work is to turn that image scaffold into a real per-session runtime launch path with session-local workspace preparation and artifact/export handling.
+- Notes: The first repo-owned worker-runtime Dockerfile now exists at `docker/worker-runtime/Dockerfile`, has been built locally as `agent-sdlc-worker-runtime:test`, and is now exercised by `agent-control start-session` for a real per-session runtime launch path. The current slice prepares a session-local workspace checkout plus runtime-launch artifacts under `.agent-sdlc/runtime/`. Remaining work is to use that prepared workspace for branch/PR proposal flow and later execution steps.
 
 ### WBS 3.4 — PR Proposal Path
 - Parent: 3
@@ -396,3 +396,4 @@
 - 2026-04-15: Marked WBS 3.1 and 3.2 in progress after adding repo-local task-gateway and session-starter CLI scaffolds for file-backed task and session records.
 - 2026-04-15: Recorded ADR-0006 implications for the platform stack, npm management path, and worker Dockerfile expectations in WBS 3.
 - 2026-04-15: Marked the npm-managed platform baseline implemented and moved WBS 3.3 to in progress after adding and locally building the first worker-runtime Dockerfile.
+- 2026-04-15: Marked WBS 3.1 done after landing the webhook-backed trigger path and updated WBS 3.2 and 3.3 to reflect runtime handoff into the worker image scaffold.

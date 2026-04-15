@@ -8,14 +8,19 @@ function getRepoRoot() {
 function getProjectStatePaths(repoRoot) {
   const projectStateRoot = path.join(repoRoot, ".agent-sdlc");
   const stateRoot = path.join(projectStateRoot, "state");
+  const runtimeRoot = path.join(projectStateRoot, "runtime");
 
   return {
     repoRoot,
     projectStateRoot,
     stateRoot,
+    sourceEventStateDir: path.join(stateRoot, "source-events"),
     taskRequestStateDir: path.join(stateRoot, "task-requests"),
     agentSessionStateDir: path.join(stateRoot, "agent-sessions"),
     traceabilityDir: path.join(projectStateRoot, "traceability"),
+    runtimeRoot,
+    runtimeWorkspaceRoot: path.join(runtimeRoot, "workspaces"),
+    runtimeArtifactRoot: path.join(runtimeRoot, "artifacts"),
   };
 }
 
@@ -25,9 +30,12 @@ function ensureDir(directoryPath) {
 
 function ensureProjectState(repoRoot) {
   const paths = getProjectStatePaths(repoRoot);
+  ensureDir(paths.sourceEventStateDir);
   ensureDir(paths.taskRequestStateDir);
   ensureDir(paths.agentSessionStateDir);
   ensureDir(paths.traceabilityDir);
+  ensureDir(paths.runtimeWorkspaceRoot);
+  ensureDir(paths.runtimeArtifactRoot);
   return paths;
 }
 

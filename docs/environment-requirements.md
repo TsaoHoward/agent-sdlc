@@ -84,9 +84,10 @@ See `docs/environment-bootstrap.md` for the current bootstrap entrypoints and th
   - local bootstrap wrappers may remain in PowerShell without redefining the platform's primary service stack
 - Current bootstrap posture:
   - repo-owned `package.json`, `package-lock.json`, and `tsconfig.json` now define the npm-managed control-plane baseline
-  - repo-local CLI scaffolds now exist at `node scripts/task-gateway.js normalize-gitea-issue-comment --event <path>` and `node scripts/agent-control.js start-session --task-request <path>`
+  - repo-local control-host entrypoints now exist at `node scripts/task-gateway.js normalize-gitea-issue-comment --event <path>`, `node scripts/task-gateway.js serve-gitea-webhook ...`, and `node scripts/agent-control.js start-session --task-request <path>`
   - the current implementation uses plain Node.js CLI scaffolds as an early slice on the selected TypeScript/Node.js convergence path
-  - webhook delivery, approval handling beyond auto-approved tasks, and runtime handoff remain later slices
+  - actual Gitea issue-comment webhook delivery now lands on the repo-local task gateway, which persists retained source-event evidence plus normalized task requests before calling the direct session starter
+  - approval handling beyond auto-approved tasks remains a later slice
 - Minimum requirements:
   - ability to run the task gateway implementation
   - ability to invoke `agent-control start-session --task-request <path>`
@@ -112,7 +113,8 @@ See `docs/environment-bootstrap.md` for the current bootstrap entrypoints and th
 - Current bootstrap posture:
   - the first worker-runtime Dockerfile now exists at `docker/worker-runtime/Dockerfile`
   - the current image scaffold has been built locally as `agent-sdlc-worker-runtime:test`
-  - remaining work is to connect the session starter to actual container launch and session-local workspace preparation
+  - the current session starter now launches that image as a per-session container, prepares a fresh workspace checkout under `.agent-sdlc/runtime/workspaces/`, and exports runtime-launch artifacts under `.agent-sdlc/runtime/artifacts/`
+  - remaining work is to connect the prepared worker workspace to the proposal path and later execution steps
 - Minimum requirements:
   - container runner available to the control host
   - non-root execution inside the worker
@@ -154,8 +156,10 @@ See `docs/environment-bootstrap.md` for the current bootstrap entrypoints and th
   - proposal-linked metadata artifact under `.agent-sdlc/traceability/`
   - retention long enough to cover PR lifecycle and short post-completion review
 - Phase 1 record paths:
+  - `.agent-sdlc/state/source-events/<source_event_record_id>.json`
   - `.agent-sdlc/state/task-requests/<task_request_id>.json`
   - `.agent-sdlc/state/agent-sessions/<agent_session_id>.json`
+  - `.agent-sdlc/runtime/artifacts/<agent_session_id>/runtime-launch.json`
   - `.agent-sdlc/traceability/<task_request_id>.json`
 - Primary source docs:
   - `docs/architecture/agent-control-integration-plan.md`
@@ -225,3 +229,4 @@ Environment requirements are centralized here, but implementation responsibility
 - 2026-04-15: Marked ENV-002 partially scaffolded after adding repo-local task-gateway and agent-control CLI entrypoints for file-backed task and session records.
 - 2026-04-15: Recorded the selected platform implementation stack and packaging baseline for the control host and worker runtime.
 - 2026-04-15: Marked the npm-managed control-plane baseline and first worker-runtime Dockerfile as implemented scaffolds.
+- 2026-04-15: Updated ENV-002, ENV-003, and ENV-005 after landing webhook intake, retained source-event evidence, and per-session worker-runtime launch artifacts.

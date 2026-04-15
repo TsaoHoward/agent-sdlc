@@ -1,6 +1,8 @@
 const crypto = require("crypto");
 const fs = require("fs");
+const http = require("http");
 const path = require("path");
+const { spawnSync } = require("child_process");
 
 const { loadPolicyBundle, resolveTaskPolicy } = require("./lib/policy-loader");
 const {
@@ -10,28 +12,87 @@ const {
   writeJson,
 } = require("./lib/project-state");
 
+const DEFAULT_WEBHOOK_HOST = "127.0.0.1";
+const DEFAULT_WEBHOOK_PORT = 4010;
+const DEFAULT_WEBHOOK_ROUTE = "/hooks/gitea/issue-comment";
+
 function printUsage() {
   console.error(
-    "Usage: node scripts/task-gateway.js normalize-gitea-issue-comment --event <event-json-path>",
+    [
+      "Usage:",
+      "  node scripts/task-gateway.js normalize-gitea-issue-comment --event <event-json-path>",
+      "  node scripts/task-gateway.js serve-gitea-webhook [--host <host>] [--port <port>] [--route <path>] [--no-auto-start-session]",
+    ].join("\n"),
   );
 }
 
 function parseArguments(argv) {
-  if (argv.length < 4) {
+  if (argv.length < 3) {
     printUsage();
     process.exit(1);
   }
 
-  const [command, flag, eventPath] = argv.slice(2);
-  if (command !== "normalize-gitea-issue-comment" || flag !== "--event" || !eventPath) {
-    printUsage();
-    process.exit(1);
+  const command = argv[2];
+  if (command === "normalize-gitea-issue-comment") {
+    if (argv.length !== 5 || argv[3] !== "--event") {
+      printUsage();
+      process.exit(1);
+    }
+
+    return {
+      command,
+      eventPath: path.resolve(argv[4]),
+    };
   }
 
-  return {
-    command,
-    eventPath: path.resolve(eventPath),
-  };
+  if (command === "serve-gitea-webhook") {
+    const options = {
+      command,
+      host: DEFAULT_WEBHOOK_HOST,
+      port: DEFAULT_WEBHOOK_PORT,
+      route: DEFAULT_WEBHOOK_ROUTE,
+      autoStartSession: true,
+    };
+
+    for (let index = 3; index < argv.length; index += 1) {
+      const token = argv[index];
+      if (token === "--host") {
+        options.host = argv[index + 1];
+        index += 1;
+        continue;
+      }
+
+      if (token === "--port") {
+        options.port = Number(argv[index + 1]);
+        index += 1;
+        continue;
+      }
+
+      if (token === "--route") {
+        options.route = argv[index + 1];
+        index += 1;
+        continue;
+      }
+
+      if (token === "--no-auto-start-session") {
+        options.autoStartSession = false;
+        continue;
+      }
+
+      printUsage();
+      process.exit(1);
+    }
+
+    if (!options.host || !options.route || !Number.isInteger(options.port) || options.port < 1) {
+      printUsage();
+      process.exit(1);
+    }
+
+    return options;
+  }
+
+  printUsage();
+  process.exit(1);
 }
 
 function sha256(value) {
@@ -58,37 +119,6 @@ function parseHostFromUrl(urlValue) {
   }
 }
 
-function normalizeEventEnvelope(filePath) {
-  const rawText = fs.readFileSync(filePath, "utf8");
-  const eventData = JSON.parse(rawText);
-  const payload = eventData.payload || eventData;
-  const headers = eventData.headers || {};
-
-  return {
-    rawText,
-    eventData,
-    payload,
-    headers,
-    eventType: firstDefined(
-      eventData.eventType,
-      eventData.source_event_type,
-      headers["x-gitea-event"],
-      headers["X-Gitea-Event"],
-      headers["x-gogs-event"],
-      headers["X-Gogs-Event"],
-    ),
-    deliveryId: firstDefined(
-      eventData.delivery,
-      eventData.deliveryId,
-      eventData.source_event_id,
-      headers["x-gitea-delivery"],
-      headers["X-Gitea-Delivery"],
-      headers["x-gogs-delivery"],
-      headers["X-Gogs-Delivery"],
-    ),
-  };
-}
-
 function buildRejectionGuidance(detail) {
   return [
     "Request rejected by the Phase 1 task-intake contract.",
@@ -106,6 +136,10 @@ function reject(reasonCode, message) {
     message,
     rejectionComment: buildRejectionGuidance(message),
   };
+}
+
+function escapeRegex(value) {
+  return value.replace(/[.*+?^${}()|[\]\\]/gu, "\\$&");
 }
 
 function parseCommand(commentBody, policyBundle) {
@@ -190,8 +224,44 @@ function parseCommand(commentBody, policyBundle) {
   };
 }
 
-function escapeRegex(value) {
-  return value.replace(/[.*+?^${}()|[\]\\]/gu, "\\$&");
+function normalizeEventEnvelopeFromFile(filePath) {
+  const rawText = fs.readFileSync(filePath, "utf8");
+  const eventData = JSON.parse(rawText);
+  const payload = eventData.payload || eventData;
+  const headers = eventData.headers || {};
+
+  return buildNormalizedEnvelope({
+    rawText,
+    payload,
+    headers,
+    eventData,
+  });
+}
+
+function buildNormalizedEnvelope({ rawText, payload, headers, eventData = null }) {
+  return {
+    rawText,
+    eventData,
+    payload,
+    headers,
+    eventType: firstDefined(
+      eventData && eventData.eventType,
+      eventData && eventData.source_event_type,
+      headers["x-gitea-event"],
+      headers["X-Gitea-Event"],
+      headers["x-gogs-event"],
+      headers["X-Gogs-Event"],
+    ),
+    deliveryId: firstDefined(
+      eventData && eventData.delivery,
+      eventData && eventData.deliveryId,
+      eventData && eventData.source_event_id,
+      headers["x-gitea-delivery"],
+      headers["X-Gitea-Delivery"],
+      headers["x-gogs-delivery"],
+      headers["X-Gogs-Delivery"],
+    ),
+  };
 }
 
 function deriveSourceEventId(envelope, payload, repositoryRef, triggerActorRef, commandText) {
@@ -212,10 +282,27 @@ function deriveSourceEventId(envelope, payload, repositoryRef, triggerActorRef, 
   return `generated:gitea:issue_comment:${sha256(canonicalFallback).slice(0, 16)}`;
 }
 
-function normalizeTaskRequest(repoRoot, eventPath) {
-  const statePaths = ensureProjectState(repoRoot);
+function persistSourceEvent(repoRoot, statePaths, envelope) {
+  const persistedAt = utcNow();
+  const sourceEventId = envelope.deliveryId || `generated-event:${sha256(envelope.rawText).slice(0, 16)}`;
+  const fileId = `sev-${sha256(sourceEventId).slice(0, 12)}`;
+  const sourceEventPath = path.join(statePaths.sourceEventStateDir, `${fileId}.json`);
+
+  writeJson(sourceEventPath, {
+    source_event_record_id: fileId,
+    source_event_id: sourceEventId,
+    source_event_type: envelope.eventType || null,
+    persisted_at: persistedAt,
+    headers: envelope.headers,
+    payload: envelope.payload,
+    raw_text: envelope.rawText,
+  });
+
+  return sourceEventPath;
+}
+
+function normalizeTaskRequest(repoRoot, statePaths, envelope, sourcePayloadRef) {
   const policyBundle = loadPolicyBundle(repoRoot);
-  const envelope = normalizeEventEnvelope(eventPath);
   const payload = envelope.payload;
 
   if (envelope.eventType && envelope.eventType !== "issue_comment") {
@@ -322,13 +409,13 @@ function normalizeTaskRequest(repoRoot, eventPath) {
       repository_ref: repositoryRef,
       issue_ref: issueRef,
       comment_ref: commentRef,
-      source_payload_ref: toRepoRelativePath(repoRoot, eventPath),
+      source_payload_ref: sourcePayloadRef,
     },
     submitted_at: submittedAt,
     issue_ref: issueRef,
     comment_ref: commentRef,
     command_text: commandParseResult.commandText,
-    source_payload_ref: toRepoRelativePath(repoRoot, eventPath),
+    source_payload_ref: sourcePayloadRef,
   };
 
   if (commandParseResult.summary) {
@@ -355,30 +442,171 @@ function normalizeTaskRequest(repoRoot, eventPath) {
   };
 }
 
-function main() {
-  try {
-    const { eventPath } = parseArguments(process.argv);
-    const repoRoot = getRepoRoot();
-    const result = normalizeTaskRequest(repoRoot, eventPath);
+function startAgentSession(repoRoot, taskRequestPath) {
+  const agentControlPath = path.join(repoRoot, "scripts", "agent-control.js");
+  const result = spawnSync(
+    process.execPath,
+    [agentControlPath, "start-session", "--task-request", taskRequestPath],
+    {
+      cwd: repoRoot,
+      encoding: "utf8",
+    },
+  );
 
-    if (result.status === "accepted") {
-      console.log(
-        JSON.stringify(
-          {
-            status: result.status,
-            task_request_id: result.taskRequestId,
-            approval_state: result.approvalState,
-            task_request_path: toRepoRelativePath(repoRoot, result.taskRequestPath),
-          },
-          null,
-          2,
-        ),
-      );
-      process.exit(0);
+  if (result.error) {
+    throw new Error(`Session starter failed before launch: ${result.error.message}`);
+  }
+
+  let parsedOutput = null;
+  const outputText = (result.stdout || "").trim();
+  if (outputText) {
+    parsedOutput = JSON.parse(outputText);
+  }
+
+  if (result.status !== 0 && (!parsedOutput || parsedOutput.status !== "blocked")) {
+    const failureText = (result.stderr || result.stdout || "session starter failed").trim();
+    throw new Error(`Session starter failed: ${failureText}`);
+  }
+
+  return parsedOutput || {
+    status: result.status === 0 ? "started" : "unknown",
+  };
+}
+
+function buildAcceptedOutput(repoRoot, normalizeResult, sessionStartResult = null) {
+  const output = {
+    status: normalizeResult.status,
+    task_request_id: normalizeResult.taskRequestId,
+    approval_state: normalizeResult.approvalState,
+    task_request_path: toRepoRelativePath(repoRoot, normalizeResult.taskRequestPath),
+  };
+
+  if (sessionStartResult) {
+    output.session_start = sessionStartResult;
+  }
+
+  return output;
+}
+
+function handleNormalizeFromFile(repoRoot, eventPath) {
+  const statePaths = ensureProjectState(repoRoot);
+  const envelope = normalizeEventEnvelopeFromFile(eventPath);
+  const sourcePayloadRef = toRepoRelativePath(repoRoot, eventPath);
+  return normalizeTaskRequest(repoRoot, statePaths, envelope, sourcePayloadRef);
+}
+
+function writeJsonResponse(response, statusCode, payload) {
+  response.writeHead(statusCode, {
+    "content-type": "application/json; charset=utf-8",
+  });
+  response.end(`${JSON.stringify(payload, null, 2)}\n`);
+}
+
+function startWebhookServer(repoRoot, options) {
+  const statePaths = ensureProjectState(repoRoot);
+  const server = http.createServer((request, response) => {
+    if (request.method !== "POST" || request.url !== options.route) {
+      writeJsonResponse(response, request.method === "POST" ? 404 : 405, {
+        status: "rejected",
+        message: "Only POST requests to the configured webhook route are supported.",
+      });
+      return;
     }
 
-    console.log(JSON.stringify(result, null, 2));
-    process.exit(2);
+    const chunks = [];
+    request.on("data", (chunk) => {
+      chunks.push(chunk);
+    });
+
+    request.on("end", () => {
+      try {
+        const rawText = Buffer.concat(chunks).toString("utf8");
+        const payload = JSON.parse(rawText);
+        const envelope = buildNormalizedEnvelope({
+          rawText,
+          payload,
+          headers: request.headers,
+        });
+        const sourceEventPath = persistSourceEvent(repoRoot, statePaths, envelope);
+        const normalizeResult = normalizeTaskRequest(
+          repoRoot,
+          statePaths,
+          envelope,
+          toRepoRelativePath(repoRoot, sourceEventPath),
+        );
+
+        if (normalizeResult.status !== "accepted") {
+          writeJsonResponse(response, 202, normalizeResult);
+          return;
+        }
+
+        let sessionStartResult = null;
+        if (options.autoStartSession && normalizeResult.approvalState === "auto-approved") {
+          sessionStartResult = startAgentSession(repoRoot, normalizeResult.taskRequestPath);
+        }
+
+        writeJsonResponse(
+          response,
+          202,
+          buildAcceptedOutput(repoRoot, normalizeResult, sessionStartResult),
+        );
+      } catch (error) {
+        writeJsonResponse(response, 500, {
+          status: "error",
+          message: error.message,
+        });
+      }
+    });
+
+    request.on("error", (error) => {
+      writeJsonResponse(response, 500, {
+        status: "error",
+        message: error.message,
+      });
+    });
+  });
+
+  server.listen(options.port, options.host, () => {
+    console.log(
+      JSON.stringify(
+        {
+          status: "listening",
+          host: options.host,
+          port: options.port,
+          route: options.route,
+          auto_start_session: options.autoStartSession,
+        },
+        null,
+        2,
+      ),
+    );
+  });
+}
+
+function main() {
+  try {
+    const repoRoot = getRepoRoot();
+    const options = parseArguments(process.argv);
+
+    if (options.command === "normalize-gitea-issue-comment") {
+      const result = handleNormalizeFromFile(repoRoot, options.eventPath);
+
+      if (result.status === "accepted") {
+        console.log(JSON.stringify(buildAcceptedOutput(repoRoot, result), null, 2));
+        process.exit(0);
+      }
+
+      console.log(JSON.stringify(result, null, 2));
+      process.exit(2);
+    }
+
+    if (options.command === "serve-gitea-webhook") {
+      startWebhookServer(repoRoot, options);
+      return;
+    }
+
+    printUsage();
+    process.exit(1);
   } catch (error) {
     console.log(
       JSON.stringify(

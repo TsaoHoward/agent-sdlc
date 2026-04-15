@@ -1,4 +1,6 @@
 .agent-sdlc/dev-env/
 .agent-sdlc/state/
+.agent-sdlc/runtime/
+.agent-sdlc/traceability/
 node_modules/
 dist/

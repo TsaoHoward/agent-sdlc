@@ -10,7 +10,7 @@
 - Source Template: docs/templates/issue-note.template.md
 
 ## Summary
-The project has completed its minimum closed-loop design baseline, but the implementation work is still concentrated in WBS 3 as not-started items. This note captures the recommended packaging of that work so future runs can pick up execution without rediscovering the same context.
+The project has completed its minimum closed-loop design baseline and now has the first executable Phase 1 slices for webhook intake and runtime handoff. This note captures the remaining packaging gap so future runs can continue from the prepared worker workspace into proposal, CI, and traceability without rediscovering the same context.
 
 ## Why It Matters
 The repository is intentionally still in an early-phase, structure-first posture. Without a durable packaging note, Phase 1 implementation can fragment into ad hoc coding or repeatedly restart from design review instead of moving through bounded implementation slices.
@@ -22,7 +22,8 @@ The repository is intentionally still in an early-phase, structure-first posture
 - A project-local bootstrap entrypoint now exists to initialize `.agent-sdlc/` state paths and start the current local Gitea development forge from the repository, with repo-owned bootstrap settings, explicit high-port forwarding, PostgreSQL-backed startup as the default local path, SQLite as a fallback, and admin-password refresh behavior that preserves the tracked forced-password-change setting.
 - A first bounded implementation slice now exists:
   - `node scripts/task-gateway.js normalize-gitea-issue-comment --event <path>` can parse the selected `@agent run <token>` contract against `config/policy/*.yaml` and persist normalized task requests under `.agent-sdlc/state/task-requests/`.
-  - `node scripts/agent-control.js start-session --task-request <path>` can create pending session records under `.agent-sdlc/state/agent-sessions/` for auto-approved task requests.
+  - `node scripts/task-gateway.js serve-gitea-webhook --host 127.0.0.1 --port 4010 --route /hooks/gitea/issue-comment` can accept actual Gitea-compatible issue-comment webhook deliveries, retain source-event evidence under `.agent-sdlc/state/source-events/`, and persist normalized task requests.
+  - `node scripts/agent-control.js start-session --task-request <path>` now creates session records under `.agent-sdlc/state/agent-sessions/`, launches the worker-runtime container, and prepares runtime artifacts plus a session-local workspace under `.agent-sdlc/runtime/` for auto-approved task requests.
   - the current control-host implementation uses repo-local Node.js CLIs as the first slice on the selected platform-stack convergence path rather than as a new architecture boundary by itself.
 - The platform stack is now selected in ADR-0006:
   - the platform core should converge on `TypeScript` / `Node.js LTS` with `npm`
@@ -33,7 +34,7 @@ The repository is intentionally still in an early-phase, structure-first posture
   - `npm run validate:platform` and `npm run typecheck` now verify the current platform package
   - `docker/worker-runtime/Dockerfile` and `docker/worker-runtime/entrypoint.sh` define the first worker-runtime image scaffold
   - the worker-runtime image scaffold has been built locally as `agent-sdlc-worker-runtime:test`
-- The repo still lacks actual webhook delivery into the task gateway, worker runtime handoff, proposal path, CI workflow, and end-to-end traceability implementation.
+- The repo still lacks the branch/PR proposal path, CI workflow, and end-to-end traceability artifact that connect the prepared session to reviewer-facing surfaces.
 
 ## Dependencies And Constraints
 - Work should stay aligned to Phase 1 and WBS 3 rather than pulling Phase 2 observability or multi-source scope forward.
@@ -53,10 +54,10 @@ The repository is intentionally still in an early-phase, structure-first posture
 5. Attach CI and lifecycle linkage:
    create the PR-triggered CI skeleton and carry `task_request_id` / proposal references through proposal and verification surfaces.
 
-Steps 1 and 2 are now in progress with working file-backed CLI scaffolds. The selected packaging baseline is now also in place. The next packaging boundary is therefore narrower:
+Steps 1 through 3 now have working implementation slices, with WBS 3.1 already reaching a real trigger path and WBS 3.2/3.3 now handing off into the worker image scaffold. The next packaging boundary is therefore narrower:
 - keep the current control-plane growth path inside the npm-managed package baseline
-- convert the pending session-start placeholder into real runtime handoff using the new worker image scaffold
-- do that without collapsing task gateway, agent control, and worker responsibilities together
+- use the prepared worker workspace to create the branch/PR proposal path
+- do that without collapsing task gateway, agent control, worker, and forge proposal responsibilities together
 
 ## Exit Path
 This issue exits the active dashboard when the first implementation slice is underway and the remaining implementation work has either:
@@ -66,9 +67,10 @@ This issue exits the active dashboard when the first implementation slice is und
 If implementation uncovers a major unresolved decision, the issue should stay active until the decision is captured in `docs/decisions/decision-backlog.md` and, if needed, promoted to an ADR.
 
 ## Next Actions
-- replace the current file-based event input with actual webhook or equivalent adapter delivery into the task gateway path
-- turn the pending-only session starter placeholder into a runtime handoff path for the worker scaffold
+- implement the branch/PR proposal path on top of the prepared worker workspace and session metadata
+- seed the first `.agent-sdlc/traceability/<task_request_id>.json` artifact alongside proposal creation
 - expand the current project-local bootstrap entrypoints as those WBS 3 interfaces become real services or commands
+- attach CI once the proposal path exists
 - split or reframe this dashboard item once the implementation slices are concrete enough to track separately
 
 ## Change Log
@@ -81,3 +83,4 @@ If implementation uncovers a major unresolved decision, the issue should stay ac
 - 2026-04-15: Recorded the first working task-intake normalization and pending session-start CLI scaffolds for WBS 3.1 and 3.2.
 - 2026-04-15: Added the selected platform-stack and packaging baseline after promoting it to ADR-0006.
 - 2026-04-15: Recorded the npm-managed control-plane baseline and first locally built worker-runtime Dockerfile scaffold.
+- 2026-04-15: Recorded webhook-backed task intake, retained source-event evidence, and per-session runtime handoff into the worker image scaffold.
