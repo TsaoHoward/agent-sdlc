@@ -12,8 +12,10 @@
     "task-gateway:example": "node scripts/task-gateway.js normalize-gitea-issue-comment --event docs/examples/gitea-issue-comment-event.example.json",
     "task-gateway:webhook": "node scripts/task-gateway.js serve-gitea-webhook --host 127.0.0.1 --port 4010 --route /hooks/gitea/issue-comment",
     "agent-control": "node scripts/agent-control.js",
+    "proposal-surface": "node scripts/proposal-surface.js",
+    "dev:gitea-repo": "node scripts/dev/ensure-local-gitea-repo.js",
     "typecheck": "node ./node_modules/typescript/bin/tsc --noEmit",
-    "validate:platform": "node --check scripts/task-gateway.js && node --check scripts/agent-control.js && node --check scripts/lib/simple-yaml.js && node --check scripts/lib/policy-loader.js && node --check scripts/lib/project-state.js && node --check scripts/lib/runtime-launcher.js"
+    "validate:platform": "node --check scripts/task-gateway.js && node --check scripts/agent-control.js && node --check scripts/proposal-surface.js && node --check scripts/dev/ensure-local-gitea-repo.js && node --check scripts/lib/simple-yaml.js && node --check scripts/lib/policy-loader.js && node --check scripts/lib/project-state.js && node --check scripts/lib/runtime-launcher.js && node --check scripts/lib/gitea-client.js"
   },
   "devDependencies": {
     "@types/node": "^22.0.0",

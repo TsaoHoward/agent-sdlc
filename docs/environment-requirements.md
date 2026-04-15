@@ -57,6 +57,7 @@ See `docs/environment-bootstrap.md` for the current bootstrap entrypoints and th
   - local host access uses explicit forwarded high ports from `config/dev/gitea-bootstrap.json` instead of relying on common defaults
   - the current bootstrap path avoids manual web install by applying tracked settings and creating the bootstrap admin user non-interactively
   - bootstrap password refresh also reapplies the tracked admin `mustChangePassword` flag so manual sign-in does not drift into a forced password-change flow unless explicitly configured
+  - a repo-local helper now exists at `node scripts/dev/ensure-local-gitea-repo.js ensure-local-repo --owner <owner> --repo <repo> --seed-from <path>` so the Phase 1 proposal path can target a known local Gitea repository during development
 - Responsibilities:
   - source issue comment events
   - repository and branch surface
@@ -84,9 +85,10 @@ See `docs/environment-bootstrap.md` for the current bootstrap entrypoints and th
   - local bootstrap wrappers may remain in PowerShell without redefining the platform's primary service stack
 - Current bootstrap posture:
   - repo-owned `package.json`, `package-lock.json`, and `tsconfig.json` now define the npm-managed control-plane baseline
-  - repo-local control-host entrypoints now exist at `node scripts/task-gateway.js normalize-gitea-issue-comment --event <path>`, `node scripts/task-gateway.js serve-gitea-webhook ...`, and `node scripts/agent-control.js start-session --task-request <path>`
+  - repo-local control-host entrypoints now exist at `node scripts/task-gateway.js normalize-gitea-issue-comment --event <path>`, `node scripts/task-gateway.js serve-gitea-webhook ...`, `node scripts/agent-control.js start-session --task-request <path>`, and `node scripts/proposal-surface.js create-gitea-pr --session <path>`
   - the current implementation uses plain Node.js CLI scaffolds as an early slice on the selected TypeScript/Node.js convergence path
   - actual Gitea issue-comment webhook delivery now lands on the repo-local task gateway, which persists retained source-event evidence plus normalized task requests before calling the direct session starter
+  - the proposal surface now reads the prepared session/task records, force-adds the linked traceability artifact inside the prepared workspace, pushes `agent/<task_request_id>` to Gitea, and creates or updates the PR
   - approval handling beyond auto-approved tasks remains a later slice
 - Minimum requirements:
   - ability to run the task gateway implementation
@@ -160,7 +162,8 @@ See `docs/environment-bootstrap.md` for the current bootstrap entrypoints and th
   - `.agent-sdlc/state/task-requests/<task_request_id>.json`
   - `.agent-sdlc/state/agent-sessions/<agent_session_id>.json`
   - `.agent-sdlc/runtime/artifacts/<agent_session_id>/runtime-launch.json`
-  - `.agent-sdlc/traceability/<task_request_id>.json`
+  - proposal-branch artifact at `.agent-sdlc/traceability/<task_request_id>.json`
+  - local prepared-workspace mirror at `.agent-sdlc/runtime/workspaces/<agent_session_id>/.agent-sdlc/traceability/<task_request_id>.json`
 - Primary source docs:
   - `docs/architecture/agent-control-integration-plan.md`
   - `docs/architecture/task-intake-contract.md`
@@ -230,3 +233,4 @@ Environment requirements are centralized here, but implementation responsibility
 - 2026-04-15: Recorded the selected platform implementation stack and packaging baseline for the control host and worker runtime.
 - 2026-04-15: Marked the npm-managed control-plane baseline and first worker-runtime Dockerfile as implemented scaffolds.
 - 2026-04-15: Updated ENV-002, ENV-003, and ENV-005 after landing webhook intake, retained source-event evidence, and per-session worker-runtime launch artifacts.
+- 2026-04-16: Updated ENV-001, ENV-002, and ENV-005 after landing the local Gitea repo helper, proposal-surface CLI, and first PR-linked traceability artifact.

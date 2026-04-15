@@ -190,7 +190,7 @@
 - Dependencies: 2
 - Critical-Path-Candidate: Yes
 - Status: In Progress
-- Notes: Project-local environment bootstrap now includes repo-owned config, explicit high-port forwarding, non-interactive local Gitea initialization, and admin-password refresh behavior that preserves the tracked forced-password-change setting so the first implementation slice can start without unstable manual forge setup. The current implementation slice now also includes repo-local task-gateway and agent-control CLI scaffolds that write file-backed task and session records. ADR-0006 now sets the platform-stack convergence path to TypeScript/Node.js plus npm, with repo-owned Dockerfiles as the packaging baseline before later compose consolidation.
+- Notes: Project-local environment bootstrap now includes repo-owned config, explicit high-port forwarding, non-interactive local Gitea initialization, and admin-password refresh behavior that preserves the tracked forced-password-change setting so the first implementation slice can start without unstable manual forge setup. The current implementation slice now also includes repo-local task-gateway, agent-control, proposal-surface, and local-Gitea-repo helper CLIs that write file-backed task/session state and create the first traceable Gitea PR proposal. ADR-0006 now sets the platform-stack convergence path to TypeScript/Node.js plus npm, with repo-owned Dockerfiles as the packaging baseline before later compose consolidation.
 
 ### WBS 3.1 — Trigger Adapter Implementation
 - Parent: 3
@@ -229,8 +229,8 @@
 - Deliverable: working proposal path with task/session references
 - Dependencies: 3.1, 3.2, 3.3
 - Critical-Path-Candidate: Yes
-- Status: Not Started
-- Notes:
+- Status: Done
+- Notes: A working proposal path now exists at `node scripts/proposal-surface.js create-gitea-pr --session <path>`. The current slice reads the prepared session/task records, force-adds `.agent-sdlc/traceability/<task_request_id>.json` inside the prepared workspace, pushes `agent/<task_request_id>` to Gitea, and creates or updates the linked PR with the reviewer-facing traceability block.
 
 ### WBS 3.5 — CI Verification Skeleton
 - Parent: 3
@@ -249,8 +249,8 @@
 - Deliverable: minimal end-to-end traceability scaffold
 - Dependencies: 2.5, 3.2, 3.4, 3.5
 - Critical-Path-Candidate: Yes
-- Status: Not Started
-- Notes:
+- Status: In Progress
+- Notes: The first proposal-linked traceability artifact now exists. `proposal-surface create-gitea-pr` writes `.agent-sdlc/traceability/<task_request_id>.json` into the proposal branch and records `proposal_ref` / `proposal_url` back into the session record. Remaining work is to extend that linkage through CI and human review surfaces.
 
 ### WBS 4 — Controlled Expansion
 - Parent:
@@ -397,3 +397,4 @@
 - 2026-04-15: Recorded ADR-0006 implications for the platform stack, npm management path, and worker Dockerfile expectations in WBS 3.
 - 2026-04-15: Marked the npm-managed platform baseline implemented and moved WBS 3.3 to in progress after adding and locally building the first worker-runtime Dockerfile.
 - 2026-04-15: Marked WBS 3.1 done after landing the webhook-backed trigger path and updated WBS 3.2 and 3.3 to reflect runtime handoff into the worker image scaffold.
+- 2026-04-16: Marked WBS 3.4 done and WBS 3.6 in progress after landing the first branch/PR proposal path and proposal-linked traceability artifact.
