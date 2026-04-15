@@ -1,9 +1,9 @@
 # Decision Backlog
 
 ## Document Metadata
-- Version: 0.3
+- Version: 0.4
 - Status: Active
-- Last Updated: 2026-04-14
+- Last Updated: 2026-04-15
 - Owner: Project Maintainer
 - Source Template: docs/templates/decision-backlog.template.md
 
@@ -48,3 +48,4 @@ No active major decision items are currently tracked here. Resolved major items 
 - 2026-04-14: Moved the decided D-007 trigger-design item out of the active dashboard and added D-008 for token and input-bound details.
 - 2026-04-14: Narrowed the active dashboard to major decisions only and moved D-008 out as a supporting design note.
 - 2026-04-14: Closed and moved out D-002, D-003, D-004, and D-006 after writing their selected defaults back into architecture and planning docs.
+- 2026-04-15: Moved the issue-document workflow choice directly to ADR-0005 and kept the active dashboard empty because no unresolved major decision remains.

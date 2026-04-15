@@ -33,6 +33,8 @@ This document defines how humans and agents collaborate in this repository.
 ### Documents that should change often
 - `docs/roadmap.md`
 - `docs/wbs.md`
+- `docs/issues/issue-dashboard.md`
+- `docs/issues/items/*.md` when active issues need supporting notes
 - task-specific implementation notes if later added
 
 ### Documents that should change less often
@@ -54,6 +56,16 @@ This document defines how humans and agents collaborate in this repository.
 - work items are created, split, merged, blocked, or completed
 - dependencies change
 - work ownership or deliverable meaning changes
+
+### Update issue dashboard when:
+- meaningful active issues or blockers are created, split, merged, reframed, blocked, deferred, completed, or closed
+- a dashboard item needs an explicit exit path
+- a work item needs durable cross-run handoff context that does not belong only in chat
+
+### Update supporting issue notes when:
+- a dashboard summary is no longer sufficient
+- background, evidence, dependencies, or recommended work packaging need durable capture
+- an active issue needs more context than the dashboard should hold
 
 ### Update ADRs when:
 - architecture boundaries shift
@@ -84,6 +96,7 @@ Agents should:
 - keep durable logic in repo documents where possible
 - not treat recent chat context as the only authority
 - not implement broad product features during planning phases
+- use `docs/issues/issue-dashboard.md` as the durable dashboard for active near-term issue state
 - use `docs/decisions/decision-backlog.md` as the durable dashboard for near-term decision state
 
 ## 7. Early-Phase Bias

@@ -22,8 +22,10 @@ Before planning or implementation, read these files in order:
 12. `docs/architecture/lifecycle-traceability-contract.md`
 13. `docs/roadmap.md`
 14. `docs/wbs.md`
-15. `docs/decisions/*.md`
-16. `docs/policies/*.md`
+15. `docs/issues/*.md`
+16. `docs/issues/items/*.md` referenced by active dashboard items
+17. `docs/decisions/*.md`
+18. `docs/policies/*.md`
 
 ## Core Working Rules
 1. Plan before implementation.
@@ -37,6 +39,8 @@ Before planning or implementation, read these files in order:
 ## Planning Rules
 - `docs/roadmap.md` must follow `docs/templates/roadmap.template.md`.
 - `docs/wbs.md` must follow `docs/templates/wbs.template.md`.
+- `docs/issues/issue-dashboard.md` must follow `docs/templates/issue-dashboard.template.md`.
+- supporting issue notes under `docs/issues/items/` should follow `docs/templates/issue-note.template.md` when created.
 - `docs/decisions/decision-backlog.md` must follow `docs/templates/decision-backlog.template.md`.
 - If the template structure is no longer sufficient, update the relevant template first, then update the generated document.
 - All major implementation work should be traceable to a roadmap phase and one or more WBS items.
@@ -57,6 +61,7 @@ Before coding:
 - identify the relevant WBS item(s)
 - confirm whether an ADR is required
 - confirm whether the change belongs to architecture, policy, or implementation
+- identify whether any active or newly discovered major issue item must be added or updated in `docs/issues/issue-dashboard.md`
 - identify whether any open or newly discovered major decision item must be added or updated in `docs/decisions/decision-backlog.md`
 
 During coding:
@@ -68,6 +73,9 @@ During coding:
 After coding:
 - update WBS item status
 - update roadmap if scope or milestone meaning changed
+- update `docs/issues/issue-dashboard.md` when active issue items were discovered, split, reframed, blocked, completed, deferred, or closed
+- move done, closed, or no-longer-near-term issue items out of the active issue dashboard when they no longer need dashboard visibility
+- update or create supporting issue notes when dashboard summaries are no longer sufficient
 - update `docs/decisions/decision-backlog.md` when major decisions were discovered, narrowed, selected, deferred, or promoted
 - move ADR-promoted or closed items out of the active decision backlog when they no longer need dashboard visibility
 - update architecture docs if boundaries changed

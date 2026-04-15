@@ -15,7 +15,7 @@ This repository is in **project-baseline** state.
 The current goal is **not** to deliver the full platform immediately. The goal is to establish:
 - a stable planning baseline
 - architecture boundaries
-- decision records
+- decision and issue records
 - roadmap and WBS structure
 - human/agent operating rules
 - initialization prompt(s) for future agent runs
@@ -28,9 +28,10 @@ Use these files as the primary planning sources of truth:
 3. `docs/architecture/overview.md`
 4. `docs/roadmap.md`
 5. `docs/wbs.md`
-6. `docs/decisions/`
-7. `docs/policies/`
-8. `AGENTS.md`
+6. `docs/issues/`
+7. `docs/decisions/`
+8. `docs/policies/`
+9. `AGENTS.md`
 
 ## Repository Guide
 - `AGENTS.md`: agent working rules and update requirements
@@ -39,10 +40,12 @@ Use these files as the primary planning sources of truth:
 - `docs/environment-requirements.md`: centralized environment inventory and readiness tracking
 - `docs/roadmap.md`: current project roadmap
 - `docs/wbs.md`: current work breakdown structure
+- `docs/issues/`: active issue dashboard, archive, and supporting issue notes
 - `docs/architecture/`: system boundaries, context, task lifecycle
 - `docs/decisions/`: architecture decisions
 - `docs/decisions/decision-backlog.md`: decision dashboard for pending and recently selected choices
-- `docs/policies/`: intake and change-control rules
+- `docs/issues/issue-dashboard.md`: issue dashboard for active near-term project issues and blockers
+- `docs/policies/`: intake, issue-management, and change-control rules
 - `docs/templates/`: formatting templates for AI-maintained planning docs
 - `prompts/init-project.prompt.md`: initialization prompt for Codex or similar agents
 
@@ -77,5 +80,7 @@ This initialization package does **not** assume:
 3. Read `docs/roadmap.md` and `docs/wbs.md`
 4. Read `AGENTS.md`
 5. Use `prompts/init-project.prompt.md` to initialize future agent runs
-6. Review `docs/decisions/decision-backlog.md` for pending and recently selected decisions
-7. Update roadmap/WBS and decision docs through their templates when scope changes
+6. Review `docs/issues/issue-dashboard.md` for active near-term project issues
+7. Read any supporting note linked from an active dashboard item under `docs/issues/items/`
+8. Review `docs/decisions/decision-backlog.md` for pending and recently selected decisions
+9. Update roadmap/WBS and issue/decision docs through their templates when scope changes

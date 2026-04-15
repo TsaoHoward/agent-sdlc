@@ -3,7 +3,7 @@
 ## Document Metadata
 - Version: 0.1
 - Status: Draft
-- Last Updated: 2026-04-14
+- Last Updated: 2026-04-15
 - Owner: Project Maintainer
 - Source Template: docs/templates/roadmap.template.md
 
@@ -54,6 +54,7 @@ Create durable planning, architecture, and operating documents that can guide fu
 - architecture boundaries
 - roadmap/WBS format
 - initial ADRs and policy docs
+- issue dashboard, archive, and supporting-note workflow
 - early execution profiles and traceability conventions
 - initialization prompt(s)
 
@@ -65,7 +66,9 @@ Create durable planning, architecture, and operating documents that can guide fu
 - architecture overview, context, and task lifecycle docs
 - roadmap and WBS
 - initial ADRs
+- issue dashboard, issue archive, and issue-note template
 - intake and change-control policies
+- issue-management policy
 - documented execution profiles and lifecycle traceability guidance
 - initialization prompt
 
@@ -79,6 +82,7 @@ Create durable planning, architecture, and operating documents that can guide fu
 - architecture boundaries are documented
 - shared environment requirements are tracked in one durable document
 - minimum execution profiles and lifecycle identifiers are documented in durable repo docs
+- active near-term project issues can be tracked durably with explicit exit paths and supporting notes when needed
 - future agents can bootstrap from repository docs instead of conversation memory alone
 
 ### Dependencies
@@ -250,3 +254,4 @@ This phase should only proceed when prior boundaries are understood and defended
 - 2026-04-14: Documented first-target assumptions for Gitea, policy representation, and runtime isolation.
 - 2026-04-14: Recorded selected Phase 1 directions for trigger path, policy layout, agent control, PR path, runtime egress, and traceability display.
 - 2026-04-14: Synchronized selected Phase 1 detail defaults for command parsing, policy file schema, session record storage, and PR traceability conventions.
+- 2026-04-15: Added a durable issue dashboard, archive, and supporting-note workflow to the Phase 0 baseline.
