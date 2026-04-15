@@ -210,7 +210,7 @@
 - Dependencies: 2.2
 - Critical-Path-Candidate: Yes
 - Status: In Progress
-- Notes: A direct session-start CLI now exists at `node scripts/agent-control.js start-session --task-request <path>` and writes pending session records under `.agent-sdlc/state/agent-sessions/`. Remaining work is to assemble fuller session context, move the control-plane code under the selected npm-managed platform stack, and hand off into the worker runtime scaffold.
+- Notes: A direct session-start CLI now exists at `node scripts/agent-control.js start-session --task-request <path>` and writes pending session records under `.agent-sdlc/state/agent-sessions/`. A repo-owned npm baseline now also exists via `package.json`, `package-lock.json`, and `tsconfig.json`. Remaining work is to assemble fuller session context, migrate the growing control-plane code onto the selected package-managed path more fully, and hand off into the worker runtime scaffold.
 
 ### WBS 3.3 — Worker Runtime Scaffold
 - Parent: 3
@@ -219,8 +219,8 @@
 - Deliverable: working isolated runtime scaffold
 - Dependencies: 2.3
 - Critical-Path-Candidate: Yes
-- Status: Not Started
-- Notes: This item should now include the first repo-owned worker-runtime Dockerfile so the runtime boundary becomes packageable before later compose consolidation.
+- Status: In Progress
+- Notes: The first repo-owned worker-runtime Dockerfile now exists at `docker/worker-runtime/Dockerfile` and has been built locally as `agent-sdlc-worker-runtime:test`. Remaining work is to turn that image scaffold into a real per-session runtime launch path with session-local workspace preparation and artifact/export handling.
 
 ### WBS 3.4 — PR Proposal Path
 - Parent: 3
@@ -395,3 +395,4 @@
 - 2026-04-15: Updated the WBS 3 bootstrap note to capture the admin-password refresh fix that keeps manual Gitea sign-in out of the forced password-change flow unless configured.
 - 2026-04-15: Marked WBS 3.1 and 3.2 in progress after adding repo-local task-gateway and session-starter CLI scaffolds for file-backed task and session records.
 - 2026-04-15: Recorded ADR-0006 implications for the platform stack, npm management path, and worker Dockerfile expectations in WBS 3.
+- 2026-04-15: Marked the npm-managed platform baseline implemented and moved WBS 3.3 to in progress after adding and locally building the first worker-runtime Dockerfile.

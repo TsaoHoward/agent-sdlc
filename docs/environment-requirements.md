@@ -41,7 +41,7 @@ See `docs/environment-bootstrap.md` for the current bootstrap entrypoints and th
 |---|---|---|---|---|---|
 | ENV-001 | Forge Environment | Receive source events and host issues, branches, PRs, and review state | Phase 1 | WBS 3.1, 3.4, 3.5 | Partially Scaffolded |
 | ENV-002 | Control Host | Run task gateway and direct session starter | Phase 1 | WBS 3.1, 3.2 | Partially Scaffolded |
-| ENV-003 | Worker Runtime | Execute bounded agent work in isolated per-session containers | Phase 1 | WBS 3.3, 3.4 | Docker Ready Probe In Place |
+| ENV-003 | Worker Runtime | Execute bounded agent work in isolated per-session containers | Phase 1 | WBS 3.3, 3.4 | Partially Scaffolded |
 | ENV-004 | CI Environment | Independently validate PR proposals | Phase 1 | WBS 3.5 | Defined |
 | ENV-005 | Traceability And State Storage | Preserve task, session, and proposal-linked metadata | Phase 1 | WBS 3.2, 3.4, 3.6 | Bootstrap Scaffolded |
 | ENV-006 | Secret And Credential Surface | Provide minimum forge and workflow credentials to the right layers | Phase 1 | WBS 3.1, 3.2, 3.3, 3.5 | Defined |
@@ -83,6 +83,7 @@ See `docs/environment-bootstrap.md` for the current bootstrap entrypoints and th
   - repo-owned Node-based platform code should move under `npm` management as the current CLI scaffolds become a formal package
   - local bootstrap wrappers may remain in PowerShell without redefining the platform's primary service stack
 - Current bootstrap posture:
+  - repo-owned `package.json`, `package-lock.json`, and `tsconfig.json` now define the npm-managed control-plane baseline
   - repo-local CLI scaffolds now exist at `node scripts/task-gateway.js normalize-gitea-issue-comment --event <path>` and `node scripts/agent-control.js start-session --task-request <path>`
   - the current implementation uses plain Node.js CLI scaffolds as an early slice on the selected TypeScript/Node.js convergence path
   - webhook delivery, approval handling beyond auto-approved tasks, and runtime handoff remain later slices
@@ -108,6 +109,10 @@ See `docs/environment-bootstrap.md` for the current bootstrap entrypoints and th
 - Packaging baseline:
   - the first worker runtime should become a repo-owned container image defined by a Dockerfile
   - worker packaging should remain separate from the control-plane image so runtime isolation stays reviewable and explicit
+- Current bootstrap posture:
+  - the first worker-runtime Dockerfile now exists at `docker/worker-runtime/Dockerfile`
+  - the current image scaffold has been built locally as `agent-sdlc-worker-runtime:test`
+  - remaining work is to connect the session starter to actual container launch and session-local workspace preparation
 - Minimum requirements:
   - container runner available to the control host
   - non-root execution inside the worker
@@ -219,3 +224,4 @@ Environment requirements are centralized here, but implementation responsibility
 - 2026-04-15: Clarified that the bootstrap password-refresh path reapplies the tracked admin `mustChangePassword` setting to keep manual sign-in stable.
 - 2026-04-15: Marked ENV-002 partially scaffolded after adding repo-local task-gateway and agent-control CLI entrypoints for file-backed task and session records.
 - 2026-04-15: Recorded the selected platform implementation stack and packaging baseline for the control host and worker runtime.
+- 2026-04-15: Marked the npm-managed control-plane baseline and first worker-runtime Dockerfile as implemented scaffolds.

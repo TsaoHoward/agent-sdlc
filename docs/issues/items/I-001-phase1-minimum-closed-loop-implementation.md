@@ -28,6 +28,11 @@ The repository is intentionally still in an early-phase, structure-first posture
   - the platform core should converge on `TypeScript` / `Node.js LTS` with `npm`
   - repo-owned Dockerfiles should package the control-plane and worker runtime before later compose consolidation
   - PowerShell remains acceptable for local operator wrappers without becoming the main control-plane implementation language
+- ADR-0006's first implementation slice now exists:
+  - `package.json`, `package-lock.json`, and `tsconfig.json` define the npm-managed control-plane baseline
+  - `npm run validate:platform` and `npm run typecheck` now verify the current platform package
+  - `docker/worker-runtime/Dockerfile` and `docker/worker-runtime/entrypoint.sh` define the first worker-runtime image scaffold
+  - the worker-runtime image scaffold has been built locally as `agent-sdlc-worker-runtime:test`
 - The repo still lacks actual webhook delivery into the task gateway, worker runtime handoff, proposal path, CI workflow, and end-to-end traceability implementation.
 
 ## Dependencies And Constraints
@@ -48,10 +53,10 @@ The repository is intentionally still in an early-phase, structure-first posture
 5. Attach CI and lifecycle linkage:
    create the PR-triggered CI skeleton and carry `task_request_id` / proposal references through proposal and verification surfaces.
 
-Steps 1 and 2 are now in progress with working file-backed CLI scaffolds. ADR-0006 now narrows the next packaging boundary further:
-- first bring the growing platform code under the selected npm-managed stack
-- then convert the pending session-start placeholder into real runtime handoff
-- and do that without collapsing task gateway, agent control, and worker responsibilities together
+Steps 1 and 2 are now in progress with working file-backed CLI scaffolds. The selected packaging baseline is now also in place. The next packaging boundary is therefore narrower:
+- keep the current control-plane growth path inside the npm-managed package baseline
+- convert the pending session-start placeholder into real runtime handoff using the new worker image scaffold
+- do that without collapsing task gateway, agent control, and worker responsibilities together
 
 ## Exit Path
 This issue exits the active dashboard when the first implementation slice is underway and the remaining implementation work has either:
@@ -61,8 +66,6 @@ This issue exits the active dashboard when the first implementation slice is und
 If implementation uncovers a major unresolved decision, the issue should stay active until the decision is captured in `docs/decisions/decision-backlog.md` and, if needed, promoted to an ADR.
 
 ## Next Actions
-- add the first repo-owned Node package baseline for platform code and use it as the home for the control-plane growth path
-- add the first worker-runtime Dockerfile so WBS `3.3` has a concrete packaging boundary
 - replace the current file-based event input with actual webhook or equivalent adapter delivery into the task gateway path
 - turn the pending-only session starter placeholder into a runtime handoff path for the worker scaffold
 - expand the current project-local bootstrap entrypoints as those WBS 3 interfaces become real services or commands
@@ -77,3 +80,4 @@ If implementation uncovers a major unresolved decision, the issue should stay ac
 - 2026-04-15: Captured the bootstrap fix that reapplies the tracked admin `mustChangePassword` setting during password refresh for existing data sets.
 - 2026-04-15: Recorded the first working task-intake normalization and pending session-start CLI scaffolds for WBS 3.1 and 3.2.
 - 2026-04-15: Added the selected platform-stack and packaging baseline after promoting it to ADR-0006.
+- 2026-04-15: Recorded the npm-managed control-plane baseline and first locally built worker-runtime Dockerfile scaffold.

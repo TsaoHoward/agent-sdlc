@@ -99,6 +99,15 @@ powershell -File scripts/dev/manage-dev-environment.ps1 -Command up -SkipGitea
 powershell -File scripts/dev/manage-dev-environment.ps1 -Command status
 ```
 
+Current platform package commands:
+
+```powershell
+npm install
+npm run validate:platform
+npm run typecheck
+docker build -f docker/worker-runtime/Dockerfile -t agent-sdlc-worker-runtime:test .
+```
+
 The default local ports come from `config/dev/gitea-bootstrap.json` and are intentionally forwarded to higher, non-common host ports.
 
 See `docs/environment-bootstrap.md` for the current bootstrap posture and what each command covers.

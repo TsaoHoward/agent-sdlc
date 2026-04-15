@@ -18,8 +18,8 @@ It complements `docs/environment-requirements.md` by describing how maintainers 
 | Environment ID | Current Bootstrap Path | Current Posture |
 |---|---|---|
 | ENV-001 | `scripts/dev/manage-dev-environment.ps1 -Command up` | Starts a local Gitea development stack from repo-owned config. The default local path uses PostgreSQL-backed Gitea, explicit high-port forwarding, and non-interactive installation with an admin user bootstrap. |
-| ENV-002 | `node scripts/task-gateway.js ...`; `node scripts/agent-control.js ...` | Prepares file-backed task and session records from repo-local CLI entrypoints. The current slice supports file-based Gitea issue-comment normalization and direct session-start placeholders, while webhook delivery and runtime handoff remain pending under WBS `3.1` and `3.2`. |
-| ENV-003 | `scripts/dev/manage-dev-environment.ps1 -Command status` | Checks whether the host-local Docker-compatible runner is available for later worker-runtime work. |
+| ENV-002 | `npm install`; `npm run validate:platform`; `node scripts/task-gateway.js ...`; `node scripts/agent-control.js ...` | Prepares the npm-managed control-plane baseline and file-backed task/session records from repo-local CLI entrypoints. The current slice supports file-based Gitea issue-comment normalization and direct session-start placeholders, while webhook delivery and runtime handoff remain pending under WBS `3.1` and `3.2`. |
+| ENV-003 | `docker build -f docker/worker-runtime/Dockerfile ...` | Builds the first repo-owned worker-runtime image scaffold on top of the host-local Docker-compatible runner. Runtime handoff and session workspace launch remain pending under WBS `3.3`. |
 | ENV-004 | Not bootstrapped locally yet | CI stays an independent verifier and will be attached after the PR path exists. |
 | ENV-005 | `scripts/dev/manage-dev-environment.ps1 -Command init` | Creates the `.agent-sdlc/state/` and `.agent-sdlc/traceability/` surfaces used by the first implementation slice. |
 | ENV-006 | Operator-provided environment variables or secret injection | Secrets remain scoped and profile-specific; no broad bootstrap helper is introduced yet. |
@@ -34,8 +34,12 @@ powershell -File scripts/dev/manage-dev-environment.ps1 -Command up -GiteaDataba
 powershell -File scripts/dev/manage-dev-environment.ps1 -Command up -SkipGitea
 powershell -File scripts/dev/manage-dev-environment.ps1 -Command status
 powershell -File scripts/dev/manage-dev-environment.ps1 -Command down
+npm install
+npm run validate:platform
+npm run typecheck
 node scripts/task-gateway.js normalize-gitea-issue-comment --event docs/examples/gitea-issue-comment-event.example.json
 node scripts/agent-control.js start-session --task-request .agent-sdlc/state/task-requests/<task_request_id>.json
+docker build -f docker/worker-runtime/Dockerfile -t agent-sdlc-worker-runtime:test .
 ```
 
 Command behavior:
@@ -45,19 +49,33 @@ Command behavior:
 - `up -SkipGitea` prepares the project-local state surfaces without requiring the local forge container to be available yet
 - `status` reports the current project-local bootstrap state without changing it
 - `down` stops and removes the local Gitea development stack but leaves state directories intact
+- `npm install` installs the selected npm-managed control-plane baseline for platform code
+- `npm run validate:platform` performs syntax validation for the current platform CLI scaffolds
+- `npm run typecheck` runs the selected TypeScript baseline in no-emit mode across the current platform package
 - `node scripts/task-gateway.js normalize-gitea-issue-comment --event <path>` normalizes one file-backed Gitea issue-comment event into `.agent-sdlc/state/task-requests/<task_request_id>.json`
 - `node scripts/agent-control.js start-session --task-request <path>` creates `.agent-sdlc/state/agent-sessions/<agent_session_id>.json` for an auto-approved task request and returns the pending session metadata
+- `docker build -f docker/worker-runtime/Dockerfile -t agent-sdlc-worker-runtime:test .` builds the first worker-runtime image scaffold defined in the repository
 
 ## Repo-Owned Bootstrap Inputs
-The local forge bootstrap is configured by:
+The current local forge bootstrap and platform packaging baseline are configured by:
 - `config/dev/gitea-bootstrap.json`
+- `package.json`
+- `package-lock.json`
+- `tsconfig.json`
+- `docker/worker-runtime/Dockerfile`
+- `.dockerignore`
 
-That file currently owns:
+The local forge bootstrap config currently owns:
 - the Docker Desktop path used for auto-start attempts
 - the explicit forwarded host ports and bind address
 - the default Gitea database mode
 - the default local Gitea app settings
 - the local bootstrap admin user values for the dev stack
+
+The package and runtime files currently own:
+- the selected npm-managed platform package baseline
+- the TypeScript no-emit validation baseline for platform code
+- the first repo-owned worker-runtime image definition
 
 ## Configuration Knobs
 The current bootstrap script supports these optional environment variables:
