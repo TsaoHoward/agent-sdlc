@@ -24,17 +24,19 @@ The current goal is **not** to deliver the full platform immediately. The goal i
 Use these files as the primary planning sources of truth:
 
 1. `docs/project-overview.md`
-2. `docs/architecture/overview.md`
-3. `docs/roadmap.md`
-4. `docs/wbs.md`
-5. `docs/decisions/`
-6. `docs/policies/`
-7. `AGENTS.md`
+2. `docs/environment-requirements.md`
+3. `docs/architecture/overview.md`
+4. `docs/roadmap.md`
+5. `docs/wbs.md`
+6. `docs/decisions/`
+7. `docs/policies/`
+8. `AGENTS.md`
 
 ## Repository Guide
 - `AGENTS.md`: agent working rules and update requirements
 - `docs/project-overview.md`: problem statement, goals, scope, constraints
 - `docs/operating-model.md`: how humans and agents should collaborate
+- `docs/environment-requirements.md`: centralized environment inventory and readiness tracking
 - `docs/roadmap.md`: current project roadmap
 - `docs/wbs.md`: current work breakdown structure
 - `docs/architecture/`: system boundaries, context, task lifecycle

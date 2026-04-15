@@ -61,6 +61,7 @@ Create durable planning, architecture, and operating documents that can guide fu
 - README
 - AGENTS.md
 - project overview
+- environment requirements baseline
 - architecture overview, context, and task lifecycle docs
 - roadmap and WBS
 - initial ADRs
@@ -76,6 +77,7 @@ Create durable planning, architecture, and operating documents that can guide fu
 - durable documentation baseline exists
 - roadmap and WBS are internally consistent
 - architecture boundaries are documented
+- shared environment requirements are tracked in one durable document
 - minimum execution profiles and lifecycle identifiers are documented in durable repo docs
 - future agents can bootstrap from repository docs instead of conversation memory alone
 
@@ -131,6 +133,7 @@ Implement the smallest working path from task trigger to independently verified 
 - execution-profile policy definition
 - traceability contract
 - runtime isolation model
+- environment requirements baseline
 - forge integration target documentation
 - CI integration target
 

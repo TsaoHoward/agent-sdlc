@@ -11,18 +11,19 @@ Before planning or implementation, read these files in order:
 1. `README.md`
 2. `docs/project-overview.md`
 3. `docs/operating-model.md`
-4. `docs/architecture/overview.md`
-5. `docs/architecture/task-lifecycle.md`
-6. `docs/architecture/policy-representation.md`
-7. `docs/architecture/runtime-isolation.md`
-8. `docs/architecture/task-intake-contract.md`
-9. `docs/architecture/agent-control-integration-plan.md`
-10. `docs/architecture/pr-and-ci-path-definition.md`
-11. `docs/architecture/lifecycle-traceability-contract.md`
-12. `docs/roadmap.md`
-13. `docs/wbs.md`
-14. `docs/decisions/*.md`
-15. `docs/policies/*.md`
+4. `docs/environment-requirements.md`
+5. `docs/architecture/overview.md`
+6. `docs/architecture/task-lifecycle.md`
+7. `docs/architecture/policy-representation.md`
+8. `docs/architecture/runtime-isolation.md`
+9. `docs/architecture/task-intake-contract.md`
+10. `docs/architecture/agent-control-integration-plan.md`
+11. `docs/architecture/pr-and-ci-path-definition.md`
+12. `docs/architecture/lifecycle-traceability-contract.md`
+13. `docs/roadmap.md`
+14. `docs/wbs.md`
+15. `docs/decisions/*.md`
+16. `docs/policies/*.md`
 
 ## Core Working Rules
 1. Plan before implementation.

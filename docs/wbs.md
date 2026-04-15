@@ -24,6 +24,7 @@
 | 1.2 | Planning Document Set | 1 | Phase 0 | roadmap, WBS, prompt, operating model |
 | 1.3 | Architecture Document Set | 1 | Phase 0 | architecture overview, context, lifecycle |
 | 1.4 | Governance Document Set | 1 | Phase 0 | ADRs and policies with execution profiles and approval rules |
+| 1.5 | Environment Requirements Baseline | 1 | Phase 0 | centralized environment inventory and readiness tracker |
 | 2 | Minimum Closed Loop Design | - | Phase 1 | design-ready interfaces and workflow definition |
 | 2.1 | Task Intake Contract | 2 | Phase 1 | normalized task request definition with identifiers and policy refs |
 | 2.2 | Agent Control Integration Plan | 2 | Phase 1 | control-plane interface plan |
@@ -99,6 +100,16 @@
 - Critical-Path-Candidate: Yes
 - Status: Done
 - Notes:
+
+### WBS 1.5 — Environment Requirements Baseline
+- Parent: 1
+- Related Phase: Phase 0
+- Description: Maintain one centralized document for shared environment requirements, first-needed phase, and implementation mapping.
+- Deliverable: `docs/environment-requirements.md`
+- Dependencies: 1.2, 1.3, 1.4
+- Critical-Path-Candidate: Yes
+- Status: Done
+- Notes: This document centralizes environment needs while implementation remains distributed across later WBS items.
 
 ### WBS 2 — Minimum Closed Loop Design
 - Parent:
@@ -318,6 +329,7 @@
 | 1.2 | 1.1 | planning docs need repo entry and agent rules |
 | 1.3 | 1.1 | architecture docs depend on shared repo framing |
 | 1.4 | 1.1, 1.3 | governance docs depend on repo framing and system boundaries |
+| 1.5 | 1.2, 1.3, 1.4 | environment baseline depends on planning, architecture, and governance context |
 | 2 | 1 | design starts after baseline exists |
 | 2.1 | 1.3, 1.4 | intake contract depends on boundaries and policies |
 | 2.2 | 2.1 | control integration depends on task model |
@@ -340,6 +352,7 @@
 - 1.2
 - 1.3
 - 1.4
+- 1.5
 - 2
 - 2.1
 - 2.2
@@ -363,3 +376,4 @@
 - 2026-04-14: Marked runtime isolation strategy as designed and aligned phase-1 assumptions to ADR-0002.
 - 2026-04-14: Marked agent control and PR/CI design items done and aligned remaining open questions to implementation detail.
 - 2026-04-14: Cleared the remaining WBS-level pre-implementation detail blockers after selecting the command contract, policy schema, and minimum CI policy defaults.
+- 2026-04-14: Added a centralized environment requirements baseline so shared environment work can be tracked outside phase-specific implementation notes.
