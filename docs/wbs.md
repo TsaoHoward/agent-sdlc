@@ -190,7 +190,7 @@
 - Dependencies: 2
 - Critical-Path-Candidate: Yes
 - Status: In Progress
-- Notes: Project-local environment bootstrap now includes repo-owned config, explicit high-port forwarding, non-interactive local Gitea initialization, and admin-password refresh behavior that preserves the tracked forced-password-change setting so the first implementation slice can start without unstable manual forge setup.
+- Notes: Project-local environment bootstrap now includes repo-owned config, explicit high-port forwarding, non-interactive local Gitea initialization, and admin-password refresh behavior that preserves the tracked forced-password-change setting so the first implementation slice can start without unstable manual forge setup. The current implementation slice now also includes repo-local task-gateway and agent-control CLI scaffolds that write file-backed task and session records; these CLIs are a replaceable implementation choice rather than a new architecture boundary.
 
 ### WBS 3.1 — Trigger Adapter Implementation
 - Parent: 3
@@ -199,8 +199,8 @@
 - Deliverable: working intake adapter
 - Dependencies: 2.1
 - Critical-Path-Candidate: Yes
-- Status: Not Started
-- Notes:
+- Status: In Progress
+- Notes: A repo-local file-based Gitea issue-comment normalization CLI now exists at `node scripts/task-gateway.js normalize-gitea-issue-comment --event <path>`. Remaining work is to replace file input with actual webhook/event delivery and broaden the adapter from normalization-only to a working trigger path.
 
 ### WBS 3.2 — Agent Session Starter
 - Parent: 3
@@ -209,8 +209,8 @@
 - Deliverable: working agent session starter
 - Dependencies: 2.2
 - Critical-Path-Candidate: Yes
-- Status: Not Started
-- Notes:
+- Status: In Progress
+- Notes: A direct session-start CLI now exists at `node scripts/agent-control.js start-session --task-request <path>` and writes pending session records under `.agent-sdlc/state/agent-sessions/`. Remaining work is to assemble fuller session context and hand off into the worker runtime scaffold.
 
 ### WBS 3.3 — Worker Runtime Scaffold
 - Parent: 3
@@ -393,3 +393,4 @@
 - 2026-04-15: Marked WBS 3 in progress after adding the initial project-local environment bootstrap scaffold for the first implementation slice.
 - 2026-04-15: Expanded the WBS 3 bootstrap note to reflect repo-owned config, explicit high-port forwarding, and non-interactive local Gitea initialization.
 - 2026-04-15: Updated the WBS 3 bootstrap note to capture the admin-password refresh fix that keeps manual Gitea sign-in out of the forced password-change flow unless configured.
+- 2026-04-15: Marked WBS 3.1 and 3.2 in progress after adding repo-local task-gateway and session-starter CLI scaffolds for file-backed task and session records.

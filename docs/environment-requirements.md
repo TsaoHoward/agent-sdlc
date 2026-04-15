@@ -40,7 +40,7 @@ See `docs/environment-bootstrap.md` for the current bootstrap entrypoints and th
 | Environment ID | Name | Purpose | First Needed By | Primary WBS | Current Status |
 |---|---|---|---|---|---|
 | ENV-001 | Forge Environment | Receive source events and host issues, branches, PRs, and review state | Phase 1 | WBS 3.1, 3.4, 3.5 | Partially Scaffolded |
-| ENV-002 | Control Host | Run task gateway and direct session starter | Phase 1 | WBS 3.1, 3.2 | Defined |
+| ENV-002 | Control Host | Run task gateway and direct session starter | Phase 1 | WBS 3.1, 3.2 | Partially Scaffolded |
 | ENV-003 | Worker Runtime | Execute bounded agent work in isolated per-session containers | Phase 1 | WBS 3.3, 3.4 | Docker Ready Probe In Place |
 | ENV-004 | CI Environment | Independently validate PR proposals | Phase 1 | WBS 3.5 | Defined |
 | ENV-005 | Traceability And State Storage | Preserve task, session, and proposal-linked metadata | Phase 1 | WBS 3.2, 3.4, 3.6 | Bootstrap Scaffolded |
@@ -78,6 +78,10 @@ See `docs/environment-bootstrap.md` for the current bootstrap entrypoints and th
   - run the direct session starter
   - persist task and session records outside transient memory
   - hand off selected capability sets into runtime
+- Current bootstrap posture:
+  - repo-local CLI scaffolds now exist at `node scripts/task-gateway.js normalize-gitea-issue-comment --event <path>` and `node scripts/agent-control.js start-session --task-request <path>`
+  - the current implementation uses Node.js as a replaceable control-host implementation detail rather than as an architecture boundary choice
+  - webhook delivery, approval handling beyond auto-approved tasks, and runtime handoff remain later slices
 - Minimum requirements:
   - ability to run the task gateway implementation
   - ability to invoke `agent-control start-session --task-request <path>`
@@ -206,3 +210,4 @@ Environment requirements are centralized here, but implementation responsibility
 - 2026-04-15: Recorded the local PostgreSQL-backed Gitea bootstrap default and updated environment readiness statuses for the current scaffold.
 - 2026-04-15: Added repo-owned bootstrap config, explicit high-port forwarding, and non-interactive local Gitea installation guidance.
 - 2026-04-15: Clarified that the bootstrap password-refresh path reapplies the tracked admin `mustChangePassword` setting to keep manual sign-in stable.
+- 2026-04-15: Marked ENV-002 partially scaffolded after adding repo-local task-gateway and agent-control CLI entrypoints for file-backed task and session records.

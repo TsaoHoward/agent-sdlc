@@ -20,7 +20,11 @@ The repository is intentionally still in an early-phase, structure-first posture
 - Phase 1 design items are complete, including task intake, runtime isolation, agent control integration, PR/CI path, and lifecycle traceability contracts.
 - Machine-readable policy scaffolding exists under `config/policy/`.
 - A project-local bootstrap entrypoint now exists to initialize `.agent-sdlc/` state paths and start the current local Gitea development forge from the repository, with repo-owned bootstrap settings, explicit high-port forwarding, PostgreSQL-backed startup as the default local path, SQLite as a fallback, and admin-password refresh behavior that preserves the tracked forced-password-change setting.
-- The repo still lacks the actual task gateway, agent-control starter, worker runtime, proposal path, CI workflow, and end-to-end traceability implementation.
+- A first bounded implementation slice now exists:
+  - `node scripts/task-gateway.js normalize-gitea-issue-comment --event <path>` can parse the selected `@agent run <token>` contract against `config/policy/*.yaml` and persist normalized task requests under `.agent-sdlc/state/task-requests/`.
+  - `node scripts/agent-control.js start-session --task-request <path>` can create pending session records under `.agent-sdlc/state/agent-sessions/` for auto-approved task requests.
+  - the current control-host implementation uses repo-local Node.js CLIs as replaceable scaffolding rather than as a new architecture commitment.
+- The repo still lacks actual webhook delivery into the task gateway, worker runtime handoff, proposal path, CI workflow, and end-to-end traceability implementation.
 
 ## Dependencies And Constraints
 - Work should stay aligned to Phase 1 and WBS 3 rather than pulling Phase 2 observability or multi-source scope forward.
@@ -40,6 +44,8 @@ The repository is intentionally still in an early-phase, structure-first posture
 5. Attach CI and lifecycle linkage:
    create the PR-triggered CI skeleton and carry `task_request_id` / proposal references through proposal and verification surfaces.
 
+Steps 1 and 2 are now in progress with working file-backed CLI scaffolds. The next packaging boundary is between step 2 and step 3: convert the pending session-start placeholder into real runtime handoff without collapsing task gateway, agent control, and worker responsibilities together.
+
 ## Exit Path
 This issue exits the active dashboard when the first implementation slice is underway and the remaining implementation work has either:
 - been split into more focused active issue items, or
@@ -48,7 +54,8 @@ This issue exits the active dashboard when the first implementation slice is und
 If implementation uncovers a major unresolved decision, the issue should stay active until the decision is captured in `docs/decisions/decision-backlog.md` and, if needed, promoted to an ADR.
 
 ## Next Actions
-- implement the first concrete implementation slice inside WBS 3: task-intake normalization plus file-backed task/session records
+- replace the current file-based event input with actual webhook or equivalent adapter delivery into the task gateway path
+- turn the pending-only session starter placeholder into a runtime handoff path for the worker scaffold
 - expand the current project-local bootstrap entrypoints as those WBS 3 interfaces become real services or commands
 - split or reframe this dashboard item once the implementation slices are concrete enough to track separately
 
@@ -59,3 +66,4 @@ If implementation uncovers a major unresolved decision, the issue should stay ac
 - 2026-04-15: Added repo-owned bootstrap config and non-interactive local Gitea installation behavior.
 - 2026-04-15: Verified the local bootstrap against a clean Gitea/PostgreSQL data set with automated admin-user creation and sign-in-page readiness.
 - 2026-04-15: Captured the bootstrap fix that reapplies the tracked admin `mustChangePassword` setting during password refresh for existing data sets.
+- 2026-04-15: Recorded the first working task-intake normalization and pending session-start CLI scaffolds for WBS 3.1 and 3.2.

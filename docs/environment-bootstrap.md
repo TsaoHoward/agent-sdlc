@@ -17,7 +17,7 @@ It complements `docs/environment-requirements.md` by describing how maintainers 
 | Environment ID | Current Bootstrap Path | Current Posture |
 |---|---|---|
 | ENV-001 | `scripts/dev/manage-dev-environment.ps1 -Command up` | Starts a local Gitea development stack from repo-owned config. The default local path uses PostgreSQL-backed Gitea, explicit high-port forwarding, and non-interactive installation with an admin user bootstrap. |
-| ENV-002 | `scripts/dev/manage-dev-environment.ps1 -Command init` | Prepares project-local state paths; the actual task gateway and session starter implementation is still pending under WBS `3.1` and `3.2`. |
+| ENV-002 | `node scripts/task-gateway.js ...`; `node scripts/agent-control.js ...` | Prepares file-backed task and session records from repo-local CLI entrypoints. The current slice supports file-based Gitea issue-comment normalization and direct session-start placeholders, while webhook delivery and runtime handoff remain pending under WBS `3.1` and `3.2`. |
 | ENV-003 | `scripts/dev/manage-dev-environment.ps1 -Command status` | Checks whether the host-local Docker-compatible runner is available for later worker-runtime work. |
 | ENV-004 | Not bootstrapped locally yet | CI stays an independent verifier and will be attached after the PR path exists. |
 | ENV-005 | `scripts/dev/manage-dev-environment.ps1 -Command init` | Creates the `.agent-sdlc/state/` and `.agent-sdlc/traceability/` surfaces used by the first implementation slice. |
@@ -33,6 +33,8 @@ powershell -File scripts/dev/manage-dev-environment.ps1 -Command up -GiteaDataba
 powershell -File scripts/dev/manage-dev-environment.ps1 -Command up -SkipGitea
 powershell -File scripts/dev/manage-dev-environment.ps1 -Command status
 powershell -File scripts/dev/manage-dev-environment.ps1 -Command down
+node scripts/task-gateway.js normalize-gitea-issue-comment --event docs/examples/gitea-issue-comment-event.example.json
+node scripts/agent-control.js start-session --task-request .agent-sdlc/state/task-requests/<task_request_id>.json
 ```
 
 Command behavior:
@@ -42,6 +44,8 @@ Command behavior:
 - `up -SkipGitea` prepares the project-local state surfaces without requiring the local forge container to be available yet
 - `status` reports the current project-local bootstrap state without changing it
 - `down` stops and removes the local Gitea development stack but leaves state directories intact
+- `node scripts/task-gateway.js normalize-gitea-issue-comment --event <path>` normalizes one file-backed Gitea issue-comment event into `.agent-sdlc/state/task-requests/<task_request_id>.json`
+- `node scripts/agent-control.js start-session --task-request <path>` creates `.agent-sdlc/state/agent-sessions/<agent_session_id>.json` for an auto-approved task request and returns the pending session metadata
 
 ## Repo-Owned Bootstrap Inputs
 The local forge bootstrap is configured by:
@@ -89,6 +93,8 @@ The bootstrap script now covers:
 Starting the containers is no longer the only bootstrap step, but several workflow-specific initialization tasks still remain:
 - create an API token for later branch, PR, or webhook automation
 - create the dev repository and enable issue / PR usage
+- replace the current file-based task gateway input with actual webhook delivery and adapter wiring
+- replace the current pending-only session starter placeholder with runtime handoff into the worker scaffold
 - add webhook and branch-protection setup when the task gateway and PR path are implemented
 - attach CI or runner integration later during WBS `3.5`
 
@@ -107,3 +113,4 @@ Starting the containers is no longer the only bootstrap step, but several workfl
 - Keep using repository-local bootstrap entrypoints as the stable operator surface.
 - Expand the script or replace its internals as WBS `3.1` through `3.5` land.
 - Re-evaluate whether `docker compose` or an equivalent one-command launcher is the right consolidation step once the actual service topology is no longer speculative.
+- Treat the current Node.js control-host CLIs as replaceable implementation scaffolding rather than as a durable architecture commitment.
