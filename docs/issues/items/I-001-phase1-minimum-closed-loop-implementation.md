@@ -2,7 +2,7 @@
 
 ## Metadata
 - Issue ID: I-001
-- Status: Open
+- Status: In Progress
 - Last Updated: 2026-04-15
 - Owner: Project Maintainer
 - Related Docs / WBS: `docs/roadmap.md` Phase 1; `docs/wbs.md` WBS `3`, `3.1`, `3.2`, `3.3`, `3.4`, `3.5`, `3.6`
@@ -19,12 +19,14 @@ The repository is intentionally still in an early-phase, structure-first posture
 - Phase 0 baseline items are complete, including roadmap, WBS, architecture, policy, environment baseline, and prompts.
 - Phase 1 design items are complete, including task intake, runtime isolation, agent control integration, PR/CI path, and lifecycle traceability contracts.
 - Machine-readable policy scaffolding exists under `config/policy/`.
-- No implementation scaffold currently exists for the task gateway, agent-control starter, worker runtime, proposal path, CI workflow, or traceability files under `.agent-sdlc/`.
+- A project-local bootstrap entrypoint now exists to initialize `.agent-sdlc/` state paths and start the current local Gitea development forge from the repository, with repo-owned bootstrap settings, explicit high-port forwarding, PostgreSQL-backed startup as the default local path, SQLite as a fallback, and admin-password refresh behavior that preserves the tracked forced-password-change setting.
+- The repo still lacks the actual task gateway, agent-control starter, worker runtime, proposal path, CI workflow, and end-to-end traceability implementation.
 
 ## Dependencies And Constraints
 - Work should stay aligned to Phase 1 and WBS 3 rather than pulling Phase 2 observability or multi-source scope forward.
 - Implementation should preserve the existing layer boundaries between task gateway, policy, agent control, runtime, CI, and deploy.
 - New architecture or governance shifts discovered during implementation should be escalated through the decision backlog and ADR flow rather than buried in code.
+- Environment dependencies do not all need to be packaged inside the repository yet, but the active development stack should remain startable from repository-owned entrypoints so later consolidation into `docker compose` or an equivalent launcher stays possible.
 
 ## Proposed Handling Or Work Packaging
 1. Start with the smallest intake-and-state slice:
@@ -46,9 +48,14 @@ This issue exits the active dashboard when the first implementation slice is und
 If implementation uncovers a major unresolved decision, the issue should stay active until the decision is captured in `docs/decisions/decision-backlog.md` and, if needed, promoted to an ADR.
 
 ## Next Actions
-- choose the first concrete implementation slice inside WBS 3
-- create the corresponding code or scaffold changes
-- update `docs/issues/issue-dashboard.md` when the work shifts from packaging into active implementation
+- implement the first concrete implementation slice inside WBS 3: task-intake normalization plus file-backed task/session records
+- expand the current project-local bootstrap entrypoints as those WBS 3 interfaces become real services or commands
+- split or reframe this dashboard item once the implementation slices are concrete enough to track separately
 
 ## Change Log
 - 2026-04-15: Initial version.
+- 2026-04-15: Marked the issue in progress after adding the initial project-local environment bootstrap scaffold.
+- 2026-04-15: Expanded the local forge bootstrap scaffold to include a PostgreSQL-backed default path and Docker Desktop auto-start handling.
+- 2026-04-15: Added repo-owned bootstrap config and non-interactive local Gitea installation behavior.
+- 2026-04-15: Verified the local bootstrap against a clean Gitea/PostgreSQL data set with automated admin-user creation and sign-in-page readiness.
+- 2026-04-15: Captured the bootstrap fix that reapplies the tracked admin `mustChangePassword` setting during password refresh for existing data sets.

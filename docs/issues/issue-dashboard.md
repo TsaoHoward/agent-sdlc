@@ -45,16 +45,16 @@ It does not replace forge issues, roadmap/WBS planning structure, the decision b
 ## Dashboard
 | Issue ID | Title | Status | Related Docs / WBS | Next Action | Exit Path |
 |---|---|---|---|---|---|
-| I-001 | Phase 1 Minimum Closed Loop Implementation Packaging | Open | `docs/roadmap.md` Phase 1; WBS `3`, `3.1`-`3.6` | Start the first bounded implementation slice from the designed Phase 1 path | Archive after the first slice is underway and the remaining work is split or absorbed into active execution tracking |
+| I-001 | Phase 1 Minimum Closed Loop Implementation Packaging | In Progress | `docs/roadmap.md` Phase 1; WBS `3`, `3.1`-`3.6` | Implement task-intake normalization and file-backed task/session state on top of the new project-local bootstrap scaffold | Archive after the first slice is underway and the remaining work is split or absorbed into active execution tracking |
 
 ## Issue Items
 
 ### I-001 - Phase 1 Minimum Closed Loop Implementation Packaging
-- Status: `Open`
+- Status: `In Progress`
 - Related Docs / WBS: `docs/roadmap.md` Phase 1; `docs/wbs.md` WBS `3`, `3.1`, `3.2`, `3.3`, `3.4`, `3.5`, `3.6`
 - Why It Matters: The repository has completed the planning and design baseline for the first closed loop, but the implementation path still needs durable packaging into executable slices so work can leave the planning-only state.
-- Current State: Task-intake, policy, runtime, PR/CI, and traceability contracts are documented, and `config/policy/` scaffolding exists. The repo still lacks the actual trigger adapter, session starter, worker runtime scaffold, PR path, CI workflow, and end-to-end traceability implementation.
-- Next Action: Start the first bounded implementation slice, likely task-intake normalization plus file-backed task/session state scaffolding, then sequence the remaining WBS 3 work from that base.
+- Current State: Task-intake, policy, runtime, PR/CI, and traceability contracts are documented, and `config/policy/` scaffolding exists. The repo now also has a project-local environment bootstrap entrypoint plus a repo-owned Gitea bootstrap config that uses explicit high-port forwarding and non-interactive PostgreSQL-backed forge initialization by default, and the bootstrap password-refresh path now preserves the tracked admin `mustChangePassword` setting so manual sign-in does not fall into an unstable forced password-change flow. The repo still lacks the actual trigger adapter, session starter, worker runtime scaffold, PR path, CI workflow, and end-to-end traceability implementation.
+- Next Action: Implement the first bounded implementation slice, starting with task-intake normalization plus file-backed task/session state scaffolding on top of the new project-local bootstrap entrypoint.
 - Exit Path: Move this item to `docs/issues/issue-archive.md` once the first implementation slice is underway and the remaining work has been split into active execution issues or otherwise reflected in updated planning docs.
 - Supporting Notes: `docs/issues/items/I-001-phase1-minimum-closed-loop-implementation.md`
 - Promotion / Escalation Check: Update `docs/decisions/decision-backlog.md` and ADRs only if implementation uncovers a new major boundary, ownership, or governance decision.
@@ -63,3 +63,6 @@ It does not replace forge issues, roadmap/WBS planning structure, the decision b
 ## Change Log
 - 2026-04-15: Initial version.
 - 2026-04-15: Seeded I-001 to track the current Phase 1 implementation packaging gap.
+- 2026-04-15: Marked I-001 in progress after adding the initial project-local environment bootstrap scaffold.
+- 2026-04-15: Updated I-001 to reflect repo-owned bootstrap config, explicit forwarded ports, and non-interactive local Gitea installation.
+- 2026-04-15: Recorded the admin-password refresh fix that keeps manual Gitea sign-in from re-entering the forced password-change flow.

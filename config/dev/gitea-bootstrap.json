@@ -1,0 +1,38 @@
+{
+  "dockerDesktop": {
+    "path": "C:\\Program Files\\Docker\\Docker\\Docker Desktop.exe",
+    "startupTimeoutSeconds": 90
+  },
+  "ports": {
+    "bindAddress": "127.0.0.1",
+    "giteaHttpHost": 43000,
+    "giteaSshHost": 42222,
+    "postgresHost": 45432
+  },
+  "gitea": {
+    "image": "docker.gitea.com/gitea:latest-rootless",
+    "databaseMode": "postgres",
+    "hostName": "localhost",
+    "rootUrl": "http://localhost:43000/",
+    "appName": "Agent SDLC Dev Forge",
+    "installLock": true,
+    "disableRegistration": true,
+    "requireSignInView": false,
+    "enableActions": true,
+    "defaultBranch": "main",
+    "userUid": 1000,
+    "userGid": 1000,
+    "admin": {
+      "username": "agent-admin",
+      "password": "agent-dev-password",
+      "email": "agent-admin@example.local",
+      "mustChangePassword": false
+    }
+  },
+  "postgres": {
+    "image": "postgres:16",
+    "database": "gitea",
+    "user": "gitea",
+    "password": "gitea-dev-password"
+  }
+}

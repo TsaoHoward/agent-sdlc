@@ -38,6 +38,7 @@ Use these files as the primary planning sources of truth:
 - `docs/project-overview.md`: problem statement, goals, scope, constraints
 - `docs/operating-model.md`: how humans and agents should collaborate
 - `docs/environment-requirements.md`: centralized environment inventory and readiness tracking
+- `docs/environment-bootstrap.md`: current project-local startup guidance for Phase 1 environments
 - `docs/roadmap.md`: current project roadmap
 - `docs/wbs.md`: current work breakdown structure
 - `docs/issues/`: active issue dashboard, archive, and supporting issue notes
@@ -84,3 +85,20 @@ This initialization package does **not** assume:
 7. Read any supporting note linked from an active dashboard item under `docs/issues/items/`
 8. Review `docs/decisions/decision-backlog.md` for pending and recently selected decisions
 9. Update roadmap/WBS and issue/decision docs through their templates when scope changes
+
+## Project-Local Dev Startup
+Phase 1 environment dependencies do not all need to be bundled inside the repository, but the current operator surface should still be startable from project-owned entrypoints.
+
+Current bootstrap commands:
+
+```powershell
+powershell -File scripts/dev/manage-dev-environment.ps1 -Command init
+powershell -File scripts/dev/manage-dev-environment.ps1 -Command up
+powershell -File scripts/dev/manage-dev-environment.ps1 -Command up -GiteaDatabaseMode sqlite
+powershell -File scripts/dev/manage-dev-environment.ps1 -Command up -SkipGitea
+powershell -File scripts/dev/manage-dev-environment.ps1 -Command status
+```
+
+The default local ports come from `config/dev/gitea-bootstrap.json` and are intentionally forwarded to higher, non-common host ports.
+
+See `docs/environment-bootstrap.md` for the current bootstrap posture and what each command covers.

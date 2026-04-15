@@ -189,8 +189,8 @@
 - Deliverable: one working closed loop
 - Dependencies: 2
 - Critical-Path-Candidate: Yes
-- Status: Not Started
-- Notes:
+- Status: In Progress
+- Notes: Project-local environment bootstrap now includes repo-owned config, explicit high-port forwarding, non-interactive local Gitea initialization, and admin-password refresh behavior that preserves the tracked forced-password-change setting so the first implementation slice can start without unstable manual forge setup.
 
 ### WBS 3.1 — Trigger Adapter Implementation
 - Parent: 3
@@ -390,3 +390,6 @@
 - 2026-04-14: Cleared the remaining WBS-level pre-implementation detail blockers after selecting the command contract, policy schema, and minimum CI policy defaults.
 - 2026-04-14: Added a centralized environment requirements baseline so shared environment work can be tracked outside phase-specific implementation notes.
 - 2026-04-15: Added a Phase 0 issue-management baseline for durable active-issue tracking, archive, and supporting-note workflow.
+- 2026-04-15: Marked WBS 3 in progress after adding the initial project-local environment bootstrap scaffold for the first implementation slice.
+- 2026-04-15: Expanded the WBS 3 bootstrap note to reflect repo-owned config, explicit high-port forwarding, and non-interactive local Gitea initialization.
+- 2026-04-15: Updated the WBS 3 bootstrap note to capture the admin-password refresh fix that keeps manual Gitea sign-in out of the forced password-change flow unless configured.

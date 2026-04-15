@@ -24,14 +24,26 @@ Environment work may still be implemented through multiple WBS items, but:
 - roadmap and WBS should reference this document rather than restating full environment details
 - status here should describe environment readiness, not only document completeness
 
+## Phase 1 Startup Posture
+Phase 1 does not require every environment dependency to be packaged inside the repository itself from day one.
+
+It does require a project-local operator surface so maintainers can bring up the current development stack from repository entrypoints instead of rebuilding ad hoc commands for each run.
+
+The initial bootstrap approach may therefore:
+- use repository-owned scripts as the stable startup surface
+- call external tools or services such as Docker where practical
+- keep `docker compose` or an equivalent one-command launcher as a later consolidation option once the actual service mix is stable
+
+See `docs/environment-bootstrap.md` for the current bootstrap entrypoints and their scope.
+
 ## Shared Environment Inventory
 | Environment ID | Name | Purpose | First Needed By | Primary WBS | Current Status |
 |---|---|---|---|---|---|
-| ENV-001 | Forge Environment | Receive source events and host issues, branches, PRs, and review state | Phase 1 | WBS 3.1, 3.4, 3.5 | Defined |
+| ENV-001 | Forge Environment | Receive source events and host issues, branches, PRs, and review state | Phase 1 | WBS 3.1, 3.4, 3.5 | Partially Scaffolded |
 | ENV-002 | Control Host | Run task gateway and direct session starter | Phase 1 | WBS 3.1, 3.2 | Defined |
-| ENV-003 | Worker Runtime | Execute bounded agent work in isolated per-session containers | Phase 1 | WBS 3.3, 3.4 | Defined |
+| ENV-003 | Worker Runtime | Execute bounded agent work in isolated per-session containers | Phase 1 | WBS 3.3, 3.4 | Docker Ready Probe In Place |
 | ENV-004 | CI Environment | Independently validate PR proposals | Phase 1 | WBS 3.5 | Defined |
-| ENV-005 | Traceability And State Storage | Preserve task, session, and proposal-linked metadata | Phase 1 | WBS 3.2, 3.4, 3.6 | Defined |
+| ENV-005 | Traceability And State Storage | Preserve task, session, and proposal-linked metadata | Phase 1 | WBS 3.2, 3.4, 3.6 | Bootstrap Scaffolded |
 | ENV-006 | Secret And Credential Surface | Provide minimum forge and workflow credentials to the right layers | Phase 1 | WBS 3.1, 3.2, 3.3, 3.5 | Defined |
 | ENV-007 | Future Deploy Environment | Remain downstream from agent execution and outside the Phase 1 closed loop | Phase 3+ | WBS 5+ | Deferred |
 
@@ -39,6 +51,12 @@ Environment work may still be implemented through multiple WBS items, but:
 
 ### ENV-001 - Forge Environment
 - Initial target: Gitea
+- Current bootstrap posture:
+  - local project bootstrap defaults to a PostgreSQL-backed Gitea stack
+  - SQLite remains an allowed lighter-weight fallback for narrow local bring-up
+  - local host access uses explicit forwarded high ports from `config/dev/gitea-bootstrap.json` instead of relying on common defaults
+  - the current bootstrap path avoids manual web install by applying tracked settings and creating the bootstrap admin user non-interactively
+  - bootstrap password refresh also reapplies the tracked admin `mustChangePassword` flag so manual sign-in does not drift into a forced password-change flow unless explicitly configured
 - Responsibilities:
   - source issue comment events
   - repository and branch surface
@@ -184,3 +202,7 @@ Environment requirements are centralized here, but implementation responsibility
 
 ## Change Log
 - 2026-04-14: Initial version.
+- 2026-04-15: Added the Phase 1 project-local startup posture and linked the current bootstrap guidance.
+- 2026-04-15: Recorded the local PostgreSQL-backed Gitea bootstrap default and updated environment readiness statuses for the current scaffold.
+- 2026-04-15: Added repo-owned bootstrap config, explicit high-port forwarding, and non-interactive local Gitea installation guidance.
+- 2026-04-15: Clarified that the bootstrap password-refresh path reapplies the tracked admin `mustChangePassword` setting to keep manual sign-in stable.
