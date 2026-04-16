@@ -1,0 +1,40 @@
+name: phase1-ci
+
+on:
+  pull_request:
+    types:
+      - opened
+      - synchronize
+      - reopened
+
+jobs:
+  verify:
+    runs-on: ubuntu-22.04
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Setup Node
+        uses: actions/setup-node@v4
+        with:
+          node-version: "22"
+          cache: npm
+
+      - name: Install Dependencies
+        run: npm ci
+
+      - name: Collect Verification Metadata
+        run: node scripts/ci/collect-verification-metadata.js
+
+      - name: Validate Platform Scripts
+        run: npm run validate:platform
+
+      - name: Typecheck
+        run: npm run typecheck
+
+      - name: Upload Verification Metadata Artifact
+        uses: actions/upload-artifact@v3
+        continue-on-error: true
+        with:
+          name: verification-metadata
+          path: .agent-sdlc/ci/verification-metadata.json

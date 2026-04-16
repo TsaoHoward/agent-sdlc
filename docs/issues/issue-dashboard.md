@@ -3,7 +3,7 @@
 ## Document Metadata
 - Version: 0.1
 - Status: Active
-- Last Updated: 2026-04-15
+- Last Updated: 2026-04-16
 - Owner: Project Maintainer
 - Source Template: docs/templates/issue-dashboard.template.md
 
@@ -45,7 +45,7 @@ It does not replace forge issues, roadmap/WBS planning structure, the decision b
 ## Dashboard
 | Issue ID | Title | Status | Related Docs / WBS | Next Action | Exit Path |
 |---|---|---|---|---|---|
-| I-001 | Phase 1 Minimum Closed Loop Implementation Packaging | In Progress | `docs/roadmap.md` Phase 1; WBS `3`, `3.1`-`3.6` | Attach the first CI workflow to the new proposal path and carry proposal/task linkage into verification state | Archive after the first slice is underway and the remaining work is split or absorbed into active execution tracking |
+| I-001 | Phase 1 Minimum Closed Loop Implementation Packaging | In Progress | `docs/roadmap.md` Phase 1; WBS `3`, `3.1`-`3.6` | Extend the new CI linkage into longer-lived traceability and review surfaces, then decide whether local artifact persistence should remain best-effort or move behind a forge-reachable URL | Archive after the first slice is underway and the remaining work is split or absorbed into active execution tracking |
 
 ## Issue Items
 
@@ -53,8 +53,8 @@ It does not replace forge issues, roadmap/WBS planning structure, the decision b
 - Status: `In Progress`
 - Related Docs / WBS: `docs/roadmap.md` Phase 1; `docs/wbs.md` WBS `3`, `3.1`, `3.2`, `3.3`, `3.4`, `3.5`, `3.6`
 - Why It Matters: The repository has completed the planning and design baseline for the first closed loop, but the implementation path still needs durable packaging into executable slices so work can leave the planning-only state.
-- Current State: Task-intake, policy, runtime, PR/CI, and traceability contracts are documented, and `config/policy/` scaffolding exists. The repo now also has a project-local environment bootstrap entrypoint plus a repo-owned Gitea bootstrap config that uses explicit high-port forwarding and non-interactive PostgreSQL-backed forge initialization by default, and the bootstrap password-refresh path now preserves the tracked admin `mustChangePassword` setting so manual sign-in does not fall into an unstable forced password-change flow. The current implementation slice now includes a webhook-backed task gateway that retains source-event evidence under `.agent-sdlc/state/source-events/`, writes normalized task requests under `.agent-sdlc/state/task-requests/`, and auto-starts the direct session starter for auto-approved issue-comment commands. ADR-0006 has now been applied to the repo in four concrete ways: an npm-managed control-plane baseline exists via `package.json`, `package-lock.json`, and `tsconfig.json`; the first worker-runtime Dockerfile exists at `docker/worker-runtime/Dockerfile` and has been built locally as `agent-sdlc-worker-runtime:test`; `agent-control start-session` now launches that image to prepare a per-session workspace and runtime artifacts under `.agent-sdlc/runtime/`; and `proposal-surface create-gitea-pr` now turns that prepared workspace into a real Gitea branch/PR proposal while writing the first linked traceability artifact into the proposal branch. The repo still lacks the independent CI workflow and the later lifecycle linkage from proposal through verification and review.
-- Next Action: Attach the first CI workflow to the new proposal path and carry `task_request_id` / `proposal_ref` into the verification state so WBS `3.5` can start.
+- Current State: Task-intake, policy, runtime, PR/CI, and traceability contracts are documented, and `config/policy/` scaffolding exists. The repo now also has a project-local environment bootstrap entrypoint plus a repo-owned Gitea bootstrap config that uses explicit high-port forwarding and non-interactive PostgreSQL-backed forge initialization by default, and the bootstrap password-refresh path now preserves the tracked admin `mustChangePassword` setting so manual sign-in does not fall into an unstable forced password-change flow. The current implementation slice now includes a webhook-backed task gateway that retains source-event evidence under `.agent-sdlc/state/source-events/`, writes normalized task requests under `.agent-sdlc/state/task-requests/`, and auto-starts the direct session starter for auto-approved issue-comment commands. ADR-0006 has now been applied to the repo in four concrete ways: an npm-managed control-plane baseline exists via `package.json`, `package-lock.json`, and `tsconfig.json`; the first worker-runtime Dockerfile exists at `docker/worker-runtime/Dockerfile` and has been built locally as `agent-sdlc-worker-runtime:test`; `agent-control start-session` now launches that image to prepare a per-session workspace and runtime artifacts under `.agent-sdlc/runtime/`; `proposal-surface create-gitea-pr` now turns that prepared workspace into a real Gitea branch/PR proposal while writing the first linked traceability artifact into the proposal branch; and the first PR-triggered CI workflow now runs on the local Gitea Actions stack, generating verification linkage in `.agent-sdlc/ci/verification-metadata.json`, job logs, and step summaries. The remaining near-term gap is to push that CI linkage farther into durable traceability and review surfaces while deciding whether local artifact persistence should remain best-effort under the current localhost-rooted bootstrap topology.
+- Next Action: Extend the new CI linkage into longer-lived traceability and review surfaces, then decide whether local artifact persistence should remain best-effort or move behind a forge-reachable URL.
 - Exit Path: Move this item to `docs/issues/issue-archive.md` once the first implementation slice is underway and the remaining work has been split into active execution issues or otherwise reflected in updated planning docs.
 - Supporting Notes: `docs/issues/items/I-001-phase1-minimum-closed-loop-implementation.md`
 - Promotion / Escalation Check: Update `docs/decisions/decision-backlog.md` and ADRs only if implementation uncovers a new major boundary, ownership, or governance decision.
@@ -71,3 +71,4 @@ It does not replace forge issues, roadmap/WBS planning structure, the decision b
 - 2026-04-15: Updated I-001 after implementing the npm-managed control-plane baseline and the first worker-runtime Dockerfile scaffold.
 - 2026-04-15: Updated I-001 after landing webhook-backed task intake, retained source-event records, and per-session worker-runtime handoff.
 - 2026-04-16: Updated I-001 after landing the first branch/PR proposal path and proposal-linked traceability artifact.
+- 2026-04-16: Updated I-001 after landing the first PR-triggered CI workflow, local Gitea runner helper, and verification-metadata linkage.

@@ -3,7 +3,7 @@
 ## Document Metadata
 - Version: 0.1
 - Status: Draft
-- Last Updated: 2026-04-15
+- Last Updated: 2026-04-16
 - Owner: Project Maintainer
 - Source Template: docs/templates/wbs.template.md
 
@@ -239,8 +239,8 @@
 - Deliverable: working CI skeleton with proposal/task linkage
 - Dependencies: 2.4, 3.4
 - Critical-Path-Candidate: Yes
-- Status: Not Started
-- Notes:
+- Status: Done
+- Notes: The first PR-triggered CI workflow now exists at `.gitea/workflows/phase1-ci.yml`, and the repo-local runner helper now exists at `node scripts/dev/ensure-local-gitea-runner.js ensure-runner`. The current workflow collects `.agent-sdlc/ci/verification-metadata.json` from the proposal branch, runs `npm ci`, `npm run validate:platform`, and `npm run typecheck`, and was smoke-tested successfully against the local Gitea stack with run `#14` completing successfully. Under the current localhost-rooted local forge topology, artifact upload remains best-effort and does not block the verification result.
 
 ### WBS 3.6 — Lifecycle Traceability Scaffold
 - Parent: 3
@@ -250,7 +250,7 @@
 - Dependencies: 2.5, 3.2, 3.4, 3.5
 - Critical-Path-Candidate: Yes
 - Status: In Progress
-- Notes: The first proposal-linked traceability artifact now exists. `proposal-surface create-gitea-pr` writes `.agent-sdlc/traceability/<task_request_id>.json` into the proposal branch and records `proposal_ref` / `proposal_url` back into the session record. Remaining work is to extend that linkage through CI and human review surfaces.
+- Notes: The first proposal-linked traceability artifact now exists. `proposal-surface create-gitea-pr` writes `.agent-sdlc/traceability/<task_request_id>.json` into the proposal branch and records `proposal_ref` / `proposal_url` back into the session record. CI now extends that linkage by generating `.agent-sdlc/ci/verification-metadata.json` plus reviewer-visible job-log and step-summary metadata containing `task_request_id`, `proposal_ref`, and the linked session/source identifiers. Remaining work is to write CI run references back into longer-lived traceability surfaces and extend the linkage through human review outcome.
 
 ### WBS 4 — Controlled Expansion
 - Parent:
@@ -398,3 +398,4 @@
 - 2026-04-15: Marked the npm-managed platform baseline implemented and moved WBS 3.3 to in progress after adding and locally building the first worker-runtime Dockerfile.
 - 2026-04-15: Marked WBS 3.1 done after landing the webhook-backed trigger path and updated WBS 3.2 and 3.3 to reflect runtime handoff into the worker image scaffold.
 - 2026-04-16: Marked WBS 3.4 done and WBS 3.6 in progress after landing the first branch/PR proposal path and proposal-linked traceability artifact.
+- 2026-04-16: Marked WBS 3.5 done after landing the local Gitea Actions runner helper, PR-triggered CI workflow skeleton, and verification-metadata linkage.

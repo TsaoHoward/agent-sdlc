@@ -42,7 +42,7 @@ See `docs/environment-bootstrap.md` for the current bootstrap entrypoints and th
 | ENV-001 | Forge Environment | Receive source events and host issues, branches, PRs, and review state | Phase 1 | WBS 3.1, 3.4, 3.5 | Partially Scaffolded |
 | ENV-002 | Control Host | Run task gateway and direct session starter | Phase 1 | WBS 3.1, 3.2 | Partially Scaffolded |
 | ENV-003 | Worker Runtime | Execute bounded agent work in isolated per-session containers | Phase 1 | WBS 3.3, 3.4 | Partially Scaffolded |
-| ENV-004 | CI Environment | Independently validate PR proposals | Phase 1 | WBS 3.5 | Defined |
+| ENV-004 | CI Environment | Independently validate PR proposals | Phase 1 | WBS 3.5 | Partially Scaffolded |
 | ENV-005 | Traceability And State Storage | Preserve task, session, and proposal-linked metadata | Phase 1 | WBS 3.2, 3.4, 3.6 | Bootstrap Scaffolded |
 | ENV-006 | Secret And Credential Surface | Provide minimum forge and workflow credentials to the right layers | Phase 1 | WBS 3.1, 3.2, 3.3, 3.5 | Defined |
 | ENV-007 | Future Deploy Environment | Remain downstream from agent execution and outside the Phase 1 closed loop | Phase 3+ | WBS 5+ | Deferred |
@@ -136,6 +136,12 @@ See `docs/environment-bootstrap.md` for the current bootstrap entrypoints and th
   - run independent verification on the PR path
   - publish objective pass/fail status to the review surface
   - preserve proposal/task linkage in CI metadata
+- Current bootstrap posture:
+  - the first PR-triggered workflow now exists at `.gitea/workflows/phase1-ci.yml`
+  - the repo-local runner helper now exists at `node scripts/dev/ensure-local-gitea-runner.js ensure-runner` and starts a local Gitea Actions runner on the shared Docker network used by the local forge
+  - the current workflow runs `npm ci`, `npm run validate:platform`, and `npm run typecheck`, then writes verification linkage to `.agent-sdlc/ci/verification-metadata.json`
+  - the current local smoke-test baseline has been exercised successfully against the local Gitea instance, with verification metadata visible in job logs and step summaries
+  - local artifact upload is currently best-effort because the bootstrap forge root URL points to host loopback, which is not directly reachable from job containers during artifact upload
 - Minimum requirements:
   - PR-triggered workflow support
   - required workflow enforcement for agent-opened PRs
@@ -163,6 +169,7 @@ See `docs/environment-bootstrap.md` for the current bootstrap entrypoints and th
   - `.agent-sdlc/state/agent-sessions/<agent_session_id>.json`
   - `.agent-sdlc/runtime/artifacts/<agent_session_id>/runtime-launch.json`
   - proposal-branch artifact at `.agent-sdlc/traceability/<task_request_id>.json`
+  - workflow-created verification metadata at `.agent-sdlc/ci/verification-metadata.json`
   - local prepared-workspace mirror at `.agent-sdlc/runtime/workspaces/<agent_session_id>/.agent-sdlc/traceability/<task_request_id>.json`
 - Primary source docs:
   - `docs/architecture/agent-control-integration-plan.md`
@@ -234,3 +241,4 @@ Environment requirements are centralized here, but implementation responsibility
 - 2026-04-15: Marked the npm-managed control-plane baseline and first worker-runtime Dockerfile as implemented scaffolds.
 - 2026-04-15: Updated ENV-002, ENV-003, and ENV-005 after landing webhook intake, retained source-event evidence, and per-session worker-runtime launch artifacts.
 - 2026-04-16: Updated ENV-001, ENV-002, and ENV-005 after landing the local Gitea repo helper, proposal-surface CLI, and first PR-linked traceability artifact.
+- 2026-04-16: Marked ENV-004 partially scaffolded after landing the local Gitea Actions runner helper, PR-triggered workflow skeleton, and verification-metadata output path.

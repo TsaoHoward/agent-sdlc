@@ -107,6 +107,7 @@ npm run validate:platform
 npm run typecheck
 npm run task-gateway:webhook
 npm run dev:gitea-repo -- ensure-local-repo --owner howard --repo agent-sdlc --seed-from .
+npm run dev:gitea-runner -- ensure-runner
 npm run proposal-surface -- create-gitea-pr --session .agent-sdlc/state/agent-sessions/<agent_session_id>.json
 docker build -f docker/worker-runtime/Dockerfile -t agent-sdlc-worker-runtime:test .
 ```

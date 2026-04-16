@@ -1,4 +1,5 @@
 .agent-sdlc/dev-env/
+.agent-sdlc/ci/
 .agent-sdlc/state/
 .agent-sdlc/runtime/
 .agent-sdlc/traceability/
