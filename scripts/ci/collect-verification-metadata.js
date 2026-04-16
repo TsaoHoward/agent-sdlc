@@ -51,6 +51,7 @@ function appendStepSummary(metadata) {
     `- Task Request: \`${metadata.task_request_id}\``,
     `- Proposal Ref: \`${metadata.proposal_ref}\``,
     `- Proposal URL: ${metadata.proposal_url || "n/a"}`,
+    `- CI Run: \`${metadata.ci_run_ref || "n/a"}\``,
     `- Source Event: \`${metadata.source_event_id}\``,
     `- Verification Metadata: \`${metadata.verification_metadata_path}\``,
   ];
@@ -74,6 +75,10 @@ function main() {
 
   const eventPayloadPath = process.env.GITHUB_EVENT_PATH || process.env.GITEA_EVENT_PATH || null;
   const verificationMetadataPath = path.join(outputDir, "verification-metadata.json");
+  const ciRunRef = process.env.GITHUB_RUN_ID || process.env.GITEA_RUN_ID || process.env.GITHUB_RUN_NUMBER || process.env.GITEA_RUN_NUMBER || null;
+  const ciRunUrl = process.env.GITHUB_SERVER_URL && process.env.GITHUB_REPOSITORY && process.env.GITHUB_RUN_ID
+    ? `${process.env.GITHUB_SERVER_URL}/${process.env.GITHUB_REPOSITORY}/actions/runs/${process.env.GITHUB_RUN_ID}`
+    : null;
   const verificationMetadata = {
     verification_version: 1,
     created_at: utcNow(),
@@ -91,8 +96,10 @@ function main() {
     traceability_metadata_path: ".agent-sdlc/traceability/" + path.basename(traceabilityFiles[0]),
     verification_metadata_path: ".agent-sdlc/ci/verification-metadata.json",
     workflow_ref: process.env.GITHUB_WORKFLOW || process.env.GITEA_WORKFLOW || "phase1-ci",
-    workflow_run_number: process.env.GITHUB_RUN_NUMBER || null,
-    workflow_run_id: process.env.GITHUB_RUN_ID || null,
+    workflow_run_number: process.env.GITHUB_RUN_NUMBER || process.env.GITEA_RUN_NUMBER || null,
+    workflow_run_id: process.env.GITHUB_RUN_ID || process.env.GITEA_RUN_ID || null,
+    ci_run_ref: ciRunRef,
+    ci_run_url: ciRunUrl,
     event_name: process.env.GITHUB_EVENT_NAME || process.env.GITEA_EVENT_NAME || null,
     event_payload_path: eventPayloadPath,
     ci_status: "pending",

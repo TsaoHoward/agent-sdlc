@@ -16,7 +16,7 @@
     "dev:gitea-repo": "node scripts/dev/ensure-local-gitea-repo.js",
     "dev:gitea-runner": "node scripts/dev/ensure-local-gitea-runner.js",
     "typecheck": "node ./node_modules/typescript/bin/tsc --noEmit",
-    "validate:platform": "node --check scripts/task-gateway.js && node --check scripts/agent-control.js && node --check scripts/proposal-surface.js && node --check scripts/ci/collect-verification-metadata.js && node --check scripts/dev/ensure-local-gitea-repo.js && node --check scripts/dev/ensure-local-gitea-runner.js && node --check scripts/lib/simple-yaml.js && node --check scripts/lib/policy-loader.js && node --check scripts/lib/project-state.js && node --check scripts/lib/runtime-launcher.js && node --check scripts/lib/gitea-client.js"
+    "validate:platform": "node --check scripts/task-gateway.js && node --check scripts/agent-control.js && node --check scripts/proposal-surface.js && node --check scripts/ci/collect-verification-metadata.js && node --check scripts/ci/attach-ci-traceability.js && node --check scripts/dev/ensure-local-gitea-repo.js && node --check scripts/dev/ensure-local-gitea-runner.js && node --check scripts/lib/simple-yaml.js && node --check scripts/lib/policy-loader.js && node --check scripts/lib/project-state.js && node --check scripts/lib/runtime-launcher.js && node --check scripts/lib/gitea-client.js"
   },
   "devDependencies": {
     "@types/node": "^22.0.0",

@@ -20,7 +20,7 @@ function printUsage() {
   console.error(
     [
       "Usage:",
-      "  node scripts/task-gateway.js normalize-gitea-issue-comment --event <event-json-path>",
+      "  node scripts/task-gateway.js normalize-gitea-issue-comment --event <event-json-path> [--auto-start-session]",
       "  node scripts/task-gateway.js serve-gitea-webhook [--host <host>] [--port <port>] [--route <path>] [--no-auto-start-session]",
     ].join("\n"),
   );
@@ -34,15 +34,35 @@ function parseArguments(argv) {
 
   const command = argv[2];
   if (command === "normalize-gitea-issue-comment") {
-    if (argv.length !== 5 || argv[3] !== "--event") {
+    const options = {
+      command,
+      eventPath: null,
+      autoStartSession: false,
+    };
+
+    for (let index = 3; index < argv.length; index += 1) {
+      const token = argv[index];
+      if (token === "--event") {
+        options.eventPath = path.resolve(argv[index + 1]);
+        index += 1;
+        continue;
+      }
+
+      if (token === "--auto-start-session") {
+        options.autoStartSession = true;
+        continue;
+      }
+
       printUsage();
       process.exit(1);
     }
 
-    return {
-      command,
-      eventPath: path.resolve(argv[4]),
-    };
+    if (!options.eventPath) {
+      printUsage();
+      process.exit(1);
+    }
+
+    return options;
   }
 
   if (command === "serve-gitea-webhook") {
@@ -488,11 +508,28 @@ function buildAcceptedOutput(repoRoot, normalizeResult, sessionStartResult = nul
   return output;
 }
 
-function handleNormalizeFromFile(repoRoot, eventPath) {
+function handleNormalizeFromFile(repoRoot, eventPath, autoStartSession) {
   const statePaths = ensureProjectState(repoRoot);
   const envelope = normalizeEventEnvelopeFromFile(eventPath);
   const sourcePayloadRef = toRepoRelativePath(repoRoot, eventPath);
-  return normalizeTaskRequest(repoRoot, statePaths, envelope, sourcePayloadRef);
+  const sourceEventPath = persistSourceEvent(repoRoot, statePaths, envelope);
+  const normalizeResult = normalizeTaskRequest(
+    repoRoot,
+    statePaths,
+    envelope,
+    sourcePayloadRef,
+  );
+
+  if (normalizeResult.status !== "accepted") {
+    return normalizeResult;
+  }
+
+  let sessionStartResult = null;
+  if (autoStartSession && normalizeResult.approvalState === "auto-approved") {
+    sessionStartResult = startAgentSession(repoRoot, normalizeResult.taskRequestPath);
+  }
+
+  return buildAcceptedOutput(repoRoot, normalizeResult, sessionStartResult);
 }
 
 function writeJsonResponse(response, statusCode, payload) {
@@ -589,10 +626,10 @@ function main() {
     const options = parseArguments(process.argv);
 
     if (options.command === "normalize-gitea-issue-comment") {
-      const result = handleNormalizeFromFile(repoRoot, options.eventPath);
+      const result = handleNormalizeFromFile(repoRoot, options.eventPath, options.autoStartSession);
 
       if (result.status === "accepted") {
-        console.log(JSON.stringify(buildAcceptedOutput(repoRoot, result), null, 2));
+        console.log(JSON.stringify(result, null, 2));
         process.exit(0);
       }
 

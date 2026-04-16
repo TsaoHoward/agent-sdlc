@@ -209,8 +209,8 @@
 - Deliverable: working agent session starter
 - Dependencies: 2.2
 - Critical-Path-Candidate: Yes
-- Status: In Progress
-- Notes: A direct session-start CLI now exists at `node scripts/agent-control.js start-session --task-request <path>`, writes session records under `.agent-sdlc/state/agent-sessions/`, and now performs runtime handoff into the worker container scaffold. A repo-owned npm baseline also exists via `package.json`, `package-lock.json`, and `tsconfig.json`. Remaining work is to assemble fuller session context for actual agent execution and carry the session forward into proposal creation.
+- Status: Done
+- Notes: A direct session-start CLI exists at `node scripts/agent-control.js start-session --task-request <path>`, writes session records under `.agent-sdlc/state/agent-sessions/`, and performs runtime handoff into the worker container scaffold. File-backed task intake now supports optional `--auto-start-session`, enabling end-to-end manual event replay without requiring the webhook route. The session record includes runtime workspace and artifact references for later proposal and verification handoff.
 
 ### WBS 3.3 — Worker Runtime Scaffold
 - Parent: 3
@@ -219,8 +219,8 @@
 - Deliverable: working isolated runtime scaffold
 - Dependencies: 2.3
 - Critical-Path-Candidate: Yes
-- Status: In Progress
-- Notes: The first repo-owned worker-runtime Dockerfile now exists at `docker/worker-runtime/Dockerfile`, has been built locally as `agent-sdlc-worker-runtime:test`, and is now exercised by `agent-control start-session` for a real per-session runtime launch path. The current slice prepares a session-local workspace checkout plus runtime-launch artifacts under `.agent-sdlc/runtime/`. Remaining work is to use that prepared workspace for branch/PR proposal flow and later execution steps.
+- Status: Done
+- Notes: The first repo-owned worker-runtime Dockerfile exists at `docker/worker-runtime/Dockerfile`, has been built locally as `agent-sdlc-worker-runtime:test`, and is exercised by `agent-control start-session` for a per-session runtime launch path. The runtime now prepares a session-local workspace checkout plus runtime-launch artifacts under `.agent-sdlc/runtime/` that are consumed by the proposal path.
 
 ### WBS 3.4 — PR Proposal Path
 - Parent: 3
@@ -249,8 +249,8 @@
 - Deliverable: minimal end-to-end traceability scaffold
 - Dependencies: 2.5, 3.2, 3.4, 3.5
 - Critical-Path-Candidate: Yes
-- Status: In Progress
-- Notes: The first proposal-linked traceability artifact now exists. `proposal-surface create-gitea-pr` writes `.agent-sdlc/traceability/<task_request_id>.json` into the proposal branch and records `proposal_ref` / `proposal_url` back into the session record. CI now extends that linkage by generating `.agent-sdlc/ci/verification-metadata.json` plus reviewer-visible job-log and step-summary metadata containing `task_request_id`, `proposal_ref`, and the linked session/source identifiers. Remaining work is to write CI run references back into longer-lived traceability surfaces and extend the linkage through human review outcome.
+- Status: Done
+- Notes: The first proposal-linked traceability artifact exists. `proposal-surface create-gitea-pr` writes `.agent-sdlc/traceability/<task_request_id>.json` into the proposal branch and records `proposal_ref` / `proposal_url` back into the session record. CI now extends that linkage by generating `.agent-sdlc/ci/verification-metadata.json`, reviewer-visible job-log and step-summary metadata, and a linked traceability artifact enriched with `ci_run_ref`, workflow metadata, and verification status for the first end-to-end traceability path. Review outcome linkage remains a later follow-up.
 
 ### WBS 4 — Controlled Expansion
 - Parent:

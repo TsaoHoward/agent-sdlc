@@ -26,6 +26,9 @@ jobs:
       - name: Collect Verification Metadata
         run: node scripts/ci/collect-verification-metadata.js
 
+      - name: Attach CI Traceability
+        run: node scripts/ci/attach-ci-traceability.js
+
       - name: Validate Platform Scripts
         run: npm run validate:platform
 
@@ -36,4 +39,6 @@ jobs:
         uses: actions/upload-artifact@v3
         with:
           name: verification-metadata
-          path: .agent-sdlc/ci/verification-metadata.json
+          path: |
+            .agent-sdlc/ci/verification-metadata.json
+            .agent-sdlc/traceability/*.json
