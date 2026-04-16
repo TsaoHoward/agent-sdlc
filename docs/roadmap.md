@@ -13,6 +13,10 @@
 - Each phase should map to one or more WBS sections in `docs/wbs.md`.
 - Assumptions and open questions must remain explicit.
 
+## Environment Requirements First
+This roadmap follows the environment capability requirements defined in `docs/environment-requirements.md`.
+Phase planning is sequenced from those requirements: define the environment baseline first, then schedule Phase 0 and Phase 1 against that baseline.
+
 ## Scope Summary
 ### Goals
 - Establish a maintainable baseline for an agent-oriented SDLC system.
@@ -44,6 +48,10 @@
 - Avoid premature lock-in to a single tool.
 - Keep planning documents stable enough for future agent runs.
 - Separate architecture, policy, planning, and implementation concerns.
+
+## Environment Requirements First
+This roadmap is grounded on the environment capability requirements defined in `docs/environment-requirements.md`.
+Phase planning should follow those requirements: define what the environment must provide first, then schedule phases against that baseline.
 
 ---
 

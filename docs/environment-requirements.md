@@ -1,214 +1,208 @@
 # Environment Requirements
 
 ## Purpose
-This document centralizes the environment requirements for the project across planning, implementation, verification, and later evolution.
+This document defines the shared environment capability requirements for the repository.
 
-It exists so environment expectations do not stay fragmented across phase-specific WBS items or architecture notes.
+It exists so environment expectations are defined before phases are scheduled, so Phase 1 and later phases build on a clear set of readiness criteria rather than on ad hoc assumptions.
 
 ## Goals
-- provide one durable source of truth for project environment needs
-- separate environment inventory from phase-specific implementation sequencing
-- make shared environment dependencies easy to assign, track, and review
-- keep environment planning aligned with the layered architecture
+- define environment capabilities first, then derive phase sequencing from them
+- make environment requirements concrete and verifiable
+- keep environment requirements separate from implementation commands and bootstrap details
+- centralize readiness gate criteria for project-local forge, control host, runtime, CI, and traceability
+- preserve architecture boundary clarity while the environment evolves
 
 ## Non-Goals
-- replacing the architecture docs that define ownership and boundaries
-- selecting the final long-term platform for every layer
-- defining low-level host provisioning scripts in Phase 1
+- replacing architecture docs that define ownership and boundaries
+- prescribing the final long-term runtime or deployment engine
+- turning this document into a low-level provisioning script
 
-## Environment Tracking Model
-Use this document as the centralized environment tracker.
+## Requirement Model
+Environment requirements are defined as capability items with acceptance criteria.
 
-Environment work may still be implemented through multiple WBS items, but:
-- the requirement definition lives here
-- roadmap and WBS should reference this document rather than restating full environment details
-- status here should describe environment readiness, not only document completeness
+Each item should answer:
+- what capability is required?
+- why is it required for the first closed loop?
+- what counts as minimum Phase 1 acceptance?
+- which later phase topics depend on it?
 
-## Phase 1 Startup Posture
-Phase 1 does not require every environment dependency to be packaged inside the repository itself from day one.
+Implementation details and current bootstrap commands belong in `docs/environment-bootstrap.md`.
 
-It does require a project-local operator surface so maintainers can bring up the current development stack from repository entrypoints instead of rebuilding ad hoc commands for each run.
+## Overview
+This repository separates environment planning from phase planning.
 
-The initial bootstrap approach may therefore:
-- use repository-owned scripts as the stable startup surface
-- call external tools or services such as Docker where practical
-- keep `docker compose` or an equivalent one-command launcher as a later consolidation option once the actual service mix is stable
+1. Define the environment capability requirements and their Phase 1 acceptance criteria.
+2. Use those requirements as the baseline for Phase 0 and Phase 1 scheduling.
+3. Only then split the work into phases and WBS items.
 
-See `docs/environment-bootstrap.md` for the current bootstrap entrypoints and their scope.
+Phase 0 is therefore not just document writing; it is the work of making environment readiness observable and actionable.
 
 ## Shared Environment Inventory
-| Environment ID | Name | Purpose | First Needed By | Primary WBS | Current Status |
+| Environment ID | Name | Purpose | First Needed By | Primary WBS | Phase 1 Acceptance |
 |---|---|---|---|---|---|
-| ENV-001 | Forge Environment | Receive source events and host issues, branches, PRs, and review state | Phase 1 | WBS 3.1, 3.4, 3.5 | Partially Scaffolded |
-| ENV-002 | Control Host | Run task gateway and direct session starter | Phase 1 | WBS 3.1, 3.2 | Partially Scaffolded |
-| ENV-003 | Worker Runtime | Execute bounded agent work in isolated per-session containers | Phase 1 | WBS 3.3, 3.4 | Partially Scaffolded |
-| ENV-004 | CI Environment | Independently validate PR proposals | Phase 1 | WBS 3.5 | Partially Scaffolded |
-| ENV-005 | Traceability And State Storage | Preserve task, session, and proposal-linked metadata | Phase 1 | WBS 3.2, 3.4, 3.6 | Bootstrap Scaffolded |
-| ENV-006 | Secret And Credential Surface | Provide minimum forge and workflow credentials to the right layers | Phase 1 | WBS 3.1, 3.2, 3.3, 3.5 | Defined |
-| ENV-007 | Future Deploy Environment | Remain downstream from agent execution and outside the Phase 1 closed loop | Phase 3+ | WBS 5+ | Deferred |
+| ENV-001 | Forge Environment | Receive source events and host issues, branches, PRs, and review state | Phase 1 | WBS 3.1, 3.4, 3.5 | local forge available, event delivery, branch/PR automation, review gate |
+| ENV-002 | Control Host | Run task gateway, session starter, and orchestrate handoff | Phase 1 | WBS 3.1, 3.2 | runnable Node.js control host, task intake, session start, persisted state |
+| ENV-003 | Agent Runtime | Execute bounded agent work in isolated per-session containers | Phase 1 | WBS 3.3, 3.4 | worker image buildable, session container startable, workspace prepared |
+| ENV-004 | CI Environment | Independently validate PR proposals | Phase 1 | WBS 3.5 | PR workflow runs, verification metadata produced, status visible |
+| ENV-005 | Traceability And State Storage | Preserve task, session, and proposal-linked metadata | Phase 1 | WBS 3.2, 3.4, 3.6 | file-backed state and proposal traceability artifact exist |
+| ENV-006 | Secret And Credential Surface | Provide minimum forge and workflow credentials to the right layers | Phase 1 | WBS 3.1, 3.2, 3.3, 3.5 | scoped secrets only, no broad default injection |
+| ENV-007 | Future Deploy Environment | Remain downstream from agent execution and outside the Phase 1 closed loop | Phase 3+ | WBS 5+ | deferred for Phase 1 |
 
 ## Environment Requirements
 
 ### ENV-001 - Forge Environment
-- Initial target: Gitea
-- Current bootstrap posture:
-  - local project bootstrap defaults to a PostgreSQL-backed Gitea stack
-  - SQLite remains an allowed lighter-weight fallback for narrow local bring-up
-  - local host access uses explicit forwarded high ports from `config/dev/gitea-bootstrap.json` instead of relying on common defaults
-  - the current bootstrap path avoids manual web install by applying tracked settings and creating the bootstrap admin user non-interactively
-  - bootstrap password refresh also reapplies the tracked admin `mustChangePassword` flag so manual sign-in does not drift into a forced password-change flow unless explicitly configured
-  - a repo-local helper now exists at `node scripts/dev/ensure-local-gitea-repo.js ensure-local-repo --owner <owner> --repo <repo> --seed-from <path>` so the Phase 1 proposal path can target a known local Gitea repository during development
-- Responsibilities:
-  - source issue comment events
-  - repository and branch surface
-  - PR creation and review surface
-  - CI trigger attachment surface
-- Minimum requirements:
-  - repository with issue and PR support
-  - webhook or equivalent event delivery for issue comments
-  - API or automation path for branch and PR creation
-  - branch protection or equivalent merge controls so human review remains the gate
+- Purpose:
+  - host issues, comments, branches, PRs, and review state
+  - deliver issue-comment events to the task gateway
+  - provide a branch/PR automation surface for proposals
+  - expose CI trigger capability and review gating
+- Minimum Phase 1 acceptance:
+  - local forge instance available and reachable from the control host
+  - issue-comment event delivery path exists and can be exercised
+  - repository branch and PR creation APIs are callable
+  - PR status or review control exists so human review can remain a gate
+- Current posture:
+  - local Gitea bootstrap is scaffolded in repo-owned config
+  - helper exists to provision a local owner/repo path for proposal flow testing
+  - bootstrap settings now include explicit host ports and non-interactive install behavior
+- Readiness check:
+  - create a local issue and exercise an issue-comment webhook through the task gateway
+  - create a branch and PR from the proposal surface and verify it appears in local Gitea
 - Primary source docs:
   - `docs/architecture/task-intake-contract.md`
   - `docs/architecture/pr-and-ci-path-definition.md`
   - `docs/decisions/ADR-0002-phase1-target-policy-and-runtime.md`
 
 ### ENV-002 - Control Host
-- Responsibilities:
-  - receive normalized task intake flow
-  - run the direct session starter
-  - persist task and session records outside transient memory
-  - hand off selected capability sets into runtime
-- Implementation-stack baseline:
-  - the platform control host should converge on `TypeScript` running on `Node.js LTS`
-  - repo-owned Node-based platform code should move under `npm` management as the current CLI scaffolds become a formal package
-  - local bootstrap wrappers may remain in PowerShell without redefining the platform's primary service stack
-- Current bootstrap posture:
-  - repo-owned `package.json`, `package-lock.json`, and `tsconfig.json` now define the npm-managed control-plane baseline
-  - repo-local control-host entrypoints now exist at `node scripts/task-gateway.js normalize-gitea-issue-comment --event <path>`, `node scripts/task-gateway.js serve-gitea-webhook ...`, `node scripts/agent-control.js start-session --task-request <path>`, and `node scripts/proposal-surface.js create-gitea-pr --session <path>`
-  - the current implementation uses plain Node.js CLI scaffolds as an early slice on the selected TypeScript/Node.js convergence path
-  - actual Gitea issue-comment webhook delivery now lands on the repo-local task gateway, which persists retained source-event evidence plus normalized task requests before calling the direct session starter
-  - the proposal surface now reads the prepared session/task records, force-adds the linked traceability artifact inside the prepared workspace, pushes `agent/<task_request_id>` to Gitea, and creates or updates the PR
-  - approval handling beyond auto-approved tasks remains a later slice
-- Minimum requirements:
-  - ability to run the task gateway implementation
-  - ability to invoke `agent-control start-session --task-request <path>`
-  - access to repository policy/config/docs needed for context assembly
-  - access to the local container runner used for worker startup
-- Recommended Phase 1 posture:
-  - single trusted orchestration host is acceptable
-  - separate service decomposition is not required yet
+- Purpose:
+  - normalize source events into task requests
+  - start agent sessions and track session state
+  - persist state and hand off selected capabilities to runtime
+- Minimum Phase 1 acceptance:
+  - task gateway can normalize an issue comment event into a persisted task request
+  - direct session starter can create a session record and prepare runtime handoff artifacts
+  - task and session record persistence is observable under `.agent-sdlc/state/`
+- Current posture:
+  - npm-managed Node.js control-plane baseline exists
+  - task gateway CLI and webhook listener commands are implemented
+  - direct session start CLI exists and writes agent session records
+  - approval beyond auto-approved tasks is intentionally deferred
+- Readiness check:
+  - normalize a sample Gitea event and confirm `.agent-sdlc/state/task-requests/<id>.json`
+  - run `agent-control start-session` and confirm `.agent-sdlc/state/agent-sessions/<id>.json`
 - Primary source docs:
   - `docs/architecture/agent-control-integration-plan.md`
   - `docs/architecture/task-intake-contract.md`
 
-### ENV-003 - Worker Runtime
-- Initial target: host-local Docker-compatible container runner
-- Responsibilities:
-  - create one isolated worker per accepted task/session
-  - prepare fresh session-local checkout/workspace
-  - execute bounded commands under the selected capability set
-  - export approved artifacts only
-- Packaging baseline:
-  - the first worker runtime should become a repo-owned container image defined by a Dockerfile
-  - worker packaging should remain separate from the control-plane image so runtime isolation stays reviewable and explicit
-- Current bootstrap posture:
-  - the first worker-runtime Dockerfile now exists at `docker/worker-runtime/Dockerfile`
-  - the current image scaffold has been built locally as `agent-sdlc-worker-runtime:test`
-  - the current session starter now launches that image as a per-session container, prepares a fresh workspace checkout under `.agent-sdlc/runtime/workspaces/`, and exports runtime-launch artifacts under `.agent-sdlc/runtime/artifacts/`
-  - remaining work is to connect the prepared worker workspace to the proposal path and later execution steps
-- Minimum requirements:
-  - container runner available to the control host
-  - non-root execution inside the worker
-  - no host Docker socket exposed inside the worker
-  - session-local workspace rather than direct host developer workspace binding
-- Phase 1 defaults:
-  - broad egress is temporarily allowed
-  - dependency caches are not mounted by default
-  - explicit artifact export is required
+### ENV-003 - Agent Runtime
+- Purpose:
+  - execute bounded agent work in an isolated, per-session runtime
+  - prepare a fresh session-local checkout and workspace
+  - produce workspace artifacts that can be proposed and verified
+- Minimum Phase 1 acceptance:
+  - worker runtime image is buildable from repository Dockerfile
+  - control host can launch a per-session worker container
+  - a session-local workspace is created under `.agent-sdlc/runtime/workspaces/`
+  - runtime launch metadata is written under `.agent-sdlc/runtime/artifacts/`
+- Current posture:
+  - initial worker-runtime Dockerfile exists
+  - image scaffold has been built locally as `agent-sdlc-worker-runtime:test`
+  - session starter prepares runtime launch artifacts and workspace paths
+- Readiness check:
+  - build worker runtime image successfully
+  - start a runtime container and confirm the session workspace exists
 - Primary source docs:
   - `docs/architecture/runtime-isolation.md`
   - `docs/decisions/ADR-0002-phase1-target-policy-and-runtime.md`
   - `docs/decisions/ADR-0003-phase1-runtime-egress-and-secret-defaults.md`
 
 ### ENV-004 - CI Environment
-- Responsibilities:
-  - run independent verification on the PR path
+- Purpose:
+  - independently validate proposed changes on the PR path
   - publish objective pass/fail status to the review surface
   - preserve proposal/task linkage in CI metadata
-- Current bootstrap posture:
-  - the first PR-triggered workflow now exists at `.gitea/workflows/phase1-ci.yml`
-  - the repo-local runner helper now exists at `node scripts/dev/ensure-local-gitea-runner.js ensure-runner` and adapts the runner and job-container network mode when the tracked local forge base URL points to host loopback
-  - the current workflow runs `npm ci`, `npm run validate:platform`, and `npm run typecheck`, then writes verification linkage to `.agent-sdlc/ci/verification-metadata.json`
-  - the current local smoke-test baseline has been exercised successfully against the local Gitea instance, with verification metadata visible in job logs, step summaries, and a persisted workflow artifact after validation run `#19`
-  - the localhost-rooted topology now succeeds by using host networking plus an injected `agent-sdlc-gitea` host alias for job containers, although local artifact listing visibility in Gitea still needs follow-up if operator browsing becomes important
-- Minimum requirements:
-  - PR-triggered workflow support
-  - required workflow enforcement for agent-opened PRs
-  - visibility of CI outcome in the PR surface
-- Phase 1 trigger expectations:
-  - PR open
-  - PR update / synchronize
-  - PR reopen
+- Minimum Phase 1 acceptance:
+  - PR-triggered workflow exists and can be executed
+  - workflow produces verification metadata linked to the traceability artifact
+  - CI result visibility is present in the PR or workflow output
+- Current posture:
+  - PR workflow skeleton defined in `.gitea/workflows/phase1-ci.yml`
+  - local runner helper exists to adapt host-loopback network topology
+  - current workflow runs npm validation and writes `.agent-sdlc/ci/verification-metadata.json`
+- Readiness check:
+  - execute the workflow for a proposal branch and confirm metadata output
+  - confirm the workflow run is visible in local Gitea
 - Primary source docs:
   - `docs/architecture/pr-and-ci-path-definition.md`
   - `docs/architecture/lifecycle-traceability-contract.md`
 
 ### ENV-005 - Traceability And State Storage
-- Responsibilities:
-  - persist normalized task request records
-  - persist session records
-  - persist proposal-linked traceability artifact references
-- Minimum requirements:
-  - file-backed JSON records under `.agent-sdlc/state/`
-  - proposal-linked metadata artifact under `.agent-sdlc/traceability/`
-  - retention long enough to cover PR lifecycle and short post-completion review
-- Phase 1 record paths:
-  - `.agent-sdlc/state/source-events/<source_event_record_id>.json`
-  - `.agent-sdlc/state/task-requests/<task_request_id>.json`
-  - `.agent-sdlc/state/agent-sessions/<agent_session_id>.json`
-  - `.agent-sdlc/runtime/artifacts/<agent_session_id>/runtime-launch.json`
-  - proposal-branch artifact at `.agent-sdlc/traceability/<task_request_id>.json`
-  - workflow-created verification metadata at `.agent-sdlc/ci/verification-metadata.json`
-  - local prepared-workspace mirror at `.agent-sdlc/runtime/workspaces/<agent_session_id>/.agent-sdlc/traceability/<task_request_id>.json`
+- Purpose:
+  - persist task, session, proposal, CI, and review linkage
+  - keep lifecycle state outside transient runtime memory
+  - support later audit and review tracing
+- Minimum Phase 1 acceptance:
+  - state records exist under `.agent-sdlc/state/`
+  - proposal traceability artifact exists under `.agent-sdlc/traceability/`
+  - CI metadata output path is defined and populated
+- Current posture:
+  - file-backed state and traceability surfaces are scaffolded
+  - proposal surface writes `.agent-sdlc/traceability/<task_request_id>.json`
+  - verification metadata path is recognized by CI collection logic
+- Readiness check:
+  - validate that task/session/proposal records exist and reference each other
+  - confirm traceability artifact is committed or staged into the proposal branch
 - Primary source docs:
   - `docs/architecture/agent-control-integration-plan.md`
   - `docs/architecture/task-intake-contract.md`
   - `docs/architecture/lifecycle-traceability-contract.md`
 
 ### ENV-006 - Secret And Credential Surface
-- Responsibilities:
-  - supply the minimum credentials needed for forge, PR, or CI-related actions
-  - keep broad runtime network access separate from credential access
-- Minimum requirements:
-  - no secret injection unless the selected profile requires it
-  - scoped credentials only
-  - ability to withhold secrets from investigation-only or escalation-hold profiles
-- Phase 1 expectation:
-  - secret handling remains profile-specific and intentionally minimal
+- Purpose:
+  - provide the minimum credentials for forge, proposal, and CI operations
+  - keep credential handling separate from runtime capability grants
+- Minimum Phase 1 acceptance:
+  - secrets are scoped and provided only when needed
+  - secret injection is not the default path for Phase 1
+  - credential handoff is explicit and auditable
+- Current posture:
+  - secret handling is documented as profile-specific
+  - operator-provided environment variables are the current surface
+- Readiness check:
+  - confirm forge automation can operate with the configured credentials
+  - verify no broad credentials are implicitly exposed to the worker runtime
 - Primary source docs:
   - `docs/architecture/runtime-isolation.md`
   - `config/policy/runtime-capability-sets.yaml`
   - `docs/decisions/ADR-0003-phase1-runtime-egress-and-secret-defaults.md`
 
 ### ENV-007 - Future Deploy Environment
-- Responsibilities:
-  - release packaging, promotion, and environment deployment
+- Purpose:
+  - support later release packaging and environment deployment
 - Phase guidance:
-  - not part of the Phase 1 closed loop
-  - remains downstream from agent execution
-  - should not be coupled into the worker runtime or agent control plane
+  - not required for Phase 1 closed loop
+  - remains downstream from agent execution and review
+  - should not be coupled into the worker runtime or control plane at this stage
+- Readiness check:
+  - defer deploy environment readiness until Phase 3 planning
 - Primary source docs:
   - `docs/architecture/overview.md`
   - `docs/project-overview.md`
 
+## Phase Planning Based on Environment Requirements
+1. Define the environment requirements and acceptance criteria.
+2. Confirm Phase 1 acceptance gates for the required environment items.
+3. Split the work into phases and WBS items that implement those gates.
+
+This document therefore drives phase planning, not the other way around.
+
 ## Phase Mapping
 | Phase | Environment Focus |
 |---|---|
-| Phase 0 | define environment requirements and boundaries without overcommitting platform specifics |
-| Phase 1 | stand up forge, control host, worker runtime, CI, and file-backed traceability for the first closed loop |
-| Phase 2 | improve observability, richer policy packs, and stronger operational handling |
-| Phase 3 | revisit remote workers, broader orchestration, and stronger long-term governance/deploy handoff |
+| Phase 0 | define environment requirements, architecture boundaries, and documented acceptance criteria |
+| Phase 1 | implement the first closed loop on top of the defined Phase 1 environment requirements |
+| Phase 2 | strengthen operational readiness, observability, and policy execution environment |
+| Phase 3 | evolve toward remote worker models, deploy handoff, and broader governance |
 
 ## WBS Mapping Guidance
 Environment requirements are centralized here, but implementation responsibility stays distributed:

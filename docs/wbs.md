@@ -110,7 +110,7 @@
 - Dependencies: 1.2, 1.3, 1.4
 - Critical-Path-Candidate: Yes
 - Status: Done
-- Notes: This document centralizes environment needs while implementation remains distributed across later WBS items.
+- Notes: This document centralizes environment needs and defines concrete Phase 1 acceptance criteria that drive later phase decomposition and implementation planning.
 
 ### WBS 1.6 ??Issue Management Baseline
 - Parent: 1
