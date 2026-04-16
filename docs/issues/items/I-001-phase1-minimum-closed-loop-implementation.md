@@ -40,7 +40,7 @@ The repository is intentionally still in an early-phase, structure-first posture
   - `docker/worker-runtime/Dockerfile` and `docker/worker-runtime/entrypoint.sh` define the first worker-runtime image scaffold
   - the worker-runtime image scaffold has been built locally as `agent-sdlc-worker-runtime:test`
 - The repo now has the first independent CI workflow, but it still needs to extend CI linkage into longer-lived traceability and human-review surfaces.
-- Under the current localhost-rooted local forge topology, artifact upload from job containers remains best-effort because the artifact endpoint is not directly reachable from job-container loopback.
+- The localhost-rooted local forge topology now uploads workflow artifacts successfully after the runner helper aligned runner and job-container networking with host loopback expectations and injected an `agent-sdlc-gitea` host alias for local job containers; local artifact listing visibility in Gitea remains a narrower follow-up if operator browsing becomes necessary.
 
 ## Dependencies And Constraints
 - Work should stay aligned to Phase 1 and WBS 3 rather than pulling Phase 2 observability or multi-source scope forward.
@@ -63,7 +63,7 @@ The repository is intentionally still in an early-phase, structure-first posture
 Steps 1 through 5 now have working implementation slices, with WBS 3.1 reaching a real trigger path, WBS 3.2/3.3 handing off into the worker image scaffold, WBS 3.4 creating a real Gitea proposal path, and WBS 3.5 exercising a real PR-triggered workflow on the local Gitea Actions path. The next packaging boundary is therefore narrower:
 - keep the current control-plane growth path inside the npm-managed package baseline
 - extend the traceability artifact and linked state from proposal creation into durable CI linkage and later review
-- decide whether local artifact persistence should keep using best-effort workflow uploads or move behind a forge-reachable URL in the local topology
+- investigate local artifact listing visibility only if operator-facing browsing of stored workflow artifacts becomes a near-term requirement
 - do that without collapsing task gateway, agent control, worker, forge proposal, and CI responsibilities together
 
 ## Exit Path
@@ -75,7 +75,7 @@ If implementation uncovers a major unresolved decision, the issue should stay ac
 
 ## Next Actions
 - extend `.agent-sdlc/traceability/<task_request_id>.json` from proposal creation through CI run references and later review
-- decide whether local artifact persistence should remain best-effort or move behind a forge-reachable service URL for local job containers
+- investigate local artifact listing visibility only if operator-facing browsing of stored workflow artifacts becomes necessary
 - expand the current project-local bootstrap entrypoints as those WBS 3 interfaces become real services or commands
 - split or reframe this dashboard item once the implementation slices are concrete enough to track separately
 
@@ -83,6 +83,7 @@ If implementation uncovers a major unresolved decision, the issue should stay ac
 - 2026-04-15: Initial version.
 - 2026-04-15: Marked the issue in progress after adding the initial project-local environment bootstrap scaffold.
 - 2026-04-15: Expanded the local forge bootstrap scaffold to include a PostgreSQL-backed default path and Docker Desktop auto-start handling.
+- 2026-04-16: Updated the issue after validating successful localhost-topology workflow artifact upload in local Gitea run `#19`.
 - 2026-04-15: Added repo-owned bootstrap config and non-interactive local Gitea installation behavior.
 - 2026-04-15: Verified the local bootstrap against a clean Gitea/PostgreSQL data set with automated admin-user creation and sign-in-page readiness.
 - 2026-04-15: Captured the bootstrap fix that reapplies the tracked admin `mustChangePassword` setting during password refresh for existing data sets.

@@ -138,10 +138,10 @@ See `docs/environment-bootstrap.md` for the current bootstrap entrypoints and th
   - preserve proposal/task linkage in CI metadata
 - Current bootstrap posture:
   - the first PR-triggered workflow now exists at `.gitea/workflows/phase1-ci.yml`
-  - the repo-local runner helper now exists at `node scripts/dev/ensure-local-gitea-runner.js ensure-runner` and starts a local Gitea Actions runner on the shared Docker network used by the local forge
+  - the repo-local runner helper now exists at `node scripts/dev/ensure-local-gitea-runner.js ensure-runner` and adapts the runner and job-container network mode when the tracked local forge base URL points to host loopback
   - the current workflow runs `npm ci`, `npm run validate:platform`, and `npm run typecheck`, then writes verification linkage to `.agent-sdlc/ci/verification-metadata.json`
-  - the current local smoke-test baseline has been exercised successfully against the local Gitea instance, with verification metadata visible in job logs and step summaries
-  - local artifact upload is currently best-effort because the bootstrap forge root URL points to host loopback, which is not directly reachable from job containers during artifact upload
+  - the current local smoke-test baseline has been exercised successfully against the local Gitea instance, with verification metadata visible in job logs, step summaries, and a persisted workflow artifact after validation run `#19`
+  - the localhost-rooted topology now succeeds by using host networking plus an injected `agent-sdlc-gitea` host alias for job containers, although local artifact listing visibility in Gitea still needs follow-up if operator browsing becomes important
 - Minimum requirements:
   - PR-triggered workflow support
   - required workflow enforcement for agent-opened PRs
@@ -242,3 +242,4 @@ Environment requirements are centralized here, but implementation responsibility
 - 2026-04-15: Updated ENV-002, ENV-003, and ENV-005 after landing webhook intake, retained source-event evidence, and per-session worker-runtime launch artifacts.
 - 2026-04-16: Updated ENV-001, ENV-002, and ENV-005 after landing the local Gitea repo helper, proposal-surface CLI, and first PR-linked traceability artifact.
 - 2026-04-16: Marked ENV-004 partially scaffolded after landing the local Gitea Actions runner helper, PR-triggered workflow skeleton, and verification-metadata output path.
+- 2026-04-16: Updated ENV-004 after validating localhost-topology artifact upload in local Gitea run `#19` and narrowing the remaining gap to artifact listing visibility.

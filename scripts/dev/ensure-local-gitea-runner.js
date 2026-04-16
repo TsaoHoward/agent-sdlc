@@ -11,7 +11,11 @@ const DEFAULT_RUNNER_NAME = process.env.AGENT_SDLC_GITEA_RUNNER_NAME || "agent-s
 const DEFAULT_RUNNER_LABELS =
   process.env.AGENT_SDLC_GITEA_RUNNER_LABELS ||
   "ubuntu-22.04:docker://node:22-bookworm-slim,ubuntu-latest:docker://node:22-bookworm-slim";
+const DEFAULT_GITEA_CONTAINER = process.env.AGENT_SDLC_GITEA_CONTAINER || "agent-sdlc-gitea";
 const DEFAULT_GITEA_NETWORK = process.env.AGENT_SDLC_GITEA_RUNNER_NETWORK || "agent-sdlc-gitea-network";
+const DEFAULT_RUNNER_CONTAINER_NETWORK =
+  process.env.AGENT_SDLC_GITEA_RUNNER_CONTAINER_NETWORK || null;
+const DEFAULT_JOB_CONTAINER_NETWORK = process.env.AGENT_SDLC_GITEA_RUNNER_JOB_NETWORK || null;
 const DEFAULT_DOCKER_INTERNAL_INSTANCE_URL =
   process.env.AGENT_SDLC_GITEA_RUNNER_INSTANCE_URL || "http://agent-sdlc-gitea:3000/";
 
@@ -80,6 +84,7 @@ function getRunnerConfigPaths(repoRoot) {
     root,
     dataDir,
     configFile: path.join(dataDir, "config.yaml"),
+    runnerFile: path.join(dataDir, ".runner"),
   };
 }
 
@@ -87,17 +92,115 @@ function yamlQuote(value) {
   return `'${String(value).replace(/'/g, "''")}'`;
 }
 
-function writeRunnerConfig(configPaths) {
-  const containerNetwork = dockerNetworkExists(DEFAULT_GITEA_NETWORK) ? DEFAULT_GITEA_NETWORK : "";
+function isLoopbackHostname(hostname) {
+  const normalized = String(hostname || "").trim().toLowerCase();
+  return normalized === "localhost" || normalized === "127.0.0.1" || normalized === "::1";
+}
+
+function resolveJobContainerNetwork(settings) {
+  if (DEFAULT_JOB_CONTAINER_NETWORK) {
+    return DEFAULT_JOB_CONTAINER_NETWORK;
+  }
+
+  const hostname = new URL(settings.baseUrl).hostname;
+  if (isLoopbackHostname(hostname)) {
+    return "host";
+  }
+
+  return dockerNetworkExists(DEFAULT_GITEA_NETWORK) ? DEFAULT_GITEA_NETWORK : "";
+}
+
+function resolveRunnerContainerNetwork(settings) {
+  if (DEFAULT_RUNNER_CONTAINER_NETWORK) {
+    return DEFAULT_RUNNER_CONTAINER_NETWORK;
+  }
+
+  const hostname = new URL(settings.baseUrl).hostname;
+  if (isLoopbackHostname(hostname)) {
+    return "host";
+  }
+
+  return dockerNetworkExists(DEFAULT_GITEA_NETWORK) ? DEFAULT_GITEA_NETWORK : "";
+}
+
+function resolveRunnerInstanceUrl(settings, runnerContainerNetwork) {
+  if (process.env.AGENT_SDLC_GITEA_RUNNER_INSTANCE_URL) {
+    return process.env.AGENT_SDLC_GITEA_RUNNER_INSTANCE_URL;
+  }
+
+  if (runnerContainerNetwork === "host") {
+    return settings.baseUrl;
+  }
+
+  return dockerNetworkExists(DEFAULT_GITEA_NETWORK) ? DEFAULT_DOCKER_INTERNAL_INSTANCE_URL : settings.baseUrl;
+}
+
+function getContainerNetworkMap(containerName) {
+  const result = runProcess(
+    "docker",
+    ["container", "inspect", containerName, "--format", "{{json .NetworkSettings.Networks}}"],
+    { allowFailure: true },
+  );
+  if (result.status !== 0 || !result.stdout) {
+    return null;
+  }
+
+  return JSON.parse(result.stdout);
+}
+
+function getContainerIp(containerName, preferredNetworkName = null) {
+  const networkMap = getContainerNetworkMap(containerName);
+  if (!networkMap) {
+    return null;
+  }
+
+  if (
+    preferredNetworkName &&
+    networkMap[preferredNetworkName] &&
+    networkMap[preferredNetworkName].IPAddress
+  ) {
+    return networkMap[preferredNetworkName].IPAddress;
+  }
+
+  const firstNetwork = Object.values(networkMap).find((network) => network && network.IPAddress);
+  return firstNetwork ? firstNetwork.IPAddress : null;
+}
+
+function resolveJobContainerOptions(settings) {
+  if (resolveJobContainerNetwork(settings) !== "host") {
+    return "";
+  }
+
+  const giteaContainerIp = getContainerIp(DEFAULT_GITEA_CONTAINER, DEFAULT_GITEA_NETWORK);
+  if (!giteaContainerIp) {
+    return "";
+  }
+
+  return `--add-host=agent-sdlc-gitea:${giteaContainerIp}`;
+}
+
+function writeRunnerConfig(configPaths, settings) {
+  const containerNetwork = resolveJobContainerNetwork(settings);
+  const containerOptions = resolveJobContainerOptions(settings);
   const lines = [
     "log:",
     "  level: info",
     "container:",
     `  network: ${yamlQuote(containerNetwork)}`,
-    "  options:",
+    `  options: ${yamlQuote(containerOptions)}`,
   ];
 
-  fs.writeFileSync(configPaths.configFile, `${lines.join("\n")}\n`, "utf8");
+  const nextContent = `${lines.join("\n")}\n`;
+  const previousContent = fs.existsSync(configPaths.configFile)
+    ? fs.readFileSync(configPaths.configFile, "utf8")
+    : null;
+
+  fs.writeFileSync(configPaths.configFile, nextContent, "utf8");
+
+  return {
+    changed: previousContent !== nextContent,
+    containerNetwork,
+  };
 }
 
 function getContainerStatus(containerName) {
@@ -111,6 +214,58 @@ function getContainerStatus(containerName) {
   }
 
   return result.stdout || null;
+}
+
+function getContainerNetworkMode(containerName) {
+  const result = runProcess(
+    "docker",
+    ["container", "inspect", containerName, "--format", "{{.HostConfig.NetworkMode}}"],
+    { allowFailure: true },
+  );
+  if (result.status !== 0) {
+    return null;
+  }
+
+  return result.stdout || null;
+}
+
+function getContainerEnvValue(containerName, envName) {
+  const result = runProcess("docker", ["container", "inspect", containerName, "--format", "{{json .Config.Env}}"], {
+    allowFailure: true,
+  });
+  if (result.status !== 0 || !result.stdout) {
+    return null;
+  }
+
+  const entries = JSON.parse(result.stdout);
+  const prefix = `${envName}=`;
+  const match = entries.find((entry) => entry.startsWith(prefix));
+  return match ? match.slice(prefix.length) : null;
+}
+
+function readRunnerRegistrationState(configPaths) {
+  if (!fs.existsSync(configPaths.runnerFile)) {
+    return null;
+  }
+
+  return JSON.parse(fs.readFileSync(configPaths.runnerFile, "utf8"));
+}
+
+function syncRunnerRegistrationState(configPaths, instanceUrl) {
+  const state = readRunnerRegistrationState(configPaths);
+  if (!state || state.address === instanceUrl) {
+    return {
+      changed: false,
+      address: state ? state.address : null,
+    };
+  }
+
+  state.address = instanceUrl;
+  fs.writeFileSync(configPaths.runnerFile, `${JSON.stringify(state, null, 2)}\n`, "utf8");
+  return {
+    changed: true,
+    address: state.address,
+  };
 }
 
 function dockerNetworkExists(networkName) {
@@ -132,13 +287,22 @@ function generateRegistrationToken() {
   return result.stdout;
 }
 
-function buildEnsureRunnerResult(containerStatus, runnerState = null) {
+function buildEnsureRunnerResult(
+  containerStatus,
+  runnerState = null,
+  jobContainerNetwork = null,
+  runnerContainerNetwork = null,
+  instanceUrl = null,
+) {
   return {
     status: "ready",
     container_name: DEFAULT_RUNNER_CONTAINER,
     container_status: containerStatus,
     runner_name: DEFAULT_RUNNER_NAME,
     runner_labels: DEFAULT_RUNNER_LABELS,
+    job_container_network: jobContainerNetwork,
+    runner_container_network: runnerContainerNetwork,
+    instance_url: instanceUrl,
     runner: runnerState,
   };
 }
@@ -155,13 +319,33 @@ async function findRunner(settings) {
 
 async function ensureRunner(repoRoot) {
   const configPaths = getRunnerConfigPaths(repoRoot);
+  const settings = loadLocalGiteaSettings(repoRoot);
   ensureDirectory(configPaths.dataDir);
-  writeRunnerConfig(configPaths);
+  const runnerConfigState = writeRunnerConfig(configPaths, settings);
+  const runnerContainerNetwork = resolveRunnerContainerNetwork(settings);
+  const instanceUrl = resolveRunnerInstanceUrl(settings, runnerContainerNetwork);
+  const runnerRegistrationState = syncRunnerRegistrationState(configPaths, instanceUrl);
 
   const existingStatus = getContainerStatus(DEFAULT_RUNNER_CONTAINER);
   if (existingStatus === "running") {
-    const settings = loadLocalGiteaSettings(repoRoot);
-    return buildEnsureRunnerResult(existingStatus, await findRunner(settings));
+    const currentNetworkMode = getContainerNetworkMode(DEFAULT_RUNNER_CONTAINER);
+    const currentInstanceUrl = getContainerEnvValue(DEFAULT_RUNNER_CONTAINER, "GITEA_INSTANCE_URL");
+    if (
+      !runnerConfigState.changed &&
+      !runnerRegistrationState.changed &&
+      currentNetworkMode === runnerContainerNetwork &&
+      currentInstanceUrl === instanceUrl
+    ) {
+      return buildEnsureRunnerResult(
+        existingStatus,
+        await findRunner(settings),
+        runnerConfigState.containerNetwork,
+        runnerContainerNetwork,
+        instanceUrl,
+      );
+    }
+
+    runProcess("docker", ["rm", "-f", DEFAULT_RUNNER_CONTAINER], { allowFailure: true });
   }
 
   if (existingStatus) {
@@ -169,10 +353,6 @@ async function ensureRunner(repoRoot) {
   }
 
   const registrationToken = generateRegistrationToken();
-  const settings = loadLocalGiteaSettings(repoRoot);
-  const instanceUrl = dockerNetworkExists(DEFAULT_GITEA_NETWORK)
-    ? DEFAULT_DOCKER_INTERNAL_INSTANCE_URL
-    : settings.baseUrl;
   const dockerSocketPath = "//var/run/docker.sock";
   const runnerArgs = [
     "run",
@@ -183,8 +363,8 @@ async function ensureRunner(repoRoot) {
     "unless-stopped",
   ];
 
-  if (dockerNetworkExists(DEFAULT_GITEA_NETWORK)) {
-    runnerArgs.push("--network", DEFAULT_GITEA_NETWORK);
+  if (runnerContainerNetwork) {
+    runnerArgs.push("--network", runnerContainerNetwork);
   }
 
   runnerArgs.push(
@@ -218,12 +398,26 @@ async function ensureRunner(repoRoot) {
     });
   }
 
-  return buildEnsureRunnerResult(getContainerStatus(DEFAULT_RUNNER_CONTAINER), runnerState);
+  return buildEnsureRunnerResult(
+    getContainerStatus(DEFAULT_RUNNER_CONTAINER),
+    runnerState,
+    runnerConfigState.containerNetwork,
+    runnerContainerNetwork,
+    instanceUrl,
+  );
 }
 
 async function showStatus(repoRoot) {
   const settings = loadLocalGiteaSettings(repoRoot);
-  return buildEnsureRunnerResult(getContainerStatus(DEFAULT_RUNNER_CONTAINER) || "not-started", await findRunner(settings));
+  const runnerContainerNetwork = resolveRunnerContainerNetwork(settings);
+  const instanceUrl = resolveRunnerInstanceUrl(settings, runnerContainerNetwork);
+  return buildEnsureRunnerResult(
+    getContainerStatus(DEFAULT_RUNNER_CONTAINER) || "not-started",
+    await findRunner(settings),
+    resolveJobContainerNetwork(settings),
+    runnerContainerNetwork,
+    instanceUrl,
+  );
 }
 
 async function stopRunner(repoRoot) {
