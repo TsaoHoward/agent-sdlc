@@ -2,6 +2,11 @@ const fs = require("fs");
 const path = require("path");
 const { spawnSync } = require("child_process");
 
+const {
+  buildRepositoryUrls,
+  loadLocalGiteaSettings,
+  parseGiteaRepositoryRef,
+} = require("./gitea-client");
 const { toRepoRelativePath, writeJson } = require("./project-state");
 
 const DEFAULT_WORKER_IMAGE = process.env.AGENT_SDLC_WORKER_IMAGE || "agent-sdlc-worker-runtime:test";
@@ -24,15 +29,93 @@ function ensureEmptyDirectory(directoryPath) {
   fs.mkdirSync(directoryPath, { recursive: true });
 }
 
+function sanitizeDockerArguments(args) {
+  return args.map((value) => {
+    if (String(value).startsWith("SOURCE_GIT_AUTH_HEADER=")) {
+      return "SOURCE_GIT_AUTH_HEADER=[redacted]";
+    }
+
+    return value;
+  });
+}
+
+function isLoopbackHostname(hostname) {
+  const normalized = String(hostname || "").trim().toLowerCase();
+  return normalized === "localhost" || normalized === "127.0.0.1" || normalized === "::1";
+}
+
+function normalizeContainerReachableGitUrl(gitUrl) {
+  const parsed = new URL(gitUrl);
+  if (!isLoopbackHostname(parsed.hostname)) {
+    return parsed.toString();
+  }
+
+  parsed.hostname = process.env.AGENT_SDLC_WORKER_GITEA_HOST || "host.docker.internal";
+  return parsed.toString();
+}
+
+function buildRuntimeSourceConfig(repoRoot, taskRequest) {
+  if (!taskRequest.repository_ref) {
+    return {
+      cloneMode: "local-source",
+      sourceGitUrl: "",
+      sourceGitAuthHeader: "",
+    };
+  }
+
+  try {
+    const settings = loadLocalGiteaSettings(repoRoot);
+    const repositoryInfo = parseGiteaRepositoryRef(taskRequest.repository_ref);
+    const repositoryUrls = buildRepositoryUrls(
+      settings,
+      repositoryInfo.owner,
+      repositoryInfo.repo,
+      taskRequest.repository_ref,
+    );
+
+    let sourceGitAuthHeader = "";
+    if (settings.username && settings.password) {
+      const basicAuth = Buffer.from(`${settings.username}:${settings.password}`, "utf8").toString(
+        "base64",
+      );
+      sourceGitAuthHeader = `AUTHORIZATION: Basic ${basicAuth}`;
+    } else if (settings.token) {
+      sourceGitAuthHeader = `AUTHORIZATION: token ${settings.token}`;
+    }
+
+    return {
+      cloneMode: "forge-repository",
+      sourceGitUrl: normalizeContainerReachableGitUrl(repositoryUrls.gitUrl),
+      sourceGitAuthHeader,
+      repositoryRef: taskRequest.repository_ref,
+    };
+  } catch (error) {
+    return {
+      cloneMode: "local-source",
+      sourceGitUrl: "",
+      sourceGitAuthHeader: "",
+      fallbackReason: error.message,
+    };
+  }
+}
+
 function buildRuntimeBootstrapScript() {
   return [
     "set -euo pipefail",
-    "git config --global --add safe.directory /source",
-    "git config --global --add safe.directory /source/.git",
-    "git clone /source /workspace",
+    'if [ -n "${SOURCE_GIT_URL:-}" ]; then',
+    '  if [ -n "${SOURCE_GIT_AUTH_HEADER:-}" ]; then',
+    '    git -c "http.extraHeader=${SOURCE_GIT_AUTH_HEADER}" clone "${SOURCE_GIT_URL}" /workspace',
+    "  else",
+    '    git clone "${SOURCE_GIT_URL}" /workspace',
+    "  fi",
+    "else",
+    "  git config --global --add safe.directory /source",
+    "  git config --global --add safe.directory /source/.git",
+    "  git clone /source /workspace",
+    "fi",
     "git config --global --add safe.directory /workspace",
     'if [ -n "${TARGET_BRANCH:-}" ]; then',
-    '  git -C /workspace checkout "${TARGET_BRANCH}"',
+    '  git -C /workspace checkout "${TARGET_BRANCH}" || git -C /workspace checkout -B "${TARGET_BRANCH}" "origin/${TARGET_BRANCH}"',
     "fi",
     "mkdir -p /artifacts",
     'printf "workspace prepared for %s\\n" "${AGENT_SESSION_ID}"',
@@ -47,6 +130,7 @@ function buildDockerArguments({
   image,
   sessionRecord,
   taskRequest,
+  runtimeSource,
 }) {
   return [
     "run",
@@ -65,6 +149,10 @@ function buildDockerArguments({
     `TASK_REQUEST_ID=${taskRequest.task_request_id}`,
     "-e",
     `TARGET_BRANCH=${taskRequest.target_branch_ref || ""}`,
+    "-e",
+    `SOURCE_GIT_URL=${runtimeSource.sourceGitUrl || ""}`,
+    "-e",
+    `SOURCE_GIT_AUTH_HEADER=${runtimeSource.sourceGitAuthHeader || ""}`,
     image,
     "bash",
     "-lc",
@@ -106,6 +194,7 @@ function launchWorkerRuntime({
 
   const launchedAt = utcNow();
   const containerName = sanitizeContainerName(`agent-sdlc-${sessionRecord.agent_session_id}`);
+  const runtimeSource = buildRuntimeSourceConfig(repoRoot, taskRequest);
   const dockerArgs = buildDockerArguments({
     repoRoot,
     workspaceDir,
@@ -114,6 +203,7 @@ function launchWorkerRuntime({
     image: workerImage,
     sessionRecord,
     taskRequest,
+    runtimeSource,
   });
 
   const result = spawnSync("docker", dockerArgs, {
@@ -137,8 +227,14 @@ function launchWorkerRuntime({
     artifact_dir_ref: toRepoRelativePath(repoRoot, artifactDir),
     stdout: result.stdout || "",
     stderr: result.stderr || "",
-    docker_args: dockerArgs,
+    docker_args: sanitizeDockerArguments(dockerArgs),
     prepared_branch_ref: taskRequest.target_branch_ref || null,
+    workspace_source: {
+      clone_mode: runtimeSource.cloneMode,
+      repository_ref: runtimeSource.repositoryRef || taskRequest.repository_ref || null,
+      git_url: runtimeSource.sourceGitUrl || null,
+      fallback_reason: runtimeSource.fallbackReason || null,
+    },
   };
 
   const artifactOutput = writeLaunchArtifacts(repoRoot, artifactDir, launchResult);

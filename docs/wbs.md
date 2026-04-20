@@ -220,7 +220,7 @@
 - Dependencies: 2.3
 - Critical-Path-Candidate: Yes
 - Status: Done
-- Notes: The first repo-owned worker-runtime Dockerfile exists at `docker/worker-runtime/Dockerfile`, has been built locally as `agent-sdlc-worker-runtime:test`, and is exercised by `agent-control start-session` for a per-session runtime launch path. The runtime now prepares a session-local workspace checkout plus runtime-launch artifacts under `.agent-sdlc/runtime/` that are consumed by the proposal path.
+- Notes: The first repo-owned worker-runtime Dockerfile exists at `docker/worker-runtime/Dockerfile`, has been built locally as `agent-sdlc-worker-runtime:test`, and is exercised by `agent-control start-session` for a per-session runtime launch path. The runtime now prepares a session-local workspace checkout plus runtime-launch artifacts under `.agent-sdlc/runtime/` that are consumed by the proposal path. The current runtime source path now clones the forge target repository and target branch into the worker workspace, with loopback local-Gitea URLs normalized to a container-reachable host so proposal branches inherit active workflow files from forge `main` during local validation.
 
 ### WBS 3.4 — PR Proposal Path
 - Parent: 3
@@ -240,7 +240,7 @@
 - Dependencies: 2.4, 3.4
 - Critical-Path-Candidate: Yes
 - Status: Done
-- Notes: The first PR-triggered CI workflow now exists at `.gitea/workflows/phase1-ci.yml`, and the repo-local runner helper now exists at `node scripts/dev/ensure-local-gitea-runner.js ensure-runner`. The current workflow collects `.agent-sdlc/ci/verification-metadata.json` from the proposal branch, runs `npm ci`, `npm run validate:platform`, and `npm run typecheck`, and was smoke-tested successfully against the local Gitea stack with run `#19` completing successfully after the localhost-rooted topology was updated to use host networking plus an injected `agent-sdlc-gitea` host alias for runner-triggered job containers. Uploaded artifact chunks now persist in local Gitea storage, while operator-facing artifact listing visibility remains a narrower follow-up.
+- Notes: The first PR-triggered CI workflow now exists at `.gitea/workflows/phase1-ci.yml`, and the repo-local runner helper now exists at `node scripts/dev/ensure-local-gitea-runner.js ensure-runner`. The current workflow collects `.agent-sdlc/ci/verification-metadata.json` from the proposal branch, runs `npm ci`, `npm run validate:platform`, and `npm run typecheck`, and was smoke-tested successfully against the local Gitea stack with run `#19` completing successfully after the localhost-rooted topology was updated to use host networking plus an injected `agent-sdlc-gitea` host alias for runner-triggered job containers. After the runtime workspace source switched from local-workspace cloning to forge-repository cloning, a live PR `#5` revalidation also restored successful auto-created `pull_request_sync` runs and successful branch-local `workflow_dispatch` execution for the proposal branch. Uploaded artifact chunks now persist in local Gitea storage, while operator-facing artifact listing visibility remains a narrower follow-up.
 
 ### WBS 3.6 — Lifecycle Traceability Scaffold
 - Parent: 3
@@ -399,3 +399,4 @@
 - 2026-04-15: Marked WBS 3.1 done after landing the webhook-backed trigger path and updated WBS 3.2 and 3.3 to reflect runtime handoff into the worker image scaffold.
 - 2026-04-16: Marked WBS 3.4 done and WBS 3.6 in progress after landing the first branch/PR proposal path and proposal-linked traceability artifact.
 - 2026-04-16: Marked WBS 3.5 done after landing the local Gitea Actions runner helper, PR-triggered CI workflow skeleton, and verification-metadata linkage.
+- 2026-04-20: Updated WBS 3.3 and 3.5 after fixing runtime workspace sourcing to clone the forge target repo/branch, which restored proposal-branch workflow presence and live PR `#5` run creation in local Gitea.

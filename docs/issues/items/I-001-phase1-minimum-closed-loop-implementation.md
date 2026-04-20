@@ -42,8 +42,10 @@ The repository is intentionally still in an early-phase, structure-first posture
 - The repo now has the first independent CI workflow plus a CI-linked reviewer surface, but it still needs to extend lifecycle linkage into explicit human review outcome capture.
 - A fuller 2026-04-20 local test pass established two sharper facts:
   - the CI-linked reviewer-surface code path works end to end when exercised directly: a live manual `collect -> attach -> finalize` pass against PR `#5` updated `.agent-sdlc/traceability/trq-849dfc1cb4a7.json`, `.agent-sdlc/ci/verification-metadata.json`, and the PR body to `CI: success` plus `Review Status: ready for human review`
-  - fresh local Gitea PR open/sync events still did not auto-create new actions runs even after `.gitea/workflows/phase1-ci.yml` was restored to the local forge `main` branch and the workflow API reported it as active
-  - the local Gitea 1.25.5 workflow-dispatch endpoint also returned `404 workflow doesn't exist` for that same active workflow even after the tracked workflow file was present in the local forge `main` branch, so both the event-driven and manual-dispatch run-creation paths remain blocked at the forge layer
+  - the missing-run / dispatch gap was rooted in proposal-branch contents rather than in a globally broken Gitea Actions trigger path: proposal branches for PR `#4` and `#5` did not contain `.gitea/workflows/phase1-ci.yml`, even though local forge `main` did
+  - that missing workflow in the PR head explains both observed Gitea 1.25.5 symptoms: no auto-created PR runs for fresh proposal updates and `404 workflow doesn't exist` when dispatch targeted those proposal branches
+  - `agent-control start-session` now prepares runtime workspaces by cloning the forge target repository and target branch instead of cloning the local workspace snapshot, and it rewrites loopback Gitea clone URLs to a container-reachable host for the worker runtime
+  - a live re-run against PR `#5` with the new runtime source path restored `.gitea/workflows/phase1-ci.yml` to the proposal branch head, completed successful `pull_request_sync` runs `#21` and `#22`, and completed a successful branch-local `workflow_dispatch` run `#23` for `agent/trq-849dfc1cb4a7`
 - The localhost-rooted local forge topology now uploads workflow artifacts successfully after the runner helper aligned runner and job-container networking with host loopback expectations and injected an `agent-sdlc-gitea` host alias for local job containers; local artifact listing visibility in Gitea remains a narrower follow-up if operator browsing becomes necessary.
 
 ## Dependencies And Constraints
@@ -67,8 +69,9 @@ The repository is intentionally still in an early-phase, structure-first posture
 Steps 1 through 5 now have working implementation slices, with WBS 3.1 reaching a real trigger path, WBS 3.2/3.3 handing off into the worker image scaffold, WBS 3.4 creating a real Gitea proposal path, and WBS 3.5 exercising a real PR-triggered workflow on the local Gitea Actions path. The next packaging boundary is therefore narrower:
 - keep the current control-plane growth path inside the npm-managed package baseline
 - keep the local forge seed path aligned to the active workspace `HEAD` so workflow and platform files match the code under test
+- keep runtime workspace preparation sourced from the forge target repository and target branch so proposal heads inherit active workflow files and other forge-truth content
 - extend the traceability artifact and linked state from proposal creation into explicit review outcome capture after the CI-linked reviewer surface
-- investigate why fresh local Gitea PR open/sync events are not currently creating actions runs even though the workflow is active in the local forge, and why the same local forge returns `404 workflow doesn't exist` for workflow dispatch against that active workflow
+- treat the now-resolved PR-trigger / branch-dispatch gap as a content-source problem unless a narrower follow-up repro shows a remaining forge-level trigger defect
 - investigate local artifact listing visibility only if operator-facing browsing of stored workflow artifacts becomes a near-term requirement
 - do that without collapsing task gateway, agent control, worker, forge proposal, and CI responsibilities together
 
@@ -81,7 +84,8 @@ If implementation uncovers a major unresolved decision, the issue should stay ac
 
 ## Next Actions
 - extend `.agent-sdlc/traceability/<task_request_id>.json` from proposal creation and CI-linked reviewer status through later review outcome capture
-- investigate the missing auto-created local Gitea actions runs for fresh PR events and the `404 workflow doesn't exist` dispatch behavior before assuming the remaining gap is only review outcome linkage
+- keep the forge-repository runtime clone path in place and reseed local forge `main` from current `HEAD` before local proposal-flow validation when the operator is testing unpushed changes
+- watch whether the two successful `pull_request_sync` runs created during PR `#5` revalidation represent acceptable update behavior or a narrower duplicate-trigger follow-up
 - investigate local artifact listing visibility only if operator-facing browsing of stored workflow artifacts becomes necessary
 - expand the current project-local bootstrap entrypoints as those WBS 3 interfaces become real services or commands
 - split or reframe this dashboard item once the implementation slices are concrete enough to track separately
@@ -102,3 +106,4 @@ If implementation uncovers a major unresolved decision, the issue should stay ac
 - 2026-04-16: Recorded the local Gitea Actions runner helper, first PR-triggered CI workflow, and verification-metadata linkage path.
 - 2026-04-20: Recorded the local repo seed-path fix to push current `HEAD` into forge `main`, the live manual PR `#5` CI-finalization validation, and the remaining missing-actions-run trigger gap for fresh local PR events.
 - 2026-04-20: Recorded the local Gitea 1.25.5 workflow-dispatch `404 workflow doesn't exist` behavior for the active `phase1-ci.yml` workflow.
+- 2026-04-20: Recorded the root cause of the missing PR runs and proposal-branch dispatch `404` as proposal heads missing `.gitea/workflows/phase1-ci.yml`, then verified the forge-clone runtime fix with successful runs `#21`, `#22`, and `#23` against PR `#5`.
