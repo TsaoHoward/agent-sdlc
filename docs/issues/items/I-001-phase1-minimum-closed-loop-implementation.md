@@ -3,7 +3,7 @@
 ## Metadata
 - Issue ID: I-001
 - Status: In Progress
-- Last Updated: 2026-04-16
+- Last Updated: 2026-04-20
 - Owner: Project Maintainer
 - Related Docs / WBS: `docs/roadmap.md` Phase 1; `docs/wbs.md` WBS `3`, `3.1`, `3.2`, `3.3`, `3.4`, `3.5`, `3.6`
 - Source Dashboard: docs/issues/issue-dashboard.md
@@ -24,7 +24,7 @@ The repository is intentionally still in an early-phase, structure-first posture
   - `node scripts/task-gateway.js normalize-gitea-issue-comment --event <path>` can parse the selected `@agent run <token>` contract against `config/policy/*.yaml`, persist normalized task requests under `.agent-sdlc/state/task-requests/`, and now optionally start an agent session automatically for manual event replay.
   - `node scripts/task-gateway.js serve-gitea-webhook --host 127.0.0.1 --port 4010 --route /hooks/gitea/issue-comment` can accept actual Gitea-compatible issue-comment webhook deliveries, retain source-event evidence under `.agent-sdlc/state/source-events/`, and persist normalized task requests.
   - `node scripts/agent-control.js start-session --task-request <path>` now creates session records under `.agent-sdlc/state/agent-sessions/`, launches the worker-runtime container, and prepares runtime artifacts plus a session-local workspace under `.agent-sdlc/runtime/` for auto-approved task requests.
-  - `node scripts/dev/ensure-local-gitea-repo.js ensure-local-repo --owner <owner> --repo <repo> --seed-from <path>` can provision the local Gitea owner/repository path used by the proposal-flow smoke tests.
+  - `node scripts/dev/ensure-local-gitea-repo.js ensure-local-repo --owner <owner> --repo <repo> --seed-from <path>` can provision the local Gitea owner/repository path used by the proposal-flow smoke tests and now seeds remote `main` from the source repo's current `HEAD` so the local forge sees the active workspace's tracked workflow files.
   - `node scripts/dev/ensure-local-gitea-runner.js ensure-runner` can provision the local Gitea Actions runner and place job containers on the shared Docker network used by the local forge.
   - `node scripts/proposal-surface.js create-gitea-pr --session <path>` now force-adds `.agent-sdlc/traceability/<task_request_id>.json` inside the prepared workspace, pushes `agent/<task_request_id>` to Gitea, and creates or updates the linked PR.
   - `.gitea/workflows/phase1-ci.yml` now runs on PR open/update/reopen, executes `npm ci`, `npm run validate:platform`, and `npm run typecheck`, writes verification linkage to `.agent-sdlc/ci/verification-metadata.json` plus the CI job log and step summary, enriches the traceability artifact with CI run references and final verification status, refreshes the PR traceability block with CI and review-readiness state, and uploads both verification metadata and traceability metadata as workflow artifacts even when verification fails.
@@ -40,6 +40,9 @@ The repository is intentionally still in an early-phase, structure-first posture
   - `docker/worker-runtime/Dockerfile` and `docker/worker-runtime/entrypoint.sh` define the first worker-runtime image scaffold
   - the worker-runtime image scaffold has been built locally as `agent-sdlc-worker-runtime:test`
 - The repo now has the first independent CI workflow plus a CI-linked reviewer surface, but it still needs to extend lifecycle linkage into explicit human review outcome capture.
+- A fuller 2026-04-20 local test pass established two sharper facts:
+  - the CI-linked reviewer-surface code path works end to end when exercised directly: a live manual `collect -> attach -> finalize` pass against PR `#5` updated `.agent-sdlc/traceability/trq-849dfc1cb4a7.json`, `.agent-sdlc/ci/verification-metadata.json`, and the PR body to `CI: success` plus `Review Status: ready for human review`
+  - fresh local Gitea PR open/sync events still did not auto-create new actions runs even after `.gitea/workflows/phase1-ci.yml` was restored to the local forge `main` branch and the workflow API reported it as active
 - The localhost-rooted local forge topology now uploads workflow artifacts successfully after the runner helper aligned runner and job-container networking with host loopback expectations and injected an `agent-sdlc-gitea` host alias for local job containers; local artifact listing visibility in Gitea remains a narrower follow-up if operator browsing becomes necessary.
 
 ## Dependencies And Constraints
@@ -62,7 +65,9 @@ The repository is intentionally still in an early-phase, structure-first posture
 
 Steps 1 through 5 now have working implementation slices, with WBS 3.1 reaching a real trigger path, WBS 3.2/3.3 handing off into the worker image scaffold, WBS 3.4 creating a real Gitea proposal path, and WBS 3.5 exercising a real PR-triggered workflow on the local Gitea Actions path. The next packaging boundary is therefore narrower:
 - keep the current control-plane growth path inside the npm-managed package baseline
+- keep the local forge seed path aligned to the active workspace `HEAD` so workflow and platform files match the code under test
 - extend the traceability artifact and linked state from proposal creation into explicit review outcome capture after the CI-linked reviewer surface
+- investigate why fresh local Gitea PR open/sync events are not currently creating actions runs even though the workflow is active in the local forge
 - investigate local artifact listing visibility only if operator-facing browsing of stored workflow artifacts becomes a near-term requirement
 - do that without collapsing task gateway, agent control, worker, forge proposal, and CI responsibilities together
 
@@ -75,6 +80,7 @@ If implementation uncovers a major unresolved decision, the issue should stay ac
 
 ## Next Actions
 - extend `.agent-sdlc/traceability/<task_request_id>.json` from proposal creation and CI-linked reviewer status through later review outcome capture
+- investigate the missing auto-created local Gitea actions runs for fresh PR events before assuming the remaining gap is only review outcome linkage
 - investigate local artifact listing visibility only if operator-facing browsing of stored workflow artifacts becomes necessary
 - expand the current project-local bootstrap entrypoints as those WBS 3 interfaces become real services or commands
 - split or reframe this dashboard item once the implementation slices are concrete enough to track separately
@@ -93,3 +99,4 @@ If implementation uncovers a major unresolved decision, the issue should stay ac
 - 2026-04-15: Recorded webhook-backed task intake, retained source-event evidence, and per-session runtime handoff into the worker image scaffold.
 - 2026-04-16: Recorded the local Gitea repo helper, first working branch/PR proposal path, and proposal-linked traceability artifact.
 - 2026-04-16: Recorded the local Gitea Actions runner helper, first PR-triggered CI workflow, and verification-metadata linkage path.
+- 2026-04-20: Recorded the local repo seed-path fix to push current `HEAD` into forge `main`, the live manual PR `#5` CI-finalization validation, and the remaining missing-actions-run trigger gap for fresh local PR events.

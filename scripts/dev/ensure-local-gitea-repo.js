@@ -112,6 +112,8 @@ function pushSeedBranch(seedFrom, remoteUrl, settings) {
     "base64",
   );
 
+  // Seed the local forge from the source repo's current HEAD so local testing
+  // sees the same tracked workflow and platform files as the active workspace.
   runProcess(
     "git",
     [
@@ -120,7 +122,7 @@ function pushSeedBranch(seedFrom, remoteUrl, settings) {
       "push",
       "--force",
       remoteUrl,
-      "refs/heads/main:refs/heads/main",
+      "HEAD:refs/heads/main",
     ],
     seedFrom,
   );

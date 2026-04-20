@@ -71,6 +71,9 @@ Command behavior:
 - `node scripts/proposal-surface.js create-gitea-pr --session <path>` creates or updates the Phase 1 proposal branch and Gitea PR while force-adding the linked traceability artifact into the prepared workspace
 - `docker build -f docker/worker-runtime/Dockerfile -t agent-sdlc-worker-runtime:test .` builds the first worker-runtime image scaffold defined in the repository
 
+Seed behavior:
+- `npm run dev:gitea-repo -- ensure-local-repo --owner <owner> --repo <repo> --seed-from <path>` now force-pushes the source repo's current `HEAD` into the local Gitea repo's `main` branch so local PR and CI testing use the same tracked workflow files as the active workspace
+
 ## Repo-Owned Bootstrap Inputs
 The current local forge bootstrap and platform packaging baseline are configured by:
 - `config/dev/gitea-bootstrap.json`

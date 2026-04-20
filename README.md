@@ -118,6 +118,8 @@ npm run proposal-surface -- create-gitea-pr --session .agent-sdlc/state/agent-se
 docker build -f docker/worker-runtime/Dockerfile -t agent-sdlc-worker-runtime:test .
 ```
 
+When `--seed-from .` is used, the local Gitea repo is seeded from the source repo's current `HEAD` into remote `main` so the local forge sees the same tracked workflow and platform files as the active workspace.
+
 The default local ports come from `config/dev/gitea-bootstrap.json` and are intentionally forwarded to higher, non-common host ports.
 
 See `docs/environment-bootstrap.md` for the current bootstrap posture and what each command covers.
