@@ -234,6 +234,17 @@ async function updatePullRequest(settings, owner, repo, index, body, repositoryR
   });
 }
 
+async function listPullReviews(settings, owner, repo, index, repositoryRef = null) {
+  return requestJson(settings, {
+    method: "GET",
+    pathname: `api/v1/repos/${owner}/${repo}/pulls/${index}/reviews`,
+    baseUrl: getForgeBaseUrl(settings, repositoryRef),
+    query: {
+      limit: 100,
+    },
+  });
+}
+
 module.exports = {
   buildRepositoryUrls,
   createPullRequest,
@@ -243,6 +254,7 @@ module.exports = {
   getPullRequest,
   getRepository,
   getUser,
+  listPullReviews,
   listPullRequests,
   loadLocalGiteaSettings,
   parseGiteaRepositoryRef,

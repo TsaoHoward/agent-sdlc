@@ -24,6 +24,28 @@ function deriveReviewStatus(ciStatus) {
   }
 }
 
+function labelForReviewStatus(status, ciStatus = "pending") {
+  switch (status) {
+    case "approved":
+      return "approved by reviewer";
+    case "changes-requested":
+      return "changes requested";
+    case "merged":
+      return "merged";
+    case "closed-without-merge":
+      return "closed without merge";
+    case "awaiting-review-decision":
+      return "awaiting human review decision";
+    case "ready-for-human-review":
+    case "blocked-on-ci":
+    case "ci-cancelled":
+    case "awaiting-ci":
+      return deriveReviewStatus(ciStatus).label;
+    default:
+      return deriveReviewStatus(ciStatus).label;
+  }
+}
+
 function formatCiDisplay(ci = {}) {
   const ciStatus = ci.ci_status || "pending";
   const ciRunRef = ci.ci_run_ref || null;
@@ -52,7 +74,8 @@ function buildTraceabilityBlock(details) {
     details.comment_ref ||
     "n/a";
   const ci = details.ci || {};
-  const reviewStatus = details.review_status || deriveReviewStatus(ci.ci_status).label;
+  const review = details.review || {};
+  const reviewStatus = details.review_status || labelForReviewStatus(review.status, ci.ci_status);
   const lines = [
     "## Agent Traceability",
     `- Task Request: \`${details.task_request_id}\``,
@@ -69,6 +92,14 @@ function buildTraceabilityBlock(details) {
 
   lines.push(`- CI: ${formatCiDisplay(ci)}`);
   lines.push(`- Review Status: ${reviewStatus}`);
+
+  if (review.decision_outcome) {
+    lines.push(`- Review Decision: \`${review.decision_outcome}\``);
+  }
+
+  if (review.reviewer_login || review.reviewer_ref) {
+    lines.push(`- Reviewer: \`${review.reviewer_login || review.reviewer_ref}\``);
+  }
 
   return lines.join("\n");
 }
@@ -91,5 +122,6 @@ function replaceTraceabilityBlock(body, newBlock) {
 module.exports = {
   buildTraceabilityBlock,
   deriveReviewStatus,
+  labelForReviewStatus,
   replaceTraceabilityBlock,
 };

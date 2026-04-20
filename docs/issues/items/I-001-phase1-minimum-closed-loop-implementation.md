@@ -10,7 +10,7 @@
 - Source Template: docs/templates/issue-note.template.md
 
 ## Summary
-The project has completed its minimum closed-loop design baseline and now has the first executable Phase 1 slices for webhook intake, runtime handoff, proposal creation, and PR-triggered CI verification. This note captures the remaining packaging gap so future runs can continue from the new CI surface into fuller lifecycle traceability and review handling without rediscovering the same context.
+The project has completed its minimum closed-loop design baseline and now has the first executable Phase 1 slices for webhook intake, runtime handoff, proposal creation, PR-triggered CI verification, and explicit review-outcome synchronization. This note captures the remaining packaging gap so future runs can continue from the new review-linked traceability surface without rediscovering the same context.
 
 ## Why It Matters
 The repository is intentionally still in an early-phase, structure-first posture. Without a durable packaging note, Phase 1 implementation can fragment into ad hoc coding or repeatedly restart from design review instead of moving through bounded implementation slices.
@@ -39,7 +39,10 @@ The repository is intentionally still in an early-phase, structure-first posture
   - `npm run validate:platform` and `npm run typecheck` now verify the current platform package
   - `docker/worker-runtime/Dockerfile` and `docker/worker-runtime/entrypoint.sh` define the first worker-runtime image scaffold
   - the worker-runtime image scaffold has been built locally as `agent-sdlc-worker-runtime:test`
-- The repo now has the first independent CI workflow plus a CI-linked reviewer surface, but it still needs to extend lifecycle linkage into explicit human review outcome capture.
+- The repo now has the first independent CI workflow plus an explicit review-outcome sync surface:
+  - `node scripts/review-surface.js sync-gitea-pr-review-outcome --session <path>` reads the linked Gitea PR plus review state, updates the canonical `.agent-sdlc/traceability/<task_request_id>.json` record, mirrors that state back into the session-local traceability copy when present, and refreshes the reviewer-facing PR traceability block with review decision and reviewer identity metadata
+  - the review-outcome sync path keeps the root traceability record as the canonical source so later syncs do not regress CI status or other already-finalized lifecycle metadata when a session-local workspace copy is stale
+  - a live local validation against PR `#5` confirmed both the no-review state (`awaiting human review decision`) and a real local Gitea `APPROVED` review (`#1` by `howard`), which updated the PR body and traceability artifact to `approved by reviewer`
 - A fuller 2026-04-20 local test pass established two sharper facts:
   - the CI-linked reviewer-surface code path works end to end when exercised directly: a live manual `collect -> attach -> finalize` pass against PR `#5` updated `.agent-sdlc/traceability/trq-849dfc1cb4a7.json`, `.agent-sdlc/ci/verification-metadata.json`, and the PR body to `CI: success` plus `Review Status: ready for human review`
   - the missing-run / dispatch gap was rooted in proposal-branch contents rather than in a globally broken Gitea Actions trigger path: proposal branches for PR `#4` and `#5` did not contain `.gitea/workflows/phase1-ci.yml`, even though local forge `main` did
@@ -72,7 +75,7 @@ Steps 1 through 5 now have working implementation slices, with WBS 3.1 reaching 
 - keep the current control-plane growth path inside the npm-managed package baseline
 - keep the local forge seed path aligned to the active workspace `HEAD` so workflow and platform files match the code under test
 - keep runtime workspace preparation sourced from the forge target repository and target branch so proposal heads inherit active workflow files and other forge-truth content
-- extend the traceability artifact and linked state from proposal creation into explicit review outcome capture after the CI-linked reviewer surface
+- keep the current explicit review-outcome sync surface aligned with the traceability contract and decide later whether that sync should remain operator-invoked or move into an automated follow-up surface
 - treat the now-resolved PR-trigger / branch-dispatch gap as a content-source problem unless a narrower follow-up repro shows a remaining forge-level trigger defect
 - investigate local artifact listing visibility only if operator-facing browsing of stored workflow artifacts becomes a near-term requirement
 - do that without collapsing task gateway, agent control, worker, forge proposal, and CI responsibilities together
@@ -85,7 +88,7 @@ This issue exits the active dashboard when the first implementation slice is und
 If implementation uncovers a major unresolved decision, the issue should stay active until the decision is captured in `docs/decisions/decision-backlog.md` and, if needed, promoted to an ADR.
 
 ## Next Actions
-- extend `.agent-sdlc/traceability/<task_request_id>.json` from proposal creation and CI-linked reviewer status through later review outcome capture
+- decide whether `review-surface sync-gitea-pr-review-outcome` should remain an operator-invoked Phase 1 command or move into a later automated review-follow-up path
 - keep the forge-repository runtime clone path in place and reseed local forge `main` from current `HEAD` before local proposal-flow validation when the operator is testing unpushed changes
 - investigate local artifact listing visibility only if operator-facing browsing of stored workflow artifacts becomes necessary
 - expand the current project-local bootstrap entrypoints as those WBS 3 interfaces become real services or commands
@@ -109,3 +112,4 @@ If implementation uncovers a major unresolved decision, the issue should stay ac
 - 2026-04-20: Recorded the local Gitea 1.25.5 workflow-dispatch `404 workflow doesn't exist` behavior for the active `phase1-ci.yml` workflow.
 - 2026-04-20: Recorded the root cause of the missing PR runs and proposal-branch dispatch `404` as proposal heads missing `.gitea/workflows/phase1-ci.yml`, then verified the forge-clone runtime fix with successful runs `#21`, `#22`, and `#23` against PR `#5`.
 - 2026-04-20: Recorded the existing-PR proposal update optimization that pre-seeds traceability from the already-open PR and verified it by reducing a fresh PR `#5` refresh to one new `pull_request_sync` run (`#24`).
+- 2026-04-20: Recorded the new review-outcome sync surface, the canonical root-traceability writeback rule, and the live local Gitea approval validation that updated PR `#5` to `approved by reviewer`.

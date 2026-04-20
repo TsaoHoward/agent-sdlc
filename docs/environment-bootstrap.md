@@ -18,9 +18,9 @@ It complements `docs/environment-requirements.md` by describing how maintainers 
 | Environment ID | Current Bootstrap Path | Current Posture |
 |---|---|---|
 | ENV-001 | `scripts/dev/manage-dev-environment.ps1 -Command up`; `npm run dev:env:up`; `npm run dev:gitea-repo -- ensure-local-repo ...` | Starts a local Gitea development stack from repo-owned config and now has a repo-local helper to provision a local owner/repository path for proposal-flow testing. The default local path uses PostgreSQL-backed Gitea, explicit high-port forwarding, and non-interactive installation with an admin user bootstrap. |
-| ENV-002 | `npm install`; `npm run validate:platform`; `npm run task-gateway:webhook`; `node scripts/agent-control.js ...`; `node scripts/proposal-surface.js ...` | Prepares the npm-managed control-plane baseline and exposes repo-local webhook, session-start, and proposal-surface CLIs. The current slice supports actual Gitea issue-comment webhook delivery, source-event retention, normalized task-request persistence, direct handoff into the worker runtime scaffold, and PR creation against the local Gitea forge. |
-| ENV-003 | `docker build -f docker/worker-runtime/Dockerfile ...`; `node scripts/agent-control.js ...` | Builds and exercises the first repo-owned worker-runtime image scaffold on top of the host-local Docker-compatible runner. The current runtime handoff launches a per-session container, prepares a fresh workspace checkout, and exports runtime launch artifacts under `.agent-sdlc/runtime/`. |
-| ENV-004 | `npm run dev:gitea-runner -- ensure-runner`; `.gitea/workflows/phase1-ci.yml` | Boots a local Gitea Actions runner and executes the first PR-triggered CI workflow. The current skeleton collects verification metadata into `.agent-sdlc/ci/verification-metadata.json`, emits it in job logs and step summaries, attaches CI run references and final verification status to the traceability artifact, refreshes the PR traceability block for reviewers, and uploads those artifacts as persisted workflow outputs even when the local forge root URL is localhost-backed. The tracked workflow also supports `workflow_dispatch` as a local fallback while fresh PR event triggering is being investigated. |
+| ENV-002 | `npm install`; `npm run validate:platform`; `npm run task-gateway:webhook`; `node scripts/agent-control.js ...`; `node scripts/proposal-surface.js ...`; `node scripts/review-surface.js ...` | Prepares the npm-managed control-plane baseline and exposes repo-local webhook, session-start, proposal-surface, and review-surface CLIs. The current slice supports actual Gitea issue-comment webhook delivery, source-event retention, normalized task-request persistence, direct handoff into the worker runtime scaffold, PR creation against the local Gitea forge, and explicit review-outcome synchronization back into durable traceability records. |
+| ENV-003 | `docker build -f docker/worker-runtime/Dockerfile ...`; `node scripts/agent-control.js ...` | Builds and exercises the first repo-owned worker-runtime image scaffold on top of the host-local Docker-compatible runner. The current runtime handoff launches a per-session container, prepares a fresh workspace checkout from the forge target repository and branch, and exports runtime launch artifacts under `.agent-sdlc/runtime/`. |
+| ENV-004 | `npm run dev:gitea-runner -- ensure-runner`; `.gitea/workflows/phase1-ci.yml` | Boots a local Gitea Actions runner and executes the first PR-triggered CI workflow. The current skeleton collects verification metadata into `.agent-sdlc/ci/verification-metadata.json`, emits it in job logs and step summaries, attaches CI run references and final verification status to the traceability artifact, refreshes the PR traceability block for reviewers, and uploads those artifacts as persisted workflow outputs even when the local forge root URL is localhost-backed. The tracked workflow also supports `workflow_dispatch` as an operator fallback for targeted reruns or local debugging. |
 | ENV-005 | `scripts/dev/manage-dev-environment.ps1 -Command init` | Creates the `.agent-sdlc/state/` and `.agent-sdlc/traceability/` surfaces used by the first implementation slice. |
 | ENV-006 | Operator-provided environment variables or secret injection | Secrets remain scoped and profile-specific; no broad bootstrap helper is introduced yet. |
 
@@ -49,6 +49,7 @@ npm run dev:gitea-runner -- ensure-runner
 node scripts/task-gateway.js normalize-gitea-issue-comment --event docs/examples/gitea-issue-comment-event.example.json
 node scripts/agent-control.js start-session --task-request .agent-sdlc/state/task-requests/<task_request_id>.json
 node scripts/proposal-surface.js create-gitea-pr --session .agent-sdlc/state/agent-sessions/<agent_session_id>.json
+node scripts/review-surface.js sync-gitea-pr-review-outcome --session .agent-sdlc/state/agent-sessions/<agent_session_id>.json
 docker build -f docker/worker-runtime/Dockerfile -t agent-sdlc-worker-runtime:test .
 ```
 
@@ -69,13 +70,14 @@ Command behavior:
 - `node scripts/task-gateway.js normalize-gitea-issue-comment --event <path>` normalizes one file-backed Gitea issue-comment event into `.agent-sdlc/state/task-requests/<task_request_id>.json`
 - `node scripts/agent-control.js start-session --task-request <path>` creates `.agent-sdlc/state/agent-sessions/<agent_session_id>.json`, launches the worker-runtime container, and prepares a session-local workspace plus runtime artifacts under `.agent-sdlc/runtime/`
 - `node scripts/proposal-surface.js create-gitea-pr --session <path>` creates or updates the Phase 1 proposal branch and Gitea PR while force-adding the linked traceability artifact into the prepared workspace
+- `node scripts/review-surface.js sync-gitea-pr-review-outcome --session <path>` reads the linked Gitea PR review state, updates the canonical root traceability artifact plus any session-local traceability copy, and refreshes the PR traceability block with explicit review decision metadata
 - `docker build -f docker/worker-runtime/Dockerfile -t agent-sdlc-worker-runtime:test .` builds the first worker-runtime image scaffold defined in the repository
 
 Seed behavior:
 - `npm run dev:gitea-repo -- ensure-local-repo --owner <owner> --repo <repo> --seed-from <path>` now force-pushes the source repo's current `HEAD` into the local Gitea repo's `main` branch so local PR and CI testing use the same tracked workflow files as the active workspace
 
 Local CI fallback:
-- `.gitea/workflows/phase1-ci.yml` now supports `workflow_dispatch` so maintainers can manually dispatch the tracked workflow against a proposal branch if the local forge fails to auto-create a run for a fresh PR event
+- `.gitea/workflows/phase1-ci.yml` supports `workflow_dispatch` so maintainers can manually dispatch the tracked workflow against a proposal branch for targeted reruns or local debugging
 
 ## Repo-Owned Bootstrap Inputs
 The current local forge bootstrap and platform packaging baseline are configured by:
@@ -149,7 +151,6 @@ The bootstrap script now covers:
 Starting the containers is no longer the only bootstrap step, but several workflow-specific initialization tasks still remain:
 - create an API token for later branch, PR, or webhook automation
 - add webhook and branch-protection setup when the task gateway and PR path are implemented
-- extend the current traceability artifact from proposal creation through review outcome after the CI-linked reviewer surface
 - investigate local Gitea artifact listing visibility if operator-facing browsing of stored workflow artifacts becomes a near-term need
 
 ## Known Local Friction Points
@@ -165,7 +166,7 @@ Starting the containers is no longer the only bootstrap step, but several workfl
 
 ## Expected Evolution
 - Keep using repository-local bootstrap entrypoints as the stable operator surface.
-- Expand the script or replace its internals as WBS `3.1` through `3.5` land.
+- Expand the script or replace its internals as WBS `3.1` through `3.6` land.
 - Re-evaluate whether `docker compose` or an equivalent one-command launcher is the right consolidation step once the actual service topology is no longer speculative.
 - Treat the current Node.js control-host CLIs as the first slice on the selected platform stack, then move them under npm and TypeScript as the control plane grows.
 - Add repo-owned Dockerfiles for the control-plane and worker runtime before consolidating them into a repo-owned compose package.
@@ -177,3 +178,4 @@ Starting the containers is no longer the only bootstrap step, but several workfl
 - 2026-04-16: Updated the bootstrap posture after landing the local Gitea repo helper, proposal-surface CLI, and first PR-linked traceability artifact.
 - 2026-04-16: Added the local Gitea Actions runner helper and recorded the first PR-triggered CI verification skeleton.
 - 2026-04-16: Updated the local runner bootstrap notes after validating successful localhost-topology artifact upload in local Gitea run `#19`.
+- 2026-04-20: Updated the bootstrap posture after landing review-outcome synchronization and promoting `review-surface` to the repo-owned operator command set.
