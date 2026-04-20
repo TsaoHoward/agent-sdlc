@@ -202,6 +202,7 @@ function buildTraceabilityArtifact(repoRoot, taskRequest, sessionRecord, branchN
     proposal_ref: proposalInfo.proposalRef,
     proposal_url: proposalInfo.proposalUrl,
     proposal_title: proposalInfo.proposalTitle,
+    proposal_state: proposalInfo.proposalState || "open",
     branch_ref: branchName,
     metadata_path: `.agent-sdlc/traceability/${taskRequest.task_request_id}.json`,
     source_payload_ref: taskRequest.source_payload_ref || null,
@@ -243,10 +244,18 @@ function findExistingPullRequest(pullRequests, owner, branchName, baseBranch) {
   });
 }
 
-async function createOrUpdatePullRequest(settings, repositoryRef, taskRequest, sessionRecord, branchName) {
+function buildProposalInfoFromPullRequest(repositoryInfo, pullRequest, proposalTitle = null) {
+  const proposalIndex = pullRequest.number || pullRequest.index;
+  return {
+    proposalRef: `gitea:${repositoryInfo.host}/${repositoryInfo.owner}/${repositoryInfo.repo}#pull/${proposalIndex}`,
+    proposalUrl: pullRequest.html_url || pullRequest.url || null,
+    proposalTitle: proposalTitle || pullRequest.title || null,
+    proposalState: pullRequest.state || "open",
+  };
+}
+
+async function resolveProposalSeed(settings, repositoryRef, taskRequest, branchName) {
   const parsedRepository = parseGiteaRepositoryRef(repositoryRef);
-  const proposalTitle = buildProposalTitle(taskRequest);
-  const proposalBody = buildProposalBody(taskRequest, sessionRecord);
   const existingPullRequests = await listPullRequests(
     settings,
     parsedRepository.owner,
@@ -259,6 +268,30 @@ async function createOrUpdatePullRequest(settings, repositoryRef, taskRequest, s
     branchName,
     taskRequest.target_branch_ref,
   );
+
+  return {
+    repositoryInfo: parsedRepository,
+    existingPullRequest,
+  };
+}
+
+async function createOrUpdatePullRequest(
+  settings,
+  repositoryRef,
+  taskRequest,
+  sessionRecord,
+  branchName,
+  resolvedProposalSeed = null,
+) {
+  const parsedRepository =
+    (resolvedProposalSeed && resolvedProposalSeed.repositoryInfo) ||
+    parseGiteaRepositoryRef(repositoryRef);
+  const proposalTitle = buildProposalTitle(taskRequest);
+  const proposalBody = buildProposalBody(taskRequest, sessionRecord);
+  const existingPullRequest =
+    resolvedProposalSeed && Object.prototype.hasOwnProperty.call(resolvedProposalSeed, "existingPullRequest")
+      ? resolvedProposalSeed.existingPullRequest
+      : null;
 
   if (existingPullRequest) {
     const updatedPullRequest = await updatePullRequest(
@@ -355,12 +388,25 @@ async function main() {
     const basicAuthHeader = Buffer.from(`${settings.username}:${settings.password}`, "utf8").toString(
       "base64",
     );
+    const resolvedProposalSeed = await resolveProposalSeed(
+      settings,
+      taskRequest.repository_ref,
+      taskRequest,
+      branchName,
+    );
 
-    const proposalSeed = {
-      proposalRef: null,
-      proposalUrl: null,
-      proposalTitle: buildProposalTitle(taskRequest),
-    };
+    const proposalSeed = resolvedProposalSeed.existingPullRequest
+      ? buildProposalInfoFromPullRequest(
+          resolvedProposalSeed.repositoryInfo,
+          resolvedProposalSeed.existingPullRequest,
+          buildProposalTitle(taskRequest),
+        )
+      : {
+          proposalRef: null,
+          proposalUrl: null,
+          proposalTitle: buildProposalTitle(taskRequest),
+          proposalState: "open",
+        };
     const traceabilityArtifact = buildTraceabilityArtifact(
       repoRoot,
       taskRequest,
@@ -388,36 +434,48 @@ async function main() {
       taskRequest,
       sessionRecord,
       branchName,
+      resolvedProposalSeed,
     );
     const pullRequest = proposalResult.pullRequest;
-    const proposalIndex = pullRequest.number || pullRequest.index;
-    const proposalRef = `gitea:${repositoryInfo.host}/${repositoryInfo.owner}/${repositoryInfo.repo}#pull/${proposalIndex}`;
-
-    traceabilityArtifact.proposal_ref = proposalRef;
-    traceabilityArtifact.proposal_url = pullRequest.html_url || pullRequest.url || null;
-    traceabilityArtifact.proposal_title = proposalResult.proposalTitle;
-    traceabilityArtifact.proposal_state = pullRequest.state || "open";
-    writeJson(traceabilityPath.absoluteArtifactPath, traceabilityArtifact);
-
-    runGit(workspaceDir, ["add", "-f", traceabilityPath.relativeArtifactPath]);
-    runGit(
-      workspaceDir,
-      ["commit", "--amend", "--no-edit"],
-      {
-        extraConfigs: [
-          `user.name=${COMMIT_AUTHOR_NAME}`,
-          `user.email=${COMMIT_AUTHOR_EMAIL}`,
-        ],
-      },
+    const proposalInfo = buildProposalInfoFromPullRequest(
+      repositoryInfo,
+      pullRequest,
+      proposalResult.proposalTitle,
     );
-    pushBranch(workspaceDir, remoteUrls.gitUrl, branchName, basicAuthHeader);
+
+    const shouldRewriteTraceability =
+      traceabilityArtifact.proposal_ref !== proposalInfo.proposalRef ||
+      traceabilityArtifact.proposal_url !== proposalInfo.proposalUrl ||
+      traceabilityArtifact.proposal_title !== proposalInfo.proposalTitle ||
+      traceabilityArtifact.proposal_state !== proposalInfo.proposalState;
+
+    if (shouldRewriteTraceability) {
+      traceabilityArtifact.proposal_ref = proposalInfo.proposalRef;
+      traceabilityArtifact.proposal_url = proposalInfo.proposalUrl;
+      traceabilityArtifact.proposal_title = proposalInfo.proposalTitle;
+      traceabilityArtifact.proposal_state = proposalInfo.proposalState;
+      writeJson(traceabilityPath.absoluteArtifactPath, traceabilityArtifact);
+
+      runGit(workspaceDir, ["add", "-f", traceabilityPath.relativeArtifactPath]);
+      runGit(
+        workspaceDir,
+        ["commit", "--amend", "--no-edit"],
+        {
+          extraConfigs: [
+            `user.name=${COMMIT_AUTHOR_NAME}`,
+            `user.email=${COMMIT_AUTHOR_EMAIL}`,
+          ],
+        },
+      );
+      pushBranch(workspaceDir, remoteUrls.gitUrl, branchName, basicAuthHeader);
+    }
 
     sessionRecord.session_state = "completed";
     sessionRecord.updated_at = utcNow();
     sessionRecord.completed_at = sessionRecord.updated_at;
-    sessionRecord.proposal_ref = proposalRef;
-    sessionRecord.proposal_url = traceabilityArtifact.proposal_url;
-    sessionRecord.proposal_title = proposalResult.proposalTitle;
+    sessionRecord.proposal_ref = proposalInfo.proposalRef;
+    sessionRecord.proposal_url = proposalInfo.proposalUrl;
+    sessionRecord.proposal_title = proposalInfo.proposalTitle;
     sessionRecord.proposal_branch_ref = branchName;
     sessionRecord.traceability_metadata_ref = toRepoRelativePath(repoRoot, traceabilityPath.absoluteArtifactPath);
     sessionRecord.artifact_refs = [
@@ -433,9 +491,9 @@ async function main() {
           created: proposalResult.created,
           task_request_id: taskRequest.task_request_id,
           agent_session_id: sessionRecord.agent_session_id,
-          proposal_ref: proposalRef,
-          proposal_url: traceabilityArtifact.proposal_url,
-          proposal_title: proposalResult.proposalTitle,
+          proposal_ref: proposalInfo.proposalRef,
+          proposal_url: proposalInfo.proposalUrl,
+          proposal_title: proposalInfo.proposalTitle,
           branch_ref: branchName,
           traceability_metadata_ref: sessionRecord.traceability_metadata_ref,
           session_record_path: toRepoRelativePath(repoRoot, sessionRecordPath),

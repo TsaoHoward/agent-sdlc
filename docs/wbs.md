@@ -230,7 +230,7 @@
 - Dependencies: 3.1, 3.2, 3.3
 - Critical-Path-Candidate: Yes
 - Status: Done
-- Notes: A working proposal path now exists at `node scripts/proposal-surface.js create-gitea-pr --session <path>`. The current slice reads the prepared session/task records, force-adds `.agent-sdlc/traceability/<task_request_id>.json` inside the prepared workspace, pushes `agent/<task_request_id>` to Gitea, and creates or updates the linked PR with the reviewer-facing traceability block.
+- Notes: A working proposal path now exists at `node scripts/proposal-surface.js create-gitea-pr --session <path>`. The current slice reads the prepared session/task records, force-adds `.agent-sdlc/traceability/<task_request_id>.json` inside the prepared workspace, pushes `agent/<task_request_id>` to Gitea, and creates or updates the linked PR with the reviewer-facing traceability block. When the proposal PR already exists, the path now pre-seeds proposal traceability from the open PR before the branch update so the local Gitea path does not need a second amend-and-push just to backfill `proposal_ref`.
 
 ### WBS 3.5 — CI Verification Skeleton
 - Parent: 3
@@ -400,3 +400,4 @@
 - 2026-04-16: Marked WBS 3.4 done and WBS 3.6 in progress after landing the first branch/PR proposal path and proposal-linked traceability artifact.
 - 2026-04-16: Marked WBS 3.5 done after landing the local Gitea Actions runner helper, PR-triggered CI workflow skeleton, and verification-metadata linkage.
 - 2026-04-20: Updated WBS 3.3 and 3.5 after fixing runtime workspace sourcing to clone the forge target repo/branch, which restored proposal-branch workflow presence and live PR `#5` run creation in local Gitea.
+- 2026-04-20: Updated WBS 3.4 after pre-seeding traceability for already-open PRs, reducing the local Gitea existing-PR refresh path to one new sync-triggered run.
