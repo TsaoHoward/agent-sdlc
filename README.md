@@ -97,6 +97,12 @@ powershell -File scripts/dev/manage-dev-environment.ps1 -Command up
 powershell -File scripts/dev/manage-dev-environment.ps1 -Command up -GiteaDatabaseMode sqlite
 powershell -File scripts/dev/manage-dev-environment.ps1 -Command up -SkipGitea
 powershell -File scripts/dev/manage-dev-environment.ps1 -Command status
+npm run dev:env:init
+npm run dev:env:up
+npm run dev:env:up:sqlite
+npm run dev:env:up:no-gitea
+npm run dev:env:status
+npm run dev:env:down
 ```
 
 Current platform package commands:

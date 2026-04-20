@@ -250,7 +250,7 @@
 - Dependencies: 2.5, 3.2, 3.4, 3.5
 - Critical-Path-Candidate: Yes
 - Status: Done
-- Notes: The first proposal-linked traceability artifact exists. `proposal-surface create-gitea-pr` writes `.agent-sdlc/traceability/<task_request_id>.json` into the proposal branch and records `proposal_ref` / `proposal_url` back into the session record. CI now extends that linkage by generating `.agent-sdlc/ci/verification-metadata.json`, reviewer-visible job-log and step-summary metadata, and a linked traceability artifact enriched with `ci_run_ref`, workflow metadata, and verification status for the first end-to-end traceability path. Review outcome linkage remains a later follow-up.
+- Notes: The first proposal-linked traceability artifact exists. `proposal-surface create-gitea-pr` writes `.agent-sdlc/traceability/<task_request_id>.json` into the proposal branch and records `proposal_ref` / `proposal_url` back into the session record. CI now extends that linkage by generating `.agent-sdlc/ci/verification-metadata.json`, reviewer-visible job-log and step-summary metadata, a linked traceability artifact enriched with `ci_run_ref`, workflow metadata, and final verification status, and a refreshed PR traceability block that shows whether the proposal is ready for human review. Review outcome linkage remains a later follow-up.
 
 ### WBS 4 — Controlled Expansion
 - Parent:

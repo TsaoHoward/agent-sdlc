@@ -207,6 +207,15 @@ async function listPullRequests(settings, owner, repo, repositoryRef = null) {
   });
 }
 
+async function getPullRequest(settings, owner, repo, index, repositoryRef = null) {
+  return requestJson(settings, {
+    method: "GET",
+    pathname: `api/v1/repos/${owner}/${repo}/pulls/${index}`,
+    baseUrl: getForgeBaseUrl(settings, repositoryRef),
+    allowNotFound: true,
+  });
+}
+
 async function createPullRequest(settings, owner, repo, body, repositoryRef = null) {
   return requestJson(settings, {
     method: "POST",
@@ -231,6 +240,7 @@ module.exports = {
   createRepositoryForUser,
   createUser,
   getForgeBaseUrl,
+  getPullRequest,
   getRepository,
   getUser,
   listPullRequests,

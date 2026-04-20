@@ -12,6 +12,7 @@ const {
   updatePullRequest,
 } = require("./lib/gitea-client");
 const { ensureProjectState, getRepoRoot, toRepoRelativePath, writeJson } = require("./lib/project-state");
+const { buildTraceabilityBlock, deriveReviewStatus } = require("./lib/traceability");
 
 const COMMIT_AUTHOR_NAME = process.env.AGENT_SDLC_COMMIT_AUTHOR_NAME || "Agent SDLC Bot";
 const COMMIT_AUTHOR_EMAIL =
@@ -103,24 +104,22 @@ function buildProposalTitle(taskRequest) {
   return `agent: ${summaryLabel}`;
 }
 
-function buildTraceabilityBlock(taskRequest, sessionRecord) {
-  const sourceRef = taskRequest.issue_ref || taskRequest.pull_request_ref || taskRequest.comment_ref || "n/a";
-  const metadataPath = `.agent-sdlc/traceability/${taskRequest.task_request_id}.json`;
-
-  return [
-    "## Agent Traceability",
-    `- Task Request: \`${taskRequest.task_request_id}\``,
-    `- Agent Session: \`${sessionRecord.agent_session_id}\``,
-    `- Source: \`${sourceRef}\``,
-    `- Execution Profile: \`${taskRequest.execution_profile_id}\``,
-    `- Runtime Capability Set: \`${taskRequest.runtime_capability_set_id}\``,
-    `- Metadata: \`${metadataPath}\``,
-    "- CI: `pending`",
-  ].join("\n");
-}
-
 function buildProposalBody(taskRequest, sessionRecord) {
-  const parts = [buildTraceabilityBlock(taskRequest, sessionRecord)];
+  const parts = [
+    buildTraceabilityBlock({
+      task_request_id: taskRequest.task_request_id,
+      agent_session_id: sessionRecord.agent_session_id,
+      source_ref: taskRequest.issue_ref || taskRequest.pull_request_ref || taskRequest.comment_ref || "n/a",
+      execution_profile_id: taskRequest.execution_profile_id,
+      runtime_capability_set_id: taskRequest.runtime_capability_set_id,
+      metadata_path: `.agent-sdlc/traceability/${taskRequest.task_request_id}.json`,
+      verification_metadata_path: ".agent-sdlc/ci/verification-metadata.json",
+      ci: {
+        ci_status: "pending",
+      },
+      review_status: deriveReviewStatus("pending").label,
+    }),
+  ];
 
   if (taskRequest.summary) {
     parts.push("## Proposed Intent");
@@ -209,8 +208,14 @@ function buildTraceabilityArtifact(repoRoot, taskRequest, sessionRecord, branchN
     task_request_path: toRepoRelativePath(repoRoot, path.join(repoRoot, sessionRecord.task_request_path)),
     session_record_path: toRepoRelativePath(repoRoot, path.join(repoRoot, ".agent-sdlc", "state", "agent-sessions", `${sessionRecord.agent_session_id}.json`)),
     ci: {
-      status: "pending",
+      ci_status: "pending",
       ci_run_ref: null,
+      ci_run_url: null,
+      verification_metadata_path: ".agent-sdlc/ci/verification-metadata.json",
+    },
+    review: {
+      status: deriveReviewStatus("pending").id,
+      proposal_body_sync_status: "pending",
     },
   };
 }

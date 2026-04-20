@@ -27,7 +27,7 @@ The repository is intentionally still in an early-phase, structure-first posture
   - `node scripts/dev/ensure-local-gitea-repo.js ensure-local-repo --owner <owner> --repo <repo> --seed-from <path>` can provision the local Gitea owner/repository path used by the proposal-flow smoke tests.
   - `node scripts/dev/ensure-local-gitea-runner.js ensure-runner` can provision the local Gitea Actions runner and place job containers on the shared Docker network used by the local forge.
   - `node scripts/proposal-surface.js create-gitea-pr --session <path>` now force-adds `.agent-sdlc/traceability/<task_request_id>.json` inside the prepared workspace, pushes `agent/<task_request_id>` to Gitea, and creates or updates the linked PR.
-  - `.gitea/workflows/phase1-ci.yml` now runs on PR open/update/reopen, executes `npm ci`, `npm run validate:platform`, and `npm run typecheck`, and writes verification linkage to `.agent-sdlc/ci/verification-metadata.json` plus the CI job log and step summary. The workflow also enriches the traceability artifact with CI run references and uploads both verification metadata and traceability metadata as workflow artifacts.
+  - `.gitea/workflows/phase1-ci.yml` now runs on PR open/update/reopen, executes `npm ci`, `npm run validate:platform`, and `npm run typecheck`, writes verification linkage to `.agent-sdlc/ci/verification-metadata.json` plus the CI job log and step summary, enriches the traceability artifact with CI run references and final verification status, refreshes the PR traceability block with CI and review-readiness state, and uploads both verification metadata and traceability metadata as workflow artifacts even when verification fails.
   - the local Gitea smoke-test baseline now includes a successful PR-triggered workflow run against the local forge and runner path.
   - the current control-host implementation uses repo-local Node.js CLIs as the first slice on the selected platform-stack convergence path rather than as a new architecture boundary by itself.
 - The platform stack is now selected in ADR-0006:
@@ -39,7 +39,7 @@ The repository is intentionally still in an early-phase, structure-first posture
   - `npm run validate:platform` and `npm run typecheck` now verify the current platform package
   - `docker/worker-runtime/Dockerfile` and `docker/worker-runtime/entrypoint.sh` define the first worker-runtime image scaffold
   - the worker-runtime image scaffold has been built locally as `agent-sdlc-worker-runtime:test`
-- The repo now has the first independent CI workflow, but it still needs to extend CI linkage into longer-lived traceability and human-review surfaces.
+- The repo now has the first independent CI workflow plus a CI-linked reviewer surface, but it still needs to extend lifecycle linkage into explicit human review outcome capture.
 - The localhost-rooted local forge topology now uploads workflow artifacts successfully after the runner helper aligned runner and job-container networking with host loopback expectations and injected an `agent-sdlc-gitea` host alias for local job containers; local artifact listing visibility in Gitea remains a narrower follow-up if operator browsing becomes necessary.
 
 ## Dependencies And Constraints
@@ -62,7 +62,7 @@ The repository is intentionally still in an early-phase, structure-first posture
 
 Steps 1 through 5 now have working implementation slices, with WBS 3.1 reaching a real trigger path, WBS 3.2/3.3 handing off into the worker image scaffold, WBS 3.4 creating a real Gitea proposal path, and WBS 3.5 exercising a real PR-triggered workflow on the local Gitea Actions path. The next packaging boundary is therefore narrower:
 - keep the current control-plane growth path inside the npm-managed package baseline
-- extend the traceability artifact and linked state from proposal creation into durable CI linkage and later review
+- extend the traceability artifact and linked state from proposal creation into explicit review outcome capture after the CI-linked reviewer surface
 - investigate local artifact listing visibility only if operator-facing browsing of stored workflow artifacts becomes a near-term requirement
 - do that without collapsing task gateway, agent control, worker, forge proposal, and CI responsibilities together
 
@@ -74,7 +74,7 @@ This issue exits the active dashboard when the first implementation slice is und
 If implementation uncovers a major unresolved decision, the issue should stay active until the decision is captured in `docs/decisions/decision-backlog.md` and, if needed, promoted to an ADR.
 
 ## Next Actions
-- extend `.agent-sdlc/traceability/<task_request_id>.json` from proposal creation through CI run references and later review
+- extend `.agent-sdlc/traceability/<task_request_id>.json` from proposal creation and CI-linked reviewer status through later review outcome capture
 - investigate local artifact listing visibility only if operator-facing browsing of stored workflow artifacts becomes necessary
 - expand the current project-local bootstrap entrypoints as those WBS 3 interfaces become real services or commands
 - split or reframe this dashboard item once the implementation slices are concrete enough to track separately

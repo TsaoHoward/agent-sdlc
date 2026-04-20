@@ -1,5 +1,6 @@
 const fs = require("fs");
 const path = require("path");
+const { deriveReviewStatus } = require("../lib/traceability");
 
 function getRepoRoot() {
   return path.resolve(__dirname, "..", "..");
@@ -69,6 +70,12 @@ function main() {
   traceability.ci.workflow_run_id = process.env.GITHUB_RUN_ID || process.env.GITEA_RUN_ID || traceability.ci.workflow_run_id || null;
   traceability.ci.workflow_run_number = process.env.GITHUB_RUN_NUMBER || process.env.GITEA_RUN_NUMBER || traceability.ci.workflow_run_number || null;
   traceability.ci.ci_status = "pending";
+  traceability.ci.verification_metadata_path =
+    traceability.ci.verification_metadata_path || ".agent-sdlc/ci/verification-metadata.json";
+  traceability.review = traceability.review || {};
+  traceability.review.status = deriveReviewStatus("pending").id;
+  traceability.review.proposal_body_sync_status =
+    traceability.review.proposal_body_sync_status || "pending";
 
   writeJson(traceabilityPath, traceability);
   console.log(JSON.stringify(traceability, null, 2));

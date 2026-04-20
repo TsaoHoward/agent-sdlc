@@ -33,6 +33,18 @@ function writeJson(filePath, value) {
   fs.writeFileSync(filePath, `${JSON.stringify(value, null, 2)}\n`, "utf8");
 }
 
+function buildCiRunUrl() {
+  if (process.env.GITHUB_SERVER_URL && process.env.GITHUB_REPOSITORY && process.env.GITHUB_RUN_ID) {
+    return `${process.env.GITHUB_SERVER_URL}/${process.env.GITHUB_REPOSITORY}/actions/runs/${process.env.GITHUB_RUN_ID}`;
+  }
+
+  if (process.env.GITEA_SERVER_URL && process.env.GITEA_RUN_ID) {
+    return `${process.env.GITEA_SERVER_URL}/actions/runs/${process.env.GITEA_RUN_ID}`;
+  }
+
+  return null;
+}
+
 function setGithubOutput(name, value) {
   if (!process.env.GITHUB_OUTPUT) {
     return;
@@ -76,9 +88,7 @@ function main() {
   const eventPayloadPath = process.env.GITHUB_EVENT_PATH || process.env.GITEA_EVENT_PATH || null;
   const verificationMetadataPath = path.join(outputDir, "verification-metadata.json");
   const ciRunRef = process.env.GITHUB_RUN_ID || process.env.GITEA_RUN_ID || process.env.GITHUB_RUN_NUMBER || process.env.GITEA_RUN_NUMBER || null;
-  const ciRunUrl = process.env.GITHUB_SERVER_URL && process.env.GITHUB_REPOSITORY && process.env.GITHUB_RUN_ID
-    ? `${process.env.GITHUB_SERVER_URL}/${process.env.GITHUB_REPOSITORY}/actions/runs/${process.env.GITHUB_RUN_ID}`
-    : null;
+  const ciRunUrl = buildCiRunUrl();
   const verificationMetadata = {
     verification_version: 1,
     created_at: utcNow(),

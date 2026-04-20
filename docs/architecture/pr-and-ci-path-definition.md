@@ -45,6 +45,7 @@ The PR body should show at least:
 - selected execution profile
 
 The linked metadata artifact may carry fuller machine-readable fields, including CI linkage.
+When CI starts and finishes, the proposal path may refresh the reviewer-facing traceability block so the PR surface shows the current CI run and whether the proposal is ready for human review.
 
 ### 5.1 Concrete Proposal Conventions
 The first proposal path should use these conventions:
