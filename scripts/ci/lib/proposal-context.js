@@ -19,6 +19,31 @@ function parseHostFromUrl(urlValue) {
   }
 }
 
+function normalizeNullableString(value) {
+  if (value === undefined || value === null) {
+    return null;
+  }
+
+  if (typeof value !== "string") {
+    return value;
+  }
+
+  const normalized = value.trim();
+  if (normalized === "") {
+    return null;
+  }
+
+  if (["null", "undefined"].includes(normalized.toLowerCase())) {
+    return null;
+  }
+
+  return normalized;
+}
+
+function isSupportedProposalRef(proposalRef) {
+  return /^gitea:[^/]+\/[^/]+\/[^#]+#pull\/\d+$/u.test(String(proposalRef || ""));
+}
+
 function readEventPayload() {
   const eventPayloadPath = process.env.GITHUB_EVENT_PATH || process.env.GITEA_EVENT_PATH || null;
   if (!eventPayloadPath) {
@@ -64,13 +89,15 @@ function buildProposalContextFromPayload(payload) {
   }
 
   return {
-    proposalRef,
+    proposalRef: normalizeNullableString(proposalRef),
     proposalUrl:
-      (pullRequest && (pullRequest.html_url || pullRequest.url)) ||
-      (repository && repository.html_url && `${repository.html_url.replace(/\/$/u, "")}/pulls/${proposalIndex}`) ||
-      null,
-    proposalTitle: (pullRequest && pullRequest.title) || null,
-    proposalState: (pullRequest && pullRequest.state) || "open",
+      normalizeNullableString(
+        (pullRequest && (pullRequest.html_url || pullRequest.url)) ||
+          (repository && repository.html_url && `${repository.html_url.replace(/\/$/u, "")}/pulls/${proposalIndex}`) ||
+          null,
+      ),
+    proposalTitle: normalizeNullableString((pullRequest && pullRequest.title) || null),
+    proposalState: normalizeNullableString((pullRequest && pullRequest.state) || "open"),
     source: "event-payload",
   };
 }
@@ -108,35 +135,49 @@ async function buildProposalContextFromBranch(repoRoot, traceability) {
 
   const proposalIndex = pullRequest.number || pullRequest.index;
   return {
-    proposalRef: buildProposalRef(
-      repositoryInfo.host,
-      `${repositoryInfo.owner}/${repositoryInfo.repo}`,
-      proposalIndex,
+    proposalRef: normalizeNullableString(
+      buildProposalRef(
+        repositoryInfo.host,
+        `${repositoryInfo.owner}/${repositoryInfo.repo}`,
+        proposalIndex,
+      ),
     ),
-    proposalUrl: pullRequest.html_url || pullRequest.url || null,
-    proposalTitle: pullRequest.title || null,
-    proposalState: pullRequest.state || "open",
+    proposalUrl: normalizeNullableString(pullRequest.html_url || pullRequest.url || null),
+    proposalTitle: normalizeNullableString(pullRequest.title || null),
+    proposalState: normalizeNullableString(pullRequest.state || "open"),
     source: "branch-lookup",
   };
 }
 
 async function resolveProposalContext(repoRoot, traceability) {
-  if (traceability.proposal_ref) {
+  const traceabilityProposalRef = normalizeNullableString(traceability.proposal_ref);
+  if (traceabilityProposalRef && isSupportedProposalRef(traceabilityProposalRef)) {
     return {
-      proposalRef: traceability.proposal_ref,
-      proposalUrl: traceability.proposal_url || null,
-      proposalTitle: traceability.proposal_title || null,
-      proposalState: traceability.proposal_state || "open",
+      proposalRef: traceabilityProposalRef,
+      proposalUrl: normalizeNullableString(traceability.proposal_url || null),
+      proposalTitle: normalizeNullableString(traceability.proposal_title || null),
+      proposalState: normalizeNullableString(traceability.proposal_state || "open"),
       source: "traceability",
     };
   }
 
   const payloadContext = buildProposalContextFromPayload(readEventPayload());
-  if (payloadContext) {
+  if (payloadContext && payloadContext.proposalRef && isSupportedProposalRef(payloadContext.proposalRef)) {
     return payloadContext;
   }
 
-  return buildProposalContextFromBranch(repoRoot, traceability);
+  const branchContext = await buildProposalContextFromBranch(repoRoot, traceability);
+  if (branchContext && branchContext.proposalRef && isSupportedProposalRef(branchContext.proposalRef)) {
+    return branchContext;
+  }
+
+  return {
+    proposalRef: null,
+    proposalUrl: normalizeNullableString(traceability.proposal_url || null),
+    proposalTitle: normalizeNullableString(traceability.proposal_title || null),
+    proposalState: normalizeNullableString(traceability.proposal_state || "open"),
+    source: "unresolved",
+  };
 }
 
 function applyProposalContext(traceability, proposalContext) {
@@ -153,7 +194,7 @@ function applyProposalContext(traceability, proposalContext) {
   ];
 
   for (const [field, nextValue] of fieldMap) {
-    if (nextValue !== undefined && traceability[field] !== nextValue) {
+    if (nextValue !== undefined && nextValue !== null && traceability[field] !== nextValue) {
       traceability[field] = nextValue;
       changed = true;
     }

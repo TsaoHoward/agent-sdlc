@@ -10,16 +10,24 @@ const {
   updatePullRequest,
 } = require("./lib/gitea-client");
 const { ensureProjectState, getRepoRoot, toRepoRelativePath, writeJson } = require("./lib/project-state");
-const { buildTraceabilityBlock, labelForReviewStatus, replaceTraceabilityBlock } = require("./lib/traceability");
+const {
+  buildTraceabilityBlock,
+  deriveReviewStatus,
+  labelForReviewStatus,
+  replaceTraceabilityBlock,
+} = require("./lib/traceability");
 
 const DEFAULT_WEBHOOK_HOST = "127.0.0.1";
 const DEFAULT_WEBHOOK_PORT = 4011;
 const DEFAULT_WEBHOOK_ROUTE = "/hooks/gitea/pull-request-review";
+const DEFAULT_CI_TRACEABILITY_SYNC_ROUTE = "/hooks/internal/ci-traceability";
 
 function printUsage() {
   console.error(
     [
       "Usage:",
+      "  node scripts/review-surface.js sync-gitea-proposal-traceability --session <agent-session-json-path>",
+      "  node scripts/review-surface.js sync-gitea-proposal-traceability --proposal <gitea:host/owner/repo#pull/index>",
       "  node scripts/review-surface.js sync-gitea-pr-review-outcome --session <agent-session-json-path>",
       "  node scripts/review-surface.js sync-gitea-pr-review-outcome --proposal <gitea:host/owner/repo#pull/index>",
       "  node scripts/review-surface.js sync-gitea-pr-review-event --event <event-json-path>",
@@ -35,6 +43,39 @@ function parseArguments(argv) {
   }
 
   const command = argv[2];
+  if (command === "sync-gitea-proposal-traceability") {
+    const options = {
+      command,
+      sessionRecordPath: null,
+      proposalRef: null,
+    };
+
+    for (let index = 3; index < argv.length; index += 1) {
+      const token = argv[index];
+      if (token === "--session") {
+        options.sessionRecordPath = path.resolve(argv[index + 1]);
+        index += 1;
+        continue;
+      }
+
+      if (token === "--proposal") {
+        options.proposalRef = argv[index + 1];
+        index += 1;
+        continue;
+      }
+
+      printUsage();
+      process.exit(1);
+    }
+
+    if ((options.sessionRecordPath && options.proposalRef) || (!options.sessionRecordPath && !options.proposalRef)) {
+      printUsage();
+      process.exit(1);
+    }
+
+    return options;
+  }
+
   if (command === "sync-gitea-pr-review-outcome") {
     const options = {
       command,
@@ -394,6 +435,25 @@ function dedupePaths(paths) {
   return paths.filter((candidate, index, values) => candidate && values.indexOf(candidate) === index);
 }
 
+function collectSessionTraceabilityPaths(repoRoot, sessionEntries) {
+  return dedupePaths(
+    sessionEntries.flatMap(({ sessionRecord }) => {
+      const explicitPaths = [];
+
+      if (sessionRecord.traceability_metadata_ref) {
+        explicitPaths.push(path.join(repoRoot, sessionRecord.traceability_metadata_ref));
+      }
+
+      const artifactPaths = (sessionRecord.artifact_refs || [])
+        .filter((artifactRef) => typeof artifactRef === "string")
+        .filter((artifactRef) => /(^|\/)\.agent-sdlc\/traceability\/[^/]+\.json$/u.test(artifactRef))
+        .map((artifactRef) => path.join(repoRoot, artifactRef));
+
+      return [...explicitPaths, ...artifactPaths].filter((absolutePath) => fs.existsSync(absolutePath));
+    }),
+  );
+}
+
 function resolveTraceabilityTargets(repoRoot, statePaths, options) {
   const {
     sessionEntries,
@@ -414,16 +474,7 @@ function resolveTraceabilityTargets(repoRoot, statePaths, options) {
   const resolvedTaskRequestId = taskRequestId || uniqueTaskRequestIds[0] || null;
   const stateTraceabilityPath =
     resolvedTaskRequestId && path.join(statePaths.traceabilityDir, `${resolvedTaskRequestId}.json`);
-  const sessionTraceabilityPaths = sessionEntries
-    .map(({ sessionRecord }) => {
-      if (!sessionRecord.traceability_metadata_ref) {
-        return null;
-      }
-
-      const absolutePath = path.join(repoRoot, sessionRecord.traceability_metadata_ref);
-      return fs.existsSync(absolutePath) ? absolutePath : null;
-    })
-    .filter((value) => value);
+  const sessionTraceabilityPaths = collectSessionTraceabilityPaths(repoRoot, sessionEntries);
   const syncPaths = dedupePaths([
     stateTraceabilityPath,
     explicitSessionTraceabilityPath,
@@ -597,6 +648,51 @@ async function enrichTraceabilityCiFromActions(settings, repositoryRef, proposal
   return traceability;
 }
 
+function hasExplicitReviewDecision(review = {}) {
+  const explicitStatuses = new Set([
+    "approved",
+    "changes-requested",
+    "merged",
+    "closed-without-merge",
+  ]);
+
+  return Boolean(
+    review.review_decision_ref ||
+      review.decision_outcome ||
+      explicitStatuses.has(String(review.status || "").trim()),
+  );
+}
+
+function mergeProposalTraceabilitySnapshot(traceability, snapshot) {
+  if (!snapshot || typeof snapshot !== "object") {
+    return traceability;
+  }
+
+  if (snapshot.proposal_ref) {
+    traceability.proposal_ref = snapshot.proposal_ref;
+  }
+  if (snapshot.proposal_url) {
+    traceability.proposal_url = snapshot.proposal_url;
+  }
+  if (snapshot.proposal_title) {
+    traceability.proposal_title = snapshot.proposal_title;
+  }
+  if (snapshot.proposal_state) {
+    traceability.proposal_state = snapshot.proposal_state;
+  }
+
+  if (snapshot.ci && typeof snapshot.ci === "object") {
+    traceability.ci = traceability.ci || {};
+    for (const [field, value] of Object.entries(snapshot.ci)) {
+      if (value !== undefined) {
+        traceability.ci[field] = value;
+      }
+    }
+  }
+
+  return traceability;
+}
+
 async function syncProposalBody(settings, repositoryRef, proposalInfo, traceability) {
   const currentPullRequest = await getPullRequest(
     settings,
@@ -743,6 +839,88 @@ async function syncReviewOutcome(repoRoot, statePaths, syncContext) {
   };
 }
 
+async function syncProposalTraceability(repoRoot, statePaths, syncContext, snapshot = null) {
+  const { traceabilityTargets, proposalRef } = syncContext;
+  const traceabilityPath = traceabilityTargets.primaryPath;
+  const traceability = readJson(traceabilityPath);
+
+  if (traceability.proposal_ref && proposalRef && traceability.proposal_ref !== proposalRef) {
+    throw new Error(
+      `Traceability record proposal_ref '${traceability.proposal_ref}' did not match requested proposal '${proposalRef}'.`,
+    );
+  }
+
+  mergeProposalTraceabilitySnapshot(traceability, snapshot);
+
+  if (!traceability.proposal_ref) {
+    if (!proposalRef) {
+      throw new Error("Traceability record does not include proposal_ref.");
+    }
+
+    traceability.proposal_ref = proposalRef;
+  }
+
+  const proposalInfo = parseProposalRef(traceability.proposal_ref);
+  const repositoryRef = `gitea:${proposalInfo.host}/${proposalInfo.owner}/${proposalInfo.repo}`;
+  const settings = loadLocalGiteaSettings(repoRoot);
+  const pullRequest = await getPullRequest(
+    settings,
+    proposalInfo.owner,
+    proposalInfo.repo,
+    proposalInfo.index,
+    repositoryRef,
+  );
+
+  if (!pullRequest) {
+    throw new Error(`Pull request '${traceability.proposal_ref}' was not found.`);
+  }
+
+  const ciNeedsEnrichment =
+    !traceability.ci ||
+    !traceability.ci.ci_status ||
+    traceability.ci.ci_status === "pending" ||
+    !traceability.ci.ci_run_ref;
+
+  if (ciNeedsEnrichment) {
+    await enrichTraceabilityCiFromActions(settings, repositoryRef, proposalInfo, traceability);
+  } else {
+    traceability.ci = traceability.ci || {};
+    if (!traceability.ci.verification_metadata_path) {
+      traceability.ci.verification_metadata_path = ".agent-sdlc/ci/verification-metadata.json";
+    }
+  }
+
+  const syncedAt = utcNow();
+  traceability.proposal_url = pullRequest.html_url || pullRequest.url || traceability.proposal_url || null;
+  traceability.proposal_title = pullRequest.title || traceability.proposal_title || null;
+  traceability.proposal_state = pullRequest.merged ? "merged" : pullRequest.state || traceability.proposal_state || "open";
+  traceability.review = traceability.review || {};
+
+  if (!hasExplicitReviewDecision(traceability.review)) {
+    const derivedReviewStatus = deriveReviewStatus(
+      (traceability.ci && traceability.ci.ci_status) || "pending",
+    );
+    traceability.review.status = derivedReviewStatus.id;
+    traceability.review.status_label = derivedReviewStatus.label;
+    traceability.review.updated_at =
+      (traceability.ci && traceability.ci.completed_at) || syncedAt;
+  }
+
+  traceability.review.host_traceability_sync_at = syncedAt;
+  writeTraceabilityCopies(traceabilityTargets.syncPaths, traceability);
+
+  return {
+    status: "proposal-traceability-synced",
+    task_request_id: traceability.task_request_id,
+    proposal_ref: traceability.proposal_ref,
+    ci_status: traceability.ci && traceability.ci.ci_status,
+    review_status: traceability.review && traceability.review.status,
+    traceability_metadata_ref: toRepoRelativePath(repoRoot, traceabilityPath),
+    matched_session_ids: traceabilityTargets.matchedSessionIds,
+    synced_copy_count: traceabilityTargets.syncPaths.length,
+  };
+}
+
 function writeJsonResponse(response, statusCode, payload) {
   response.writeHead(statusCode, {
     "content-type": "application/json; charset=utf-8",
@@ -753,10 +931,13 @@ function writeJsonResponse(response, statusCode, payload) {
 function startWebhookServer(repoRoot, options) {
   const statePaths = ensureProjectState(repoRoot);
   const server = http.createServer((request, response) => {
-    if (request.method !== "POST" || request.url !== options.route) {
+    const isReviewWebhook = request.method === "POST" && request.url === options.route;
+    const isCiTraceabilitySync = request.method === "POST" && request.url === DEFAULT_CI_TRACEABILITY_SYNC_ROUTE;
+
+    if (!isReviewWebhook && !isCiTraceabilitySync) {
       writeJsonResponse(response, request.method === "POST" ? 404 : 405, {
         status: "rejected",
-        message: "Only POST requests to the configured review webhook route are supported.",
+        message: "Only POST requests to the configured review routes are supported.",
       });
       return;
     }
@@ -771,6 +952,21 @@ function startWebhookServer(repoRoot, options) {
         try {
           const rawText = Buffer.concat(chunks).toString("utf8");
           const payload = JSON.parse(rawText);
+          if (isCiTraceabilitySync) {
+            if (!payload.proposal_ref) {
+              writeJsonResponse(response, 400, {
+                status: "rejected",
+                message: "CI traceability sync payload must include 'proposal_ref'.",
+              });
+              return;
+            }
+
+            const syncContext = resolveSyncContextByProposalRef(repoRoot, statePaths, payload.proposal_ref);
+            const syncResult = await syncProposalTraceability(repoRoot, statePaths, syncContext, payload);
+            writeJsonResponse(response, 202, syncResult);
+            return;
+          }
+
           const envelope = buildNormalizedEnvelope({
             rawText,
             payload,
@@ -849,6 +1045,15 @@ async function main() {
       ? resolveSyncContextBySession(repoRoot, statePaths, options.sessionRecordPath)
       : resolveSyncContextByProposalRef(repoRoot, statePaths, options.proposalRef);
     const result = await syncReviewOutcome(repoRoot, statePaths, syncContext);
+    console.log(JSON.stringify(result, null, 2));
+    return;
+  }
+
+  if (options.command === "sync-gitea-proposal-traceability") {
+    const syncContext = options.sessionRecordPath
+      ? resolveSyncContextBySession(repoRoot, statePaths, options.sessionRecordPath)
+      : resolveSyncContextByProposalRef(repoRoot, statePaths, options.proposalRef);
+    const result = await syncProposalTraceability(repoRoot, statePaths, syncContext);
     console.log(JSON.stringify(result, null, 2));
     return;
   }

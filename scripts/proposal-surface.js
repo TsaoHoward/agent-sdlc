@@ -199,9 +199,21 @@ function buildTraceabilityArtifact(repoRoot, taskRequest, sessionRecord, branchN
     execution_profile_id: taskRequest.execution_profile_id,
     runtime_capability_set_id: taskRequest.runtime_capability_set_id,
     policy_refs: taskRequest.policy_refs || [],
-    proposal_ref: proposalInfo.proposalRef,
-    proposal_url: proposalInfo.proposalUrl,
-    proposal_title: proposalInfo.proposalTitle,
+    ...(proposalInfo.proposalRef
+      ? {
+          proposal_ref: proposalInfo.proposalRef,
+        }
+      : {}),
+    ...(proposalInfo.proposalUrl
+      ? {
+          proposal_url: proposalInfo.proposalUrl,
+        }
+      : {}),
+    ...(proposalInfo.proposalTitle
+      ? {
+          proposal_title: proposalInfo.proposalTitle,
+        }
+      : {}),
     proposal_state: proposalInfo.proposalState || "open",
     branch_ref: branchName,
     metadata_path: `.agent-sdlc/traceability/${taskRequest.task_request_id}.json`,

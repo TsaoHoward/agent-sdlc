@@ -47,6 +47,10 @@ jobs:
           AGENT_SDLC_VALIDATE_PLATFORM_OUTCOME: ${{ steps.validate_platform.outcome }}
           AGENT_SDLC_TYPECHECK_OUTCOME: ${{ steps.typecheck.outcome }}
 
+      - name: Sync Host Traceability
+        if: always()
+        run: node scripts/ci/sync-host-traceability.js
+
       - name: Upload Verification Metadata Artifact
         if: always()
         uses: actions/upload-artifact@v3
