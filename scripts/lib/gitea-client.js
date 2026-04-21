@@ -206,6 +206,17 @@ async function listRepositoryHooks(settings, owner, repo, repositoryRef = null) 
   });
 }
 
+async function listRepositoryActionRuns(settings, owner, repo, repositoryRef = null) {
+  return requestJson(settings, {
+    method: "GET",
+    pathname: `api/v1/repos/${owner}/${repo}/actions/runs`,
+    baseUrl: getForgeBaseUrl(settings, repositoryRef),
+    query: {
+      limit: 100,
+    },
+  });
+}
+
 async function createRepositoryHook(settings, owner, repo, body, repositoryRef = null) {
   return requestJson(settings, {
     method: "POST",
@@ -284,6 +295,7 @@ module.exports = {
   getPullRequest,
   getRepository,
   getUser,
+  listRepositoryActionRuns,
   listPullReviews,
   listPullRequests,
   listRepositoryHooks,

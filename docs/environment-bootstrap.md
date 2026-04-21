@@ -167,12 +167,14 @@ The bootstrap script now covers:
 Starting the containers is no longer the only bootstrap step, but several workflow-specific initialization tasks still remain:
 - create an API token for later branch, PR, or webhook automation
 - add webhook and branch-protection setup when the task gateway and PR path are implemented
+- confirm live local Gitea review webhook delivery reaches the bootstrap-managed review listener without manual replay
 - investigate local Gitea artifact listing visibility if operator-facing browsing of stored workflow artifacts becomes a near-term need
 
 ## Known Local Friction Points
 - the rootless Gitea image expects writable data and config mounts; if host-mounted directories behave badly on Windows, switch the service data to named Docker volumes before spending time on deeper debugging
 - the first PostgreSQL bring-up can take noticeably longer than a normal restart because the database has to initialize before Gitea can connect
 - under the localhost-rooted local forge topology, the runner helper now shifts runner and job containers onto host networking and injects an `agent-sdlc-gitea` host alias so checkout and artifact upload both succeed; during validation, local Gitea still returned an empty artifact listing response even though uploaded chunks were persisted on disk
+- the bootstrap-managed review listener now accepts real Gitea-style review payloads and replayed local callbacks, but this validation pass did not yet observe a live review delivery from local Gitea reaching that listener automatically
 - if an older local data set was created before this bootstrap synced the admin `mustChangePassword` flag during password refresh, run `powershell -File scripts/dev/manage-dev-environment.ps1 -Command up` once to reconcile the existing admin account with the tracked bootstrap setting
 
 ## Non-Goals

@@ -54,6 +54,9 @@ The repository is intentionally still in an early-phase, structure-first posture
   - `proposal-surface create-gitea-pr` now pre-seeds traceability from an already-open PR before the branch update when the proposal already exists, so the existing-PR update path no longer needs a second amend-and-push just to backfill `proposal_ref`
   - a second live update against the same PR `#5` then increased the Actions run count from `23` to `24`, confirming that an existing-PR refresh now creates one `pull_request_sync` run instead of two
 - The localhost-rooted local forge topology now uploads workflow artifacts successfully after the runner helper aligned runner and job-container networking with host loopback expectations and injected an `agent-sdlc-gitea` host alias for local job containers; local artifact listing visibility in Gitea remains a narrower follow-up if operator browsing becomes necessary.
+- A 2026-04-21 local e2e pass against a fresh task request (`trq-8a0f9df00705`) and PR `#6` confirmed that the repo-owned commands can still carry a new task through session start, proposal creation, auto-created CI runs, successful `pull_request_sync` validation (`run #26`), and explicit reviewer approval sync into both PR body and durable traceability. That same pass also surfaced two narrower follow-ups:
+  - `review-surface --proposal` needed to preserve CI state from local Gitea Actions runs when no canonical root traceability file existed yet, because otherwise a proposal-based review sync could regress the PR body from `CI: success` back to `CI: pending`
+  - the bootstrap-managed review listener accepted real Gitea-style review payloads when exercised directly, but the pass did not yet observe a live local Gitea review delivery reaching that listener automatically
 
 ## Dependencies And Constraints
 - Work should stay aligned to Phase 1 and WBS 3 rather than pulling Phase 2 observability or multi-source scope forward.
@@ -90,7 +93,7 @@ This issue exits the active dashboard when the first implementation slice is und
 If implementation uncovers a major unresolved decision, the issue should stay active until the decision is captured in `docs/decisions/decision-backlog.md` and, if needed, promoted to an ADR.
 
 ## Next Actions
-- validate the now-wired default bootstrap path from issue-comment intake through review callback without manual patch-up steps
+- validate the now-wired default bootstrap path from issue-comment intake through live local Gitea review delivery without manual patch-up steps
 - keep the forge-repository runtime clone path in place and reseed local forge `main` from current `HEAD` before local proposal-flow validation when the operator is testing unpushed changes
 - investigate local artifact listing visibility only if operator-facing browsing of stored workflow artifacts becomes necessary
 - expand the current project-local bootstrap entrypoints as those WBS 3 interfaces become real services or commands
@@ -117,3 +120,4 @@ If implementation uncovers a major unresolved decision, the issue should stay ac
 - 2026-04-20: Recorded the new review-outcome sync surface, the canonical root-traceability writeback rule, and the live local Gitea approval validation that updated PR `#5` to `approved by reviewer`.
 - 2026-04-21: Recorded the automation-ready review-follow-up expansion after adding proposal-based sync, review-event replay, and a dedicated review webhook listener.
 - 2026-04-21: Recorded the default-bootstrap integration that now starts both managed webhook listeners and ensures the default local repo hook set points at those control-host callbacks.
+- 2026-04-21: Recorded the fresh PR `#6` e2e validation pass, the CI-preservation fix in proposal-based review sync, and the remaining gap that live local Gitea review delivery still needs to be observed at the bootstrap-managed review listener.

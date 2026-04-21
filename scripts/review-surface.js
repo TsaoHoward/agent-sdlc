@@ -4,6 +4,7 @@ const path = require("path");
 
 const {
   getPullRequest,
+  listRepositoryActionRuns,
   listPullReviews,
   loadLocalGiteaSettings,
   updatePullRequest,
@@ -523,6 +524,79 @@ function writeTraceabilityCopies(filePaths, value) {
   });
 }
 
+function selectLatestRunForProposal(workflowRuns, proposalInfo) {
+  const expectedPathSuffix = `@refs/pull/${proposalInfo.index}/head`;
+  const matchingRuns = (workflowRuns || []).filter((run) => {
+    return String(run.path || "").endsWith(expectedPathSuffix);
+  });
+
+  if (matchingRuns.length === 0) {
+    return null;
+  }
+
+  return matchingRuns
+    .slice()
+    .sort((left, right) => {
+      const leftOrder = Number(left.run_number || left.id || 0);
+      const rightOrder = Number(right.run_number || right.id || 0);
+      return rightOrder - leftOrder;
+    })[0];
+}
+
+function deriveCiStatusFromRun(run) {
+  if (!run) {
+    return null;
+  }
+
+  if (run.status && run.status !== "completed") {
+    return "pending";
+  }
+
+  switch (String(run.conclusion || "").trim().toLowerCase()) {
+    case "success":
+      return "success";
+    case "cancelled":
+      return "cancelled";
+    case "failure":
+    default:
+      return "failure";
+  }
+}
+
+async function enrichTraceabilityCiFromActions(settings, repositoryRef, proposalInfo, traceability) {
+  const runsResponse = await listRepositoryActionRuns(
+    settings,
+    proposalInfo.owner,
+    proposalInfo.repo,
+    repositoryRef,
+  );
+  const latestRun = selectLatestRunForProposal(runsResponse && runsResponse.workflow_runs, proposalInfo);
+  if (!latestRun) {
+    return traceability;
+  }
+
+  traceability.ci = traceability.ci || {};
+  traceability.ci.ci_status = deriveCiStatusFromRun(latestRun) || traceability.ci.ci_status || "pending";
+  traceability.ci.ci_run_ref = String(latestRun.run_number || latestRun.id || traceability.ci.ci_run_ref || "");
+  traceability.ci.ci_run_url = latestRun.html_url || latestRun.url || traceability.ci.ci_run_url || null;
+  traceability.ci.workflow_ref = latestRun.path || traceability.ci.workflow_ref || null;
+  traceability.ci.workflow_run_id = latestRun.id || traceability.ci.workflow_run_id || null;
+  traceability.ci.workflow_run_number =
+    latestRun.run_number || traceability.ci.workflow_run_number || null;
+  traceability.ci.completed_at =
+    latestRun.completed_at || traceability.ci.completed_at || null;
+
+  if (!traceability.ci.verification_metadata_path) {
+    traceability.ci.verification_metadata_path = ".agent-sdlc/ci/verification-metadata.json";
+  }
+
+  if (!traceability.review) {
+    traceability.review = {};
+  }
+
+  return traceability;
+}
+
 async function syncProposalBody(settings, repositoryRef, proposalInfo, traceability) {
   const currentPullRequest = await getPullRequest(
     settings,
@@ -611,6 +685,7 @@ async function syncReviewOutcome(repoRoot, statePaths, syncContext) {
     proposalInfo.index,
     repositoryRef,
   );
+  await enrichTraceabilityCiFromActions(settings, repositoryRef, proposalInfo, traceability);
 
   const reviewOutcome = deriveReviewOutcome(pullRequest, reviews, proposalInfo);
   const syncedAt = utcNow();
