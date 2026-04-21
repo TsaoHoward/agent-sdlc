@@ -62,7 +62,7 @@ It does not replace CI run history, forge issue or PR history, roadmap/WBS plann
 - Mode: `CLI half-live`
 - Related Docs / WBS: `docs/testing/items/TC-002-cli-proposal-and-traceability-smoke.md`; WBS `3.4`, `3.5`, `3.6`
 - Why It Matters: This is the most direct way to validate proposal creation, traceability write-back, and direct review-sync entrypoints against the local forge.
-- Current State: Proposal creation and reviewer-facing PR-body CI updates are working, but the host root traceability file can remain at pre-CI state until a later host-side sync event such as review-follow-up or manual proposal-based review sync.
+- Current State: Proposal creation and reviewer-facing PR-body CI updates are working. A fresh post-fix validation on synthetic proposal `PR #18` completed one successful `pull_request` run (`#37`) without the earlier duplicate sync-triggered second run, but the host root traceability file and session-local workspace copy still remained at pre-CI state until a later host-side sync event such as review-follow-up or manual proposal-based review sync.
 - Next Action: Re-run against the latest proposal path and close the remaining host-side canonical traceability refresh gap.
 - Exit Path: Move out after the current validation window when proposal, PR body, and host-side traceability converge automatically through the normal CI path.
 - Canonical Case: `docs/testing/items/TC-002-cli-proposal-and-traceability-smoke.md`
@@ -74,3 +74,4 @@ It does not replace CI run history, forge issue or PR history, roadmap/WBS plann
 - 2026-04-21: Reopened `TC-003` after a fresh GUI run showed that the current default issue-comment path stops at `workspace-prepared` and still requires manual proposal continuation.
 - 2026-04-21: Moved `TC-003` back out after issue `#11` and PR `#12` confirmed the GUI issue-comment path now auto-creates the proposal and root traceability file.
 - 2026-04-21: Promoted the remaining host-side canonical traceability refresh gap into active item `TC-002`.
+- 2026-04-21: Recorded the post-fix CLI half-live validation on PR `#18`, which removed the duplicate new-PR CI run while leaving the host-side canonical traceability refresh gap active.

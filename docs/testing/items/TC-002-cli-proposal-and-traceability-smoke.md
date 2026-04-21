@@ -15,9 +15,9 @@ Verify that the local forge can receive a proposal from the CLI path, produce tr
 
 Latest known result:
 - Date: 2026-04-21
-- Task request: `trq-bd85673302e7`
-- Proposal PR: `#12`
-- Result: proposal creation, PR-body CI updates, and later review-follow-up sync all worked, but the host root traceability file stayed at pre-CI state until a later host-side sync event refreshed it
+- Task request: `trq-route1-postfix-20260421111452`
+- Proposal PR: `#18`
+- Result: the post-fix proposal path created one successful `pull_request` CI run (`#37`) without the earlier duplicate sync-triggered second run, and the PR body converged automatically to `CI: success` / `ready for human review`, but the host root traceability file and session-local workspace copy still stayed at pre-CI state until a later host-side sync event refreshed them
 
 ## Scope
 This case covers:
@@ -78,3 +78,4 @@ Close or keep the test PR according to the current validation window. If it rema
 ## Change Log
 - 2026-04-21: Initial version.
 - 2026-04-21: Recorded the remaining host-side traceability-refresh gap after proposal PR `#12` showed CI success in the PR body before the root traceability file converged.
+- 2026-04-21: Updated the latest known result after post-fix proposal PR `#18` confirmed that duplicate new-PR CI runs were removed while the host-side traceability-refresh gap remained.
