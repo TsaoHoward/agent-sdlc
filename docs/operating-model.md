@@ -33,6 +33,7 @@ This document defines how humans and agents collaborate in this repository.
 ### Documents that should change often
 - `docs/roadmap.md`
 - `docs/wbs.md`
+- `docs/user-capability-matrix.md`
 - `docs/issues/issue-dashboard.md`
 - `docs/issues/items/*.md` when active issues need supporting notes
 - `docs/testing/test-dashboard.md`
@@ -52,12 +53,19 @@ This document defines how humans and agents collaborate in this repository.
 - phase meaning changes
 - milestone scope changes
 - a new phase is introduced
+- a durable user-facing workflow or capability surface is added, removed, or reframed
 - a previously deferred capability is pulled forward
 
 ### Update WBS when:
 - work items are created, split, merged, blocked, or completed
 - dependencies change
 - work ownership or deliverable meaning changes
+
+### Update user capability matrix when:
+- supported `@agent` locations change
+- supported task tokens or parsing rules change
+- the boundary between automated and manual operator workflow changes
+- the current implemented lifecycle no longer matches what users are told the system can do
 
 ### Update issue dashboard when:
 - meaningful active issues or blockers are created, split, merged, reframed, blocked, deferred, completed, or closed

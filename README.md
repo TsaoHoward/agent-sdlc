@@ -39,9 +39,8 @@ Current progress:
 - `review follow-up automation`: working through a default bootstrap-managed review webhook plus event-driven replay/sync entrypoints
 
 ## Current Todo
-- close the remaining host-side canonical traceability gap after CI success
-  The live issue-comment path now auto-creates task, session, proposal PR, and root traceability again, but the host root traceability file can still lag behind CI completion until a later host-side sync event refreshes it.
 - improve operator-facing artifact browsing or listing now that traceability, CI metadata, and review sync are in place
+- keep `docs/user-capability-matrix.md` aligned with the actual supported `@agent` surfaces, task tokens, and lifecycle boundaries
 - decide how much more of the local operator workflow should be consolidated into the default bootstrap before moving on to broader Phase 2 concerns
 - keep the Phase 1 slice narrow and avoid pulling in broader observability, multi-source intake, or deployment concerns too early
 
@@ -56,12 +55,14 @@ Use these files as the primary planning sources of truth:
 6. `docs/issues/`
 7. `docs/decisions/`
 8. `docs/testing/`
-9. `docs/policies/`
-10. `AGENTS.md`
+9. `docs/user-capability-matrix.md`
+10. `docs/policies/`
+11. `AGENTS.md`
 
 ## Repository Guide
 - `AGENTS.md`: agent working rules and update requirements
 - `docs/project-overview.md`: problem statement, goals, scope, constraints
+- `docs/user-capability-matrix.md`: current supported user-facing `@agent` surfaces, task tokens, and lifecycle coverage
 - `docs/operating-model.md`: how humans and agents should collaborate
 - `docs/environment-requirements.md`: centralized environment inventory and readiness tracking
 - `docs/environment-bootstrap.md`: current project-local startup guidance for Phase 1 environments

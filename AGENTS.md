@@ -10,27 +10,28 @@ Before planning or implementation, read these files in order:
 
 1. `README.md`
 2. `docs/project-overview.md`
-3. `docs/operating-model.md`
-4. `docs/environment-requirements.md`
-5. `docs/architecture/overview.md`
-6. `docs/architecture/task-lifecycle.md`
-7. `docs/architecture/policy-representation.md`
-8. `docs/architecture/runtime-isolation.md`
-9. `docs/architecture/task-intake-contract.md`
-10. `docs/architecture/agent-control-integration-plan.md`
-11. `docs/architecture/pr-and-ci-path-definition.md`
-12. `docs/architecture/lifecycle-traceability-contract.md`
-13. `docs/roadmap.md`
-14. `docs/wbs.md`
-15. `docs/issues/*.md`
-16. `docs/issues/items/*.md` referenced by active dashboard items
-17. `docs/testing/README.md`
-18. `docs/testing/test-plan.md`
-19. `docs/testing/test-framework.md`
-20. `docs/testing/test-dashboard.md`
-21. `docs/testing/items/*.md` referenced by active dashboard items
-22. `docs/decisions/*.md`
-23. `docs/policies/*.md`
+3. `docs/user-capability-matrix.md`
+4. `docs/operating-model.md`
+5. `docs/environment-requirements.md`
+6. `docs/architecture/overview.md`
+7. `docs/architecture/task-lifecycle.md`
+8. `docs/architecture/policy-representation.md`
+9. `docs/architecture/runtime-isolation.md`
+10. `docs/architecture/task-intake-contract.md`
+11. `docs/architecture/agent-control-integration-plan.md`
+12. `docs/architecture/pr-and-ci-path-definition.md`
+13. `docs/architecture/lifecycle-traceability-contract.md`
+14. `docs/roadmap.md`
+15. `docs/wbs.md`
+16. `docs/issues/*.md`
+17. `docs/issues/items/*.md` referenced by active dashboard items
+18. `docs/testing/README.md`
+19. `docs/testing/test-plan.md`
+20. `docs/testing/test-framework.md`
+21. `docs/testing/test-dashboard.md`
+22. `docs/testing/items/*.md` referenced by active dashboard items
+23. `docs/decisions/*.md`
+24. `docs/policies/*.md`
 
 ## Core Working Rules
 1. Plan before implementation.

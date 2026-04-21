@@ -118,6 +118,7 @@ If implementation uncovers a major unresolved decision, the issue should stay ac
 
 ## Next Actions
 - rerun and maintain the canonical CLI and GUI procedures under `docs/testing/` when intake, runtime, proposal, CI, review, or bootstrap behavior changes
+- keep `docs/user-capability-matrix.md` aligned with the actual supported `@agent` locations, task tokens, and manual operator surfaces as the implementation evolves
 - keep the strengthened live issue-comment path in place now that it auto-creates the proposal and root traceability file
 - keep the CI-to-host traceability callback path stable so `.agent-sdlc/traceability/<task_request_id>.json` continues to converge automatically after CI success
 - keep the route-1 duplicate-CI cleanup covered by future local PR-creation validation so new proposal-path changes do not reintroduce an immediate second CI run
@@ -157,3 +158,4 @@ If implementation uncovers a major unresolved decision, the issue should stay ac
 - 2026-04-21: Landed the route-1 duplicate-CI cleanup, added CI-side proposal-context fallback for pre-PR traceability seeds, and validated the new path with synthetic local PR `#15`, which produced only one queued `pull_request` run (`#35`).
 - 2026-04-21: Revalidated the landed route-1 duplicate-CI cleanup after seeding commit `e97f0ba` into local forge `main`; fresh PR `#18` completed one successful `pull_request` run (`#37`) and reaffirmed that the remaining gap is host-side canonical traceability refresh after CI success.
 - 2026-04-22: Closed the remaining host-side canonical traceability refresh gap by adding proposal-traceability sync plus a CI host callback, then validated automatic convergence on seeded local PR `#23` with successful run `#41`.
+- 2026-04-22: Added `docs/user-capability-matrix.md` as the durable current-state handoff for supported `@agent` entrypoints, task tokens, manual operator surfaces, and lifecycle coverage.

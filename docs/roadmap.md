@@ -3,7 +3,7 @@
 ## Document Metadata
 - Version: 0.1
 - Status: Draft
-- Last Updated: 2026-04-21
+- Last Updated: 2026-04-22
 - Owner: Project Maintainer
 - Source Template: docs/templates/roadmap.template.md
 
@@ -122,6 +122,7 @@ Implement the smallest working path from task trigger to independently verified 
 - one PR creation flow
 - one CI verification flow
 - one human review point
+- one durable user capability matrix linked to the implemented workflow
 
 ### Deliverables
 - task intake adapter
@@ -131,6 +132,7 @@ Implement the smallest working path from task trigger to independently verified 
 - branch/PR proposal path
 - CI workflow skeleton
 - repeatable local testing workflow with canonical CLI and GUI cases plus a durable testing dashboard
+- user capability matrix and current workflow map linked to the implemented Phase 1 surfaces
 - traceable task lifecycle contract and minimal logging
 
 ### Entry Criteria
@@ -143,6 +145,7 @@ Implement the smallest working path from task trigger to independently verified 
 - CI validates the proposed change independently
 - human review remains the merge gate
 - maintainers can execute documented local CLI and GUI validation procedures and capture the resulting evidence without relying on transient chat context
+- maintainers and users can recover where `@agent` is supported, what each supported task token currently means, and which parts of the lifecycle are automated from a durable repo document
 
 ### Dependencies
 - task model definition
@@ -269,3 +272,4 @@ This phase should only proceed when prior boundaries are understood and defended
 - 2026-04-15: Added a durable issue dashboard, archive, and supporting-note workflow to the Phase 0 baseline.
 - 2026-04-15: Recorded the platform implementation-stack baseline for TypeScript/Node.js, npm, repo-owned Dockerfiles, and later compose packaging.
 - 2026-04-21: Expanded the Phase 1 deliverables and exit criteria to include a durable local testing workflow with canonical cases and active dashboard tracking.
+- 2026-04-22: Expanded the Phase 1 workflow packaging to include a durable user capability matrix linked to the live `@agent` entrypoints and current lifecycle coverage.
