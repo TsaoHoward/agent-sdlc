@@ -29,6 +29,38 @@
       "mustChangePassword": false
     }
   },
+  "localRepo": {
+    "ensureOnBootstrap": true,
+    "owner": "howard",
+    "repo": "agent-sdlc",
+    "seedFrom": "."
+  },
+  "controlHost": {
+    "callbackScheme": "http",
+    "callbackHost": "host.docker.internal",
+    "issueCommentWebhook": {
+      "enabled": true,
+      "host": "0.0.0.0",
+      "port": 4010,
+      "route": "/hooks/gitea/issue-comment",
+      "events": [
+        "issue_comment"
+      ],
+      "contentType": "json",
+      "autoStartSession": true
+    },
+    "reviewWebhook": {
+      "enabled": true,
+      "host": "0.0.0.0",
+      "port": 4011,
+      "route": "/hooks/gitea/pull-request-review",
+      "events": [
+        "pull_request_review",
+        "pull_request"
+      ],
+      "contentType": "json"
+    }
+  },
   "postgres": {
     "image": "postgres:16",
     "database": "gitea",

@@ -10,15 +10,38 @@ The target user experience is:
 The target architecture is deliberately layered so the system can evolve without being locked to a single forge, agent runtime, CI stack, or deployment mechanism.
 
 ## Current Status
-This repository is in **project-baseline** state.
+This repository is in **early Phase 1 implementation** state.
 
-The current goal is **not** to deliver the full platform immediately. The goal is to establish:
-- a stable planning baseline
-- architecture boundaries
-- decision and issue records
-- roadmap and WBS structure
-- human/agent operating rules
-- initialization prompt(s) for future agent runs
+The repo is no longer planning-only. It now has a working minimum closed-loop scaffold across the main Phase 1 layers:
+- repo-owned local Gitea bootstrap with a default local repo path
+- webhook-backed task intake from issue comments
+- file-backed task and session records under `.agent-sdlc/state/`
+- isolated worker-runtime handoff into per-session workspaces
+- proposal surfacing as branch plus PR
+- local Gitea Actions verification with traceability metadata
+- reviewer-facing traceability that now extends through explicit review outcomes
+
+The goal is still **not** to deliver the full platform immediately. The current focus is to harden the smallest useful issue-driven experience without collapsing architecture boundaries.
+
+## Progress Against Target Experience
+Target experience:
+
+`issue -> task intake -> agent session -> code change -> branch/PR -> CI verification -> human review/merge`
+
+Current progress:
+- `issue -> task intake`: working through the Gitea issue-comment webhook path and file-backed replay examples
+- `task intake -> agent session`: working for auto-approved Phase 1 task classes
+- `agent session -> code change -> branch/PR`: working through the worker-runtime scaffold plus proposal surface
+- `branch/PR -> CI verification`: working on the local Gitea Actions stack, including restored PR-triggered runs and branch-local dispatch fallback
+- `CI verification -> human review`: working with reviewer-facing PR traceability updates
+- `human review -> review outcome traceability`: working, including explicit sync of Gitea review decisions back into durable traceability and the PR body
+- `review follow-up automation`: working through a default bootstrap-managed review webhook plus event-driven replay/sync entrypoints
+
+## Current Todo
+- validate the fully bootstrapped local happy path end to end from issue comment through review webhook without manual patch-up steps
+- improve operator-facing artifact browsing or listing now that traceability, CI metadata, and review sync are in place
+- decide how much more of the local operator workflow should be consolidated into the default bootstrap before moving on to broader Phase 2 concerns
+- keep the Phase 1 slice narrow and avoid pulling in broader observability, multi-source intake, or deployment concerns too early
 
 ## Source of Truth
 Use these files as the primary planning sources of truth:
@@ -105,6 +128,8 @@ npm run dev:env:status
 npm run dev:env:down
 ```
 
+`dev:env:up` now also starts the default task-intake and review-follow-up webhook listeners from repo-owned config, and the default local Gitea repo bootstrap path now ensures both issue-comment and review-follow-up webhooks are configured against that repo.
+
 Current platform package commands:
 
 ```powershell
@@ -112,6 +137,7 @@ npm install
 npm run validate:platform
 npm run typecheck
 npm run task-gateway:webhook
+npm run review-surface:webhook
 npm run dev:gitea-repo -- ensure-local-repo --owner howard --repo agent-sdlc --seed-from .
 npm run dev:gitea-runner -- ensure-runner
 npm run proposal-surface -- create-gitea-pr --session .agent-sdlc/state/agent-sessions/<agent_session_id>.json

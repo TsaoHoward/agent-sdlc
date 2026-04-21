@@ -195,6 +195,35 @@ async function createRepositoryForUser(settings, owner, body) {
   });
 }
 
+async function listRepositoryHooks(settings, owner, repo, repositoryRef = null) {
+  return requestJson(settings, {
+    method: "GET",
+    pathname: `api/v1/repos/${owner}/${repo}/hooks`,
+    baseUrl: getForgeBaseUrl(settings, repositoryRef),
+    query: {
+      limit: 100,
+    },
+  });
+}
+
+async function createRepositoryHook(settings, owner, repo, body, repositoryRef = null) {
+  return requestJson(settings, {
+    method: "POST",
+    pathname: `api/v1/repos/${owner}/${repo}/hooks`,
+    baseUrl: getForgeBaseUrl(settings, repositoryRef),
+    body,
+  });
+}
+
+async function updateRepositoryHook(settings, owner, repo, hookId, body, repositoryRef = null) {
+  return requestJson(settings, {
+    method: "PATCH",
+    pathname: `api/v1/repos/${owner}/${repo}/hooks/${hookId}`,
+    baseUrl: getForgeBaseUrl(settings, repositoryRef),
+    body,
+  });
+}
+
 async function listPullRequests(settings, owner, repo, repositoryRef = null) {
   return requestJson(settings, {
     method: "GET",
@@ -249,6 +278,7 @@ module.exports = {
   buildRepositoryUrls,
   createPullRequest,
   createRepositoryForUser,
+  createRepositoryHook,
   createUser,
   getForgeBaseUrl,
   getPullRequest,
@@ -256,8 +286,10 @@ module.exports = {
   getUser,
   listPullReviews,
   listPullRequests,
+  listRepositoryHooks,
   loadLocalGiteaSettings,
   parseGiteaRepositoryRef,
   requestJson,
   updatePullRequest,
+  updateRepositoryHook,
 };

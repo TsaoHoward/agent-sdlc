@@ -64,9 +64,12 @@ Phase 0 is therefore not just document writing; it is the work of making environ
 - Current posture:
   - local Gitea bootstrap is scaffolded in repo-owned config
   - helper exists to provision a local owner/repo path for proposal flow testing
+  - default bootstrap config now identifies the local development repo and its control-host callback URLs
+  - repo bootstrap now ensures both issue-comment and review-follow-up webhooks exist for the default local repo
   - bootstrap settings now include explicit host ports and non-interactive install behavior
 - Readiness check:
   - create a local issue and exercise an issue-comment webhook through the task gateway
+  - submit a PR review or PR-close event and confirm the review-follow-up webhook path refreshes traceability
   - create a branch and PR from the proposal surface and verify it appears in local Gitea
 - Primary source docs:
   - `docs/architecture/task-intake-contract.md`
@@ -85,10 +88,12 @@ Phase 0 is therefore not just document writing; it is the work of making environ
 - Current posture:
   - npm-managed Node.js control-plane baseline exists
   - task gateway CLI and webhook listener commands are implemented
+  - the local bootstrap now starts the default task-intake and review-follow-up webhook listeners as managed control-host services
   - direct session start CLI exists and writes agent session records
   - approval beyond auto-approved tasks is intentionally deferred
 - Readiness check:
   - normalize a sample Gitea event and confirm `.agent-sdlc/state/task-requests/<id>.json`
+  - run the local bootstrap in `-SkipGitea` mode and confirm both managed webhook listeners report healthy status
   - run `agent-control start-session` and confirm `.agent-sdlc/state/agent-sessions/<id>.json`
 - Primary source docs:
   - `docs/architecture/agent-control-integration-plan.md`
@@ -237,3 +242,4 @@ Environment requirements are centralized here, but implementation responsibility
 - 2026-04-16: Updated ENV-001, ENV-002, and ENV-005 after landing the local Gitea repo helper, proposal-surface CLI, and first PR-linked traceability artifact.
 - 2026-04-16: Marked ENV-004 partially scaffolded after landing the local Gitea Actions runner helper, PR-triggered workflow skeleton, and verification-metadata output path.
 - 2026-04-16: Updated ENV-004 after validating localhost-topology artifact upload in local Gitea run `#19` and narrowing the remaining gap to artifact listing visibility.
+- 2026-04-21: Updated ENV-001 and ENV-002 after wiring the default local repo webhook set and bootstrap-managed control-host listeners into the local development posture.

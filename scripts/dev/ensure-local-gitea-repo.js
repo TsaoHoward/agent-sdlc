@@ -1,12 +1,16 @@
+const fs = require("fs");
 const { spawnSync } = require("child_process");
 const path = require("path");
 
 const {
   buildRepositoryUrls,
   createRepositoryForUser,
+  createRepositoryHook,
   getRepository,
   getUser,
+  listRepositoryHooks,
   loadLocalGiteaSettings,
+  updateRepositoryHook,
 } = require("../lib/gitea-client");
 const { getRepoRoot } = require("../lib/project-state");
 
@@ -80,6 +84,189 @@ function runProcess(fileName, args, cwd = undefined) {
   return (result.stdout || "").trim();
 }
 
+function readBootstrapConfig(repoRoot) {
+  const configPath = path.join(repoRoot, "config", "dev", "gitea-bootstrap.json");
+  return JSON.parse(fs.readFileSync(configPath, "utf8"));
+}
+
+function normalizeRoute(route) {
+  const normalized = String(route || "").trim();
+  if (!normalized) {
+    return "/";
+  }
+
+  return normalized.startsWith("/") ? normalized : `/${normalized}`;
+}
+
+function normalizeHookUrl(value) {
+  const parsed = new URL(value);
+  if (!parsed.pathname) {
+    parsed.pathname = "/";
+  }
+
+  return parsed.toString();
+}
+
+function normalizeHookEvents(events) {
+  return [...new Set((events || []).map((event) => String(event || "").trim()).filter((event) => event))]
+    .sort();
+}
+
+function existingEventsSatisfyDesired(existingEvents, desiredEvents) {
+  const normalizedExisting = normalizeHookEvents(existingEvents);
+  const normalizedDesired = normalizeHookEvents(desiredEvents);
+
+  return normalizedDesired.every((desiredEvent) => normalizedExisting.includes(desiredEvent));
+}
+
+function buildDesiredHooks(bootstrapConfig) {
+  const controlHost = bootstrapConfig.controlHost || {};
+  const callbackHost = controlHost.callbackHost || "host.docker.internal";
+  const callbackScheme = controlHost.callbackScheme || "http";
+  const hooks = [];
+
+  const issueCommentHook = controlHost.issueCommentWebhook || {};
+  if (issueCommentHook.enabled !== false) {
+    hooks.push({
+      key: "issue-comment",
+      type: "gitea",
+      active: true,
+      events: normalizeHookEvents(issueCommentHook.events || ["issue_comment"]),
+      config: {
+        url: normalizeHookUrl(
+          `${callbackScheme}://${callbackHost}:${issueCommentHook.port || 4010}${normalizeRoute(issueCommentHook.route || "/hooks/gitea/issue-comment")}`,
+        ),
+        content_type: issueCommentHook.contentType || "json",
+      },
+    });
+  }
+
+  const reviewHook = controlHost.reviewWebhook || {};
+  if (reviewHook.enabled !== false) {
+    hooks.push({
+      key: "review-follow-up",
+      type: "gitea",
+      active: true,
+      events: normalizeHookEvents(reviewHook.events || ["pull_request_review", "pull_request"]),
+      config: {
+        url: normalizeHookUrl(
+          `${callbackScheme}://${callbackHost}:${reviewHook.port || 4011}${normalizeRoute(reviewHook.route || "/hooks/gitea/pull-request-review")}`,
+        ),
+        content_type: reviewHook.contentType || "json",
+      },
+    });
+  }
+
+  return hooks;
+}
+
+function findMatchingHook(existingHooks, desiredHook) {
+  return (existingHooks || []).find((hook) => {
+    const existingUrl =
+      hook &&
+      hook.config &&
+      hook.config.url &&
+      normalizeHookUrl(hook.config.url);
+
+    return existingUrl === desiredHook.config.url;
+  });
+}
+
+function hookNeedsUpdate(existingHook, desiredHook) {
+  if (!existingHook) {
+    return true;
+  }
+
+  const existingUrl = existingHook.config && existingHook.config.url
+    ? normalizeHookUrl(existingHook.config.url)
+    : null;
+  const existingEvents = normalizeHookEvents(existingHook.events);
+  const desiredEvents = normalizeHookEvents(desiredHook.events);
+  const existingContentType =
+    existingHook.config &&
+    existingHook.config.content_type
+      ? String(existingHook.config.content_type)
+      : null;
+
+  if (existingHook.type !== desiredHook.type) {
+    return true;
+  }
+
+  if (Boolean(existingHook.active) !== Boolean(desiredHook.active)) {
+    return true;
+  }
+
+  if (existingUrl !== desiredHook.config.url) {
+    return true;
+  }
+
+  if (existingContentType !== desiredHook.config.content_type) {
+    return true;
+  }
+
+  return !existingEventsSatisfyDesired(existingEvents, desiredEvents);
+}
+
+async function ensureRepositoryHooks(settings, owner, repo, repositoryRef, desiredHooks) {
+  if (!desiredHooks.length) {
+    return [];
+  }
+
+  const existingHooks = await listRepositoryHooks(settings, owner, repo, repositoryRef);
+  const results = [];
+
+  for (const desiredHook of desiredHooks) {
+    const matchingHook = findMatchingHook(existingHooks, desiredHook);
+
+    if (!matchingHook) {
+      const createdHook = await createRepositoryHook(
+        settings,
+        owner,
+        repo,
+        desiredHook,
+        repositoryRef,
+      );
+      results.push({
+        key: desiredHook.key,
+        id: createdHook.id,
+        url: desiredHook.config.url,
+        events: desiredHook.events,
+        status: "created",
+      });
+      continue;
+    }
+
+    if (hookNeedsUpdate(matchingHook, desiredHook)) {
+      const updatedHook = await updateRepositoryHook(
+        settings,
+        owner,
+        repo,
+        matchingHook.id,
+        desiredHook,
+        repositoryRef,
+      );
+      results.push({
+        key: desiredHook.key,
+        id: updatedHook.id,
+        url: desiredHook.config.url,
+        events: desiredHook.events,
+        status: "updated",
+      });
+      continue;
+    }
+
+    results.push({
+      key: desiredHook.key,
+      id: matchingHook.id,
+      url: desiredHook.config.url,
+      events: desiredHook.events,
+      status: "unchanged",
+    });
+  }
+
+  return results;
+}
+
 function ensureLocalGiteaUser(settings, username) {
   const email = `${username}@example.local`;
   const password = process.env.AGENT_SDLC_LOCAL_GITEA_USER_PASSWORD || settings.password;
@@ -132,6 +319,7 @@ async function main() {
   try {
     const repoRoot = getRepoRoot();
     const options = parseArguments(process.argv);
+    const bootstrapConfig = readBootstrapConfig(repoRoot);
     const settings = loadLocalGiteaSettings(repoRoot);
     const repositoryRef = `gitea:${new URL(settings.baseUrl).host}/${options.owner}/${options.repo}`;
     const repositoryUrls = buildRepositoryUrls(settings, options.owner, options.repo, repositoryRef);
@@ -160,6 +348,14 @@ async function main() {
       repository = await getRepository(settings, options.owner, options.repo, repositoryRef);
     }
 
+    const configuredHooks = await ensureRepositoryHooks(
+      settings,
+      options.owner,
+      options.repo,
+      repositoryRef,
+      buildDesiredHooks(bootstrapConfig),
+    );
+
     console.log(
       JSON.stringify(
         {
@@ -172,6 +368,7 @@ async function main() {
           repository_url: repository && (repository.html_url || repository.clone_url || repositoryUrls.webUrl),
           git_url: repositoryUrls.gitUrl,
           seeded_from: options.seedFrom ? path.resolve(options.seedFrom) : null,
+          configured_hooks: configuredHooks,
         },
         null,
         2,

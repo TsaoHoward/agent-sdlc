@@ -32,6 +32,9 @@ $AgentSessionStateDir = Join-Path $StateRoot "agent-sessions"
 $TraceabilityDir = Join-Path $ProjectStateRoot "traceability"
 $DevEnvRoot = Join-Path $ProjectStateRoot "dev-env"
 $GiteaRoot = Join-Path $DevEnvRoot "gitea"
+$ControlHostRoot = Join-Path $DevEnvRoot "control-host"
+$ControlHostLogDir = Join-Path $ControlHostRoot "logs"
+$ControlHostServiceDir = Join-Path $ControlHostRoot "services"
 $GiteaDataDir = Join-Path $GiteaRoot "data"
 $GiteaConfigDir = Join-Path $GiteaRoot "config"
 $GiteaPostgresDataDir = Join-Path $GiteaRoot "postgres-data"
@@ -96,6 +99,29 @@ $GiteaAdminEmail = [string]$BootstrapConfig.gitea.admin.email
 $GiteaAdminMustChangePassword = if ($null -ne $BootstrapConfig.gitea.admin.mustChangePassword) { [bool]$BootstrapConfig.gitea.admin.mustChangePassword } else { $false }
 $GiteaDatabaseMode = if ($GiteaDatabaseMode) { $GiteaDatabaseMode } elseif ($env:AGENT_SDLC_GITEA_DB_MODE) { $env:AGENT_SDLC_GITEA_DB_MODE } else { [string]$BootstrapConfig.gitea.databaseMode }
 
+$LocalRepoEnsureOnBootstrap = if ($null -ne $BootstrapConfig.localRepo.ensureOnBootstrap) { [bool]$BootstrapConfig.localRepo.ensureOnBootstrap } else { $false }
+$LocalRepoOwner = if ($BootstrapConfig.localRepo.owner) { [string]$BootstrapConfig.localRepo.owner } else { "" }
+$LocalRepoName = if ($BootstrapConfig.localRepo.repo) { [string]$BootstrapConfig.localRepo.repo } else { "" }
+$LocalRepoSeedFrom = if ($BootstrapConfig.localRepo.seedFrom) { [string]$BootstrapConfig.localRepo.seedFrom } else { "" }
+
+$ControlHostCallbackScheme = if ($BootstrapConfig.controlHost.callbackScheme) { [string]$BootstrapConfig.controlHost.callbackScheme } else { "http" }
+$ControlHostCallbackHost = if ($BootstrapConfig.controlHost.callbackHost) { [string]$BootstrapConfig.controlHost.callbackHost } else { "host.docker.internal" }
+$IssueCommentWebhookEnabled = if ($null -ne $BootstrapConfig.controlHost.issueCommentWebhook.enabled) { [bool]$BootstrapConfig.controlHost.issueCommentWebhook.enabled } else { $true }
+$IssueCommentWebhookHost = if ($BootstrapConfig.controlHost.issueCommentWebhook.host) { [string]$BootstrapConfig.controlHost.issueCommentWebhook.host } else { "0.0.0.0" }
+$IssueCommentWebhookPort = if ($BootstrapConfig.controlHost.issueCommentWebhook.port) { [int]$BootstrapConfig.controlHost.issueCommentWebhook.port } else { 4010 }
+$IssueCommentWebhookRoute = if ($BootstrapConfig.controlHost.issueCommentWebhook.route) { [string]$BootstrapConfig.controlHost.issueCommentWebhook.route } else { "/hooks/gitea/issue-comment" }
+$IssueCommentWebhookAutoStartSession = if ($null -ne $BootstrapConfig.controlHost.issueCommentWebhook.autoStartSession) { [bool]$BootstrapConfig.controlHost.issueCommentWebhook.autoStartSession } else { $true }
+$ReviewWebhookEnabled = if ($null -ne $BootstrapConfig.controlHost.reviewWebhook.enabled) { [bool]$BootstrapConfig.controlHost.reviewWebhook.enabled } else { $true }
+$ReviewWebhookHost = if ($BootstrapConfig.controlHost.reviewWebhook.host) { [string]$BootstrapConfig.controlHost.reviewWebhook.host } else { "0.0.0.0" }
+$ReviewWebhookPort = if ($BootstrapConfig.controlHost.reviewWebhook.port) { [int]$BootstrapConfig.controlHost.reviewWebhook.port } else { 4011 }
+$ReviewWebhookRoute = if ($BootstrapConfig.controlHost.reviewWebhook.route) { [string]$BootstrapConfig.controlHost.reviewWebhook.route } else { "/hooks/gitea/pull-request-review" }
+$IssueCommentWebhookHealthUrl = "${ControlHostCallbackScheme}://127.0.0.1:${IssueCommentWebhookPort}${IssueCommentWebhookRoute}"
+$ReviewWebhookHealthUrl = "${ControlHostCallbackScheme}://127.0.0.1:${ReviewWebhookPort}${ReviewWebhookRoute}"
+$IssueCommentWebhookCallbackUrl = "${ControlHostCallbackScheme}://${ControlHostCallbackHost}:${IssueCommentWebhookPort}${IssueCommentWebhookRoute}"
+$ReviewWebhookCallbackUrl = "${ControlHostCallbackScheme}://${ControlHostCallbackHost}:${ReviewWebhookPort}${ReviewWebhookRoute}"
+$TaskGatewayServiceStatePath = Join-Path $ControlHostServiceDir "task-gateway-webhook.json"
+$ReviewSurfaceServiceStatePath = Join-Path $ControlHostServiceDir "review-surface-webhook.json"
+
 if ($GiteaDatabaseMode -notin @("postgres", "sqlite")) {
     throw "Unsupported Gitea database mode '$GiteaDatabaseMode'. Supported values: postgres, sqlite."
 }
@@ -145,11 +171,283 @@ function Save-JsonFile {
     Set-Content -LiteralPath $Path -Value $json
 }
 
+function Get-NodeExecutable {
+    $nodeCommand = Get-Command node -ErrorAction SilentlyContinue
+    if (-not $nodeCommand) {
+        return $null
+    }
+
+    return $nodeCommand.Source
+}
+
+function Test-ProcessAlive {
+    param(
+        [Parameter(Mandatory = $true)]
+        [int]$ProcessId
+    )
+
+    return $null -ne (Get-Process -Id $ProcessId -ErrorAction SilentlyContinue)
+}
+
+function Read-ServiceState {
+    param(
+        [Parameter(Mandatory = $true)]
+        [string]$StatePath
+    )
+
+    if (-not (Test-Path -LiteralPath $StatePath)) {
+        return $null
+    }
+
+    return Get-Content -LiteralPath $StatePath -Raw | ConvertFrom-Json
+}
+
+function Remove-ServiceStateIfPresent {
+    param(
+        [Parameter(Mandatory = $true)]
+        [string]$StatePath
+    )
+
+    if (Test-Path -LiteralPath $StatePath) {
+        Remove-Item -LiteralPath $StatePath -Force
+    }
+}
+
+function Get-WebhookHealthStatus {
+    param(
+        [Parameter(Mandatory = $true)]
+        [string]$Url
+    )
+
+    try {
+        $response = Invoke-WebRequest -Uri $Url -Method Get -UseBasicParsing -TimeoutSec 3
+        return $response.StatusCode -ge 200
+    }
+    catch {
+        if ($_.Exception.Response) {
+            $statusCode = [int]$_.Exception.Response.StatusCode
+            return $statusCode -in @(200, 404, 405)
+        }
+
+        return $false
+    }
+}
+
+function Wait-ForWebhookHealth {
+    param(
+        [Parameter(Mandatory = $true)]
+        [string]$Url,
+
+        [int]$TimeoutSeconds = 20
+    )
+
+    $deadline = (Get-Date).AddSeconds($TimeoutSeconds)
+    while ((Get-Date) -lt $deadline) {
+        if (Get-WebhookHealthStatus -Url $Url) {
+            return
+        }
+
+        Start-Sleep -Seconds 1
+    }
+
+    throw "Webhook listener at '$Url' did not become reachable within $TimeoutSeconds seconds."
+}
+
+function Start-ManagedNodeService {
+    param(
+        [Parameter(Mandatory = $true)]
+        [string]$Name,
+
+        [Parameter(Mandatory = $true)]
+        [string]$StatePath,
+
+        [Parameter(Mandatory = $true)]
+        [string]$RelativeScriptPath,
+
+        [Parameter(Mandatory = $true)]
+        [string[]]$Arguments,
+
+        [Parameter(Mandatory = $true)]
+        [string]$HealthUrl
+    )
+
+    Initialize-ProjectState
+
+    $existingState = Read-ServiceState -StatePath $StatePath
+    if ($existingState -and (Test-ProcessAlive -ProcessId ([int]$existingState.pid))) {
+        if (Get-WebhookHealthStatus -Url $HealthUrl) {
+            return $existingState
+        }
+    }
+
+    Remove-ServiceStateIfPresent -StatePath $StatePath
+
+    $nodeExecutable = Get-NodeExecutable
+    if (-not $nodeExecutable) {
+        throw "Node.js was not found on PATH. It is required to start the control-host webhook listeners."
+    }
+
+    $stdoutPath = Join-Path $ControlHostLogDir "$Name.stdout.log"
+    $stderrPath = Join-Path $ControlHostLogDir "$Name.stderr.log"
+    $scriptPath = Join-Path $RepoRoot $RelativeScriptPath
+    $process = Start-Process -FilePath $nodeExecutable -ArgumentList (@($scriptPath) + $Arguments) -WorkingDirectory $RepoRoot -RedirectStandardOutput $stdoutPath -RedirectStandardError $stderrPath -PassThru -WindowStyle Hidden
+
+    $serviceState = @{
+        name = $Name
+        pid = $process.Id
+        script = $RelativeScriptPath
+        arguments = $Arguments
+        healthUrl = $HealthUrl
+        stdoutPath = $stdoutPath
+        stderrPath = $stderrPath
+        startedAt = (Get-Date).ToString("o")
+    }
+    Save-JsonFile -Path $StatePath -Value $serviceState
+
+    try {
+        Wait-ForWebhookHealth -Url $HealthUrl
+    }
+    catch {
+        if (Test-ProcessAlive -ProcessId $process.Id) {
+            Stop-Process -Id $process.Id -Force -ErrorAction SilentlyContinue
+        }
+
+        $stderrTail = ""
+        if (Test-Path -LiteralPath $stderrPath) {
+            $stderrTail = Get-Content -LiteralPath $stderrPath -Tail 20 | Out-String
+        }
+
+        Remove-ServiceStateIfPresent -StatePath $StatePath
+        throw "Failed to start service '$Name'. $($_.Exception.Message) $stderrTail".Trim()
+    }
+
+    return $serviceState
+}
+
+function Stop-ManagedNodeService {
+    param(
+        [Parameter(Mandatory = $true)]
+        [string]$StatePath
+    )
+
+    $serviceState = Read-ServiceState -StatePath $StatePath
+    if (-not $serviceState) {
+        return
+    }
+
+    if ($serviceState.pid -and (Test-ProcessAlive -ProcessId ([int]$serviceState.pid))) {
+        Stop-Process -Id ([int]$serviceState.pid) -Force -ErrorAction SilentlyContinue
+    }
+
+    Remove-ServiceStateIfPresent -StatePath $StatePath
+}
+
+function Get-ManagedNodeServiceStatus {
+    param(
+        [Parameter(Mandatory = $true)]
+        [string]$StatePath,
+
+        [Parameter(Mandatory = $true)]
+        [string]$HealthUrl
+    )
+
+    $serviceState = Read-ServiceState -StatePath $StatePath
+    if (-not $serviceState) {
+        return "not-started"
+    }
+
+    if (-not $serviceState.pid -or -not (Test-ProcessAlive -ProcessId ([int]$serviceState.pid))) {
+        return "stopped"
+    }
+
+    if (Get-WebhookHealthStatus -Url $HealthUrl) {
+        return "running"
+    }
+
+    return "degraded"
+}
+
+function Ensure-ControlHostWebhookServices {
+    if ($IssueCommentWebhookEnabled) {
+        $taskGatewayArguments = @(
+            (Join-Path "scripts" "task-gateway.js"),
+            "serve-gitea-webhook",
+            "--host", $IssueCommentWebhookHost,
+            "--port", [string]$IssueCommentWebhookPort,
+            "--route", $IssueCommentWebhookRoute
+        )
+
+        if (-not $IssueCommentWebhookAutoStartSession) {
+            $taskGatewayArguments += "--no-auto-start-session"
+        }
+
+        Start-ManagedNodeService -Name "task-gateway-webhook" -StatePath $TaskGatewayServiceStatePath -RelativeScriptPath (Join-Path "scripts" "task-gateway.js") -Arguments $taskGatewayArguments[1..($taskGatewayArguments.Length - 1)] -HealthUrl $IssueCommentWebhookHealthUrl | Out-Null
+    }
+
+    if ($ReviewWebhookEnabled) {
+        $reviewArguments = @(
+            "serve-gitea-review-webhook",
+            "--host", $ReviewWebhookHost,
+            "--port", [string]$ReviewWebhookPort,
+            "--route", $ReviewWebhookRoute
+        )
+
+        Start-ManagedNodeService -Name "review-surface-webhook" -StatePath $ReviewSurfaceServiceStatePath -RelativeScriptPath (Join-Path "scripts" "review-surface.js") -Arguments $reviewArguments -HealthUrl $ReviewWebhookHealthUrl | Out-Null
+    }
+}
+
+function Stop-ControlHostWebhookServices {
+    Stop-ManagedNodeService -StatePath $TaskGatewayServiceStatePath
+    Stop-ManagedNodeService -StatePath $ReviewSurfaceServiceStatePath
+}
+
+function Ensure-DefaultLocalRepoBootstrap {
+    if (-not $LocalRepoEnsureOnBootstrap) {
+        return
+    }
+
+    if (-not $LocalRepoOwner -or -not $LocalRepoName) {
+        throw "Bootstrap config localRepo.ensureOnBootstrap is enabled, but owner/repo is incomplete."
+    }
+
+    $nodeExecutable = Get-NodeExecutable
+    if (-not $nodeExecutable) {
+        throw "Node.js was not found on PATH. It is required to bootstrap the default local Gitea repo."
+    }
+
+    $repoHelperPath = Join-Path $RepoRoot "scripts\dev\ensure-local-gitea-repo.js"
+    $repoHelperArguments = @(
+        $repoHelperPath,
+        "ensure-local-repo",
+        "--owner", $LocalRepoOwner,
+        "--repo", $LocalRepoName
+    )
+
+    if ($LocalRepoSeedFrom) {
+        $seedSource = if ([System.IO.Path]::IsPathRooted($LocalRepoSeedFrom)) {
+            $LocalRepoSeedFrom
+        }
+        else {
+            Join-Path $RepoRoot $LocalRepoSeedFrom
+        }
+
+        $repoHelperArguments += @("--seed-from", $seedSource)
+    }
+
+    $result = & $nodeExecutable @repoHelperArguments
+    if ($LASTEXITCODE -ne 0) {
+        throw "Failed to bootstrap the default local Gitea repo. $result"
+    }
+}
+
 function Initialize-ProjectState {
     $paths = @(
         $TaskRequestStateDir,
         $AgentSessionStateDir,
         $TraceabilityDir,
+        $ControlHostRoot,
+        $ControlHostLogDir,
+        $ControlHostServiceDir,
         $GiteaDataDir,
         $GiteaConfigDir,
         $GiteaPostgresDataDir
@@ -183,6 +481,31 @@ function Initialize-ProjectState {
                 username = $GiteaAdminUsername
                 email = $GiteaAdminEmail
                 mustChangePassword = $GiteaAdminMustChangePassword
+            }
+        }
+        localRepo = @{
+            ensureOnBootstrap = $LocalRepoEnsureOnBootstrap
+            owner = $LocalRepoOwner
+            repo = $LocalRepoName
+            seedFrom = $LocalRepoSeedFrom
+        }
+        controlHost = @{
+            callbackScheme = $ControlHostCallbackScheme
+            callbackHost = $ControlHostCallbackHost
+            issueCommentWebhook = @{
+                enabled = $IssueCommentWebhookEnabled
+                host = $IssueCommentWebhookHost
+                port = $IssueCommentWebhookPort
+                route = $IssueCommentWebhookRoute
+                callbackUrl = $IssueCommentWebhookCallbackUrl
+                autoStartSession = $IssueCommentWebhookAutoStartSession
+            }
+            reviewWebhook = @{
+                enabled = $ReviewWebhookEnabled
+                host = $ReviewWebhookHost
+                port = $ReviewWebhookPort
+                route = $ReviewWebhookRoute
+                callbackUrl = $ReviewWebhookCallbackUrl
             }
         }
         postgres = @{
@@ -563,6 +886,26 @@ function Write-GiteaBootstrapSummary {
         installLock = $GiteaInstallLock
         configPath = $ConfigPath
         generatedSecretsPath = $GiteaSecretsPath
+        localRepo = @{
+            ensureOnBootstrap = $LocalRepoEnsureOnBootstrap
+            owner = $LocalRepoOwner
+            repo = $LocalRepoName
+            seedFrom = $LocalRepoSeedFrom
+        }
+        controlHost = @{
+            issueCommentWebhook = @{
+                enabled = $IssueCommentWebhookEnabled
+                callbackUrl = $IssueCommentWebhookCallbackUrl
+                healthUrl = $IssueCommentWebhookHealthUrl
+                status = Get-ManagedNodeServiceStatus -StatePath $TaskGatewayServiceStatePath -HealthUrl $IssueCommentWebhookHealthUrl
+            }
+            reviewWebhook = @{
+                enabled = $ReviewWebhookEnabled
+                callbackUrl = $ReviewWebhookCallbackUrl
+                healthUrl = $ReviewWebhookHealthUrl
+                status = Get-ManagedNodeServiceStatus -StatePath $ReviewSurfaceServiceStatePath -HealthUrl $ReviewWebhookHealthUrl
+            }
+        }
         generatedAt = (Get-Date).ToString("o")
     }
 }
@@ -580,6 +923,8 @@ function Start-GiteaContainer {
     if ($existingStatus -eq "running") {
         Wait-ForGiteaHttp
         Ensure-GiteaAdminUser
+        Ensure-ControlHostWebhookServices
+        Ensure-DefaultLocalRepoBootstrap
         Write-GiteaBootstrapSummary
         Write-Host "Gitea development container '$GiteaContainerName' is already running."
         return
@@ -593,6 +938,8 @@ function Start-GiteaContainer {
 
         Wait-ForGiteaHttp
         Ensure-GiteaAdminUser
+        Ensure-ControlHostWebhookServices
+        Ensure-DefaultLocalRepoBootstrap
         Write-GiteaBootstrapSummary
         Write-Host "Started existing Gitea development container '$GiteaContainerName'."
         return
@@ -627,6 +974,8 @@ function Start-GiteaContainer {
 
     Wait-ForGiteaHttp
     Ensure-GiteaAdminUser
+    Ensure-ControlHostWebhookServices
+    Ensure-DefaultLocalRepoBootstrap
     Write-GiteaBootstrapSummary
     Write-Host "Started new Gitea development container '$GiteaContainerName' using '$GiteaDatabaseMode' mode."
 }
@@ -649,6 +998,8 @@ function Remove-ContainerIfPresent {
 }
 
 function Stop-GiteaStack {
+    Stop-ControlHostWebhookServices
+
     if (-not (Test-DockerDaemonReady)) {
         Write-Host "Docker is not ready. No local Gitea stack was stopped."
         return
@@ -686,6 +1037,8 @@ function Show-EnvironmentStatus {
     $dockerDaemon = Test-DockerDaemonReady
     $giteaStatus = Get-ContainerStatus -ContainerName $GiteaContainerName
     $postgresStatus = Get-ContainerStatus -ContainerName $GiteaPostgresContainerName
+    $taskGatewayStatus = Get-ManagedNodeServiceStatus -StatePath $TaskGatewayServiceStatePath -HealthUrl $IssueCommentWebhookHealthUrl
+    $reviewWebhookStatus = Get-ManagedNodeServiceStatus -StatePath $ReviewSurfaceServiceStatePath -HealthUrl $ReviewWebhookHealthUrl
 
     if (-not $giteaStatus) {
         $giteaStatus = "not-started"
@@ -705,7 +1058,9 @@ function Show-EnvironmentStatus {
         Write-Host "ENV-001 PostgreSQL: $postgresStatus on ${PortBindAddress}:${GiteaPostgresHostPort}->5432"
     }
     Write-Host "ENV-001 Non-Interactive Install: installLock=$GiteaInstallLock admin=$GiteaAdminUsername"
-    Write-Host "ENV-002 Control Host: repo-local entrypoint scaffold only"
+    Write-Host "ENV-001 Default Local Repo Bootstrap: enabled=$LocalRepoEnsureOnBootstrap repo=$LocalRepoOwner/$LocalRepoName"
+    Write-Host "ENV-002 Task Gateway Webhook: $taskGatewayStatus at $IssueCommentWebhookHealthUrl (callback $IssueCommentWebhookCallbackUrl)"
+    Write-Host "ENV-002 Review Webhook: $reviewWebhookStatus at $ReviewWebhookHealthUrl (callback $ReviewWebhookCallbackUrl)"
     Write-Host "ENV-003 Worker Runtime: docker-cli=$dockerCli docker-daemon=$dockerDaemon"
     Write-Host "ENV-004 CI Environment: not bootstrapped locally yet"
     Write-Host "ENV-005 Task Request State: $(Get-DirectoryState -Path $TaskRequestStateDir)"
@@ -724,6 +1079,7 @@ switch ($Command) {
 
     "up" {
         Initialize-ProjectState
+        Ensure-ControlHostWebhookServices
         if (-not $SkipGitea) {
             Start-GiteaContainer
         }
@@ -732,6 +1088,9 @@ switch ($Command) {
     }
 
     "down" {
+        if ($SkipGitea) {
+            Stop-ControlHostWebhookServices
+        }
         if (-not $SkipGitea) {
             Stop-GiteaStack
         }
