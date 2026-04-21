@@ -50,6 +50,8 @@ jobs:
       - name: Sync Host Traceability
         if: always()
         run: node scripts/ci/sync-host-traceability.js
+        env:
+          AGENT_SDLC_HOST_TRACEABILITY_SYNC_URL: http://host.docker.internal:4011/hooks/internal/ci-traceability
 
       - name: Upload Verification Metadata Artifact
         if: always()
