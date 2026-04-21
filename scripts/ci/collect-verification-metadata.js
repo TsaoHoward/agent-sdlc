@@ -1,6 +1,8 @@
 const fs = require("fs");
 const path = require("path");
 
+const { applyProposalContext, resolveProposalContext } = require("./lib/proposal-context");
+
 function getRepoRoot() {
   return path.resolve(__dirname, "..", "..");
 }
@@ -71,7 +73,7 @@ function appendStepSummary(metadata) {
   fs.appendFileSync(process.env.GITHUB_STEP_SUMMARY, `${lines.join("\n")}\n`, "utf8");
 }
 
-function main() {
+async function main() {
   const repoRoot = getRepoRoot();
   const traceabilityFiles = findTraceabilityFiles(repoRoot);
 
@@ -82,6 +84,8 @@ function main() {
   }
 
   const traceability = readJson(traceabilityFiles[0]);
+  const proposalContext = await resolveProposalContext(repoRoot, traceability);
+  applyProposalContext(traceability, proposalContext);
   const outputDir = path.join(repoRoot, ".agent-sdlc", "ci");
   ensureDirectory(outputDir);
 
@@ -124,9 +128,7 @@ function main() {
   console.log(JSON.stringify(verificationMetadata, null, 2));
 }
 
-try {
-  main();
-} catch (error) {
+main().catch((error) => {
   console.log(
     JSON.stringify(
       {
@@ -138,4 +140,4 @@ try {
     ),
   );
   process.exit(1);
-}
+});

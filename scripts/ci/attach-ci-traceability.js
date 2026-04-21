@@ -1,6 +1,7 @@
 const fs = require("fs");
 const path = require("path");
 const { deriveReviewStatus } = require("../lib/traceability");
+const { applyProposalContext, resolveProposalContext } = require("./lib/proposal-context");
 
 function getRepoRoot() {
   return path.resolve(__dirname, "..", "..");
@@ -48,7 +49,7 @@ function buildCiRunUrl() {
   return null;
 }
 
-function main() {
+async function main() {
   const repoRoot = getRepoRoot();
   const traceabilityFiles = findTraceabilityFiles(repoRoot);
 
@@ -60,6 +61,8 @@ function main() {
 
   const traceabilityPath = traceabilityFiles[0];
   const traceability = readJson(traceabilityPath);
+  const proposalContext = await resolveProposalContext(repoRoot, traceability);
+  applyProposalContext(traceability, proposalContext);
   const ciRunRef = buildCiRunRef();
   const ciRunUrl = buildCiRunUrl();
 
@@ -81,9 +84,7 @@ function main() {
   console.log(JSON.stringify(traceability, null, 2));
 }
 
-try {
-  main();
-} catch (error) {
+main().catch((error) => {
   console.log(
     JSON.stringify(
       {
@@ -95,4 +96,4 @@ try {
     ),
   );
   process.exit(1);
-}
+});

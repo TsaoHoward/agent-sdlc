@@ -12,6 +12,7 @@ const {
   deriveReviewStatus,
   replaceTraceabilityBlock,
 } = require("../lib/traceability");
+const { applyProposalContext, resolveProposalContext } = require("./lib/proposal-context");
 
 function getRepoRoot() {
   return path.resolve(__dirname, "..", "..");
@@ -207,6 +208,13 @@ async function main() {
 
   const traceabilityPath = traceabilityFiles[0];
   const traceability = readJson(traceabilityPath);
+  const proposalContext = await resolveProposalContext(repoRoot, traceability);
+  applyProposalContext(traceability, proposalContext);
+  if (!traceability.proposal_ref) {
+    throw new Error(
+      "Traceability record does not include proposal_ref, and CI could not resolve one from the current workflow context.",
+    );
+  }
   const verificationMetadata = readJson(verificationMetadataPath);
   const stepOutcomes = collectRequiredStepOutcomes();
   const ciStatus = resolveCiStatus(stepOutcomes);
@@ -236,6 +244,10 @@ async function main() {
   verificationMetadata.ci_status = ciStatus;
   verificationMetadata.ci_run_ref = ciRunRef;
   verificationMetadata.ci_run_url = ciRunUrl;
+  verificationMetadata.proposal_ref = traceability.proposal_ref;
+  verificationMetadata.proposal_url = traceability.proposal_url || verificationMetadata.proposal_url || null;
+  verificationMetadata.proposal_title =
+    traceability.proposal_title || verificationMetadata.proposal_title || null;
   verificationMetadata.completed_at = finalizedAt;
   verificationMetadata.review_status = reviewStatus.id;
   verificationMetadata.required_step_outcomes = stepOutcomes;

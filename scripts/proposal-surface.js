@@ -465,19 +465,6 @@ async function main() {
       traceabilityArtifact.proposal_title = proposalInfo.proposalTitle;
       traceabilityArtifact.proposal_state = proposalInfo.proposalState;
       writeJson(traceabilityPath.absoluteArtifactPath, traceabilityArtifact);
-
-      runGit(workspaceDir, ["add", "-f", traceabilityPath.relativeArtifactPath]);
-      runGit(
-        workspaceDir,
-        ["commit", "--amend", "--no-edit"],
-        {
-          extraConfigs: [
-            `user.name=${COMMIT_AUTHOR_NAME}`,
-            `user.email=${COMMIT_AUTHOR_EMAIL}`,
-          ],
-        },
-      );
-      pushBranch(workspaceDir, remoteUrls.gitUrl, branchName, basicAuthHeader);
     }
 
     const stateTraceabilityPath = writeTraceabilityStateArtifact(

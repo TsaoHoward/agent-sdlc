@@ -77,6 +77,8 @@ The repository is intentionally still in an early-phase, structure-first posture
   - after a full listener restart, a fresh live run on issue `#11` created task request `trq-bd85673302e7`, auto-started session `ags-335855297620`, auto-created PR `#12`, and wrote `.agent-sdlc/traceability/trq-bd85673302e7.json` without manual `proposal-surface` intervention
   - `ensure-local-gitea-runner ensure-runner` now treats an `offline` runner as rebuild-worthy after forge restarts, which restored queued CI runs for PR `#12`
   - the remaining narrower gap is now host-side canonical traceability convergence after CI success: the PR body updates to the successful run automatically, but the host root traceability file can still lag until a later host-side sync event such as review follow-up or manual proposal-based review refresh
+  - the latest duplicate-CI analysis identified route 1 as the preferred cleanup path for new PR creation: stop amending and force-pushing the proposal branch a second time after PR creation, and let CI recover proposal context from the workflow event or branch lookup when the committed branch artifact still carries the pre-PR seed state
+  - that route-1 cleanup is now implemented: `proposal-surface create-gitea-pr` updates the host/session traceability copies plus the local workspace copy after PR creation without rewriting the remote proposal branch, the CI traceability scripts now resolve missing `proposal_ref` details from the workflow event payload or a branch-to-PR lookup, and a fresh local synthetic validation created PR `#15` with only one queued `pull_request` run (`#35`) instead of an immediate second `pull_request_sync` run
 
 ## Dependencies And Constraints
 - Work should stay aligned to Phase 1 and WBS 3 rather than pulling Phase 2 observability or multi-source scope forward.
@@ -101,6 +103,7 @@ Steps 1 through 5 now have working implementation slices, with WBS 3.1 reaching 
 - keep the local forge seed path aligned to the active workspace `HEAD` so workflow and platform files match the code under test
 - keep runtime workspace preparation sourced from the forge target repository and target branch so proposal heads inherit active workflow files and other forge-truth content
 - keep the current explicit review-outcome sync surface aligned with the traceability contract and close the remaining host-side canonical traceability convergence gap after CI success
+- keep the landed route-1 duplicate-CI cleanup in place so new PR creation does not reintroduce a second proposal-branch writeback
 - keep the new testing workflow baseline aligned with the active command surface, local credentials, and evidence paths as the Phase 1 closed loop evolves
 - treat the now-resolved PR-trigger / branch-dispatch gap as a content-source problem unless a narrower follow-up repro shows a remaining forge-level trigger defect
 - investigate local artifact listing visibility only if operator-facing browsing of stored workflow artifacts becomes a near-term requirement
@@ -117,6 +120,7 @@ If implementation uncovers a major unresolved decision, the issue should stay ac
 - rerun and maintain the canonical CLI and GUI procedures under `docs/testing/` when intake, runtime, proposal, CI, review, or bootstrap behavior changes
 - keep the strengthened live issue-comment path in place now that it auto-creates the proposal and root traceability file
 - close the remaining host-side canonical traceability sync gap so `.agent-sdlc/traceability/<task_request_id>.json` converges automatically after CI success without waiting for a later host-side sync event
+- keep the route-1 duplicate-CI cleanup covered by future local PR-creation validation so new proposal-path changes do not reintroduce an immediate second CI run
 - keep the forge-repository runtime clone path in place and reseed local forge `main` from current `HEAD` before local proposal-flow validation when the operator is testing unpushed changes
 - investigate local artifact listing visibility only if operator-facing browsing of stored workflow artifacts becomes necessary
 - expand the current project-local bootstrap entrypoints as those WBS 3 interfaces become real services or commands
@@ -149,3 +153,5 @@ If implementation uncovers a major unresolved decision, the issue should stay ac
 - 2026-04-21: Reframed the testing follow-up after the same-day local e2e pass confirmed the full live issue-comment path and moved that proof into the durable testing workflow.
 - 2026-04-21: Corrected the GUI-path understanding after a fresh run on issue `#7` showed that live issue-comment handling currently stops at `workspace-prepared` and still needs manual proposal continuation.
 - 2026-04-21: Recorded the strengthened live issue-comment path on issue `#11`, the automatic proposal/root-traceability restoration, the runner offline-recovery fix after forge restart, and the remaining host-side canonical traceability convergence gap after CI success.
+- 2026-04-21: Added the preferred duplicate-CI cleanup route: remove the new-PR second amend/push in proposal creation instead of solving the duplicate only at the CI layer.
+- 2026-04-21: Landed the route-1 duplicate-CI cleanup, added CI-side proposal-context fallback for pre-PR traceability seeds, and validated the new path with synthetic local PR `#15`, which produced only one queued `pull_request` run (`#35`).
