@@ -38,8 +38,8 @@ Current progress:
 - `review follow-up automation`: working through a default bootstrap-managed review webhook plus event-driven replay/sync entrypoints
 
 ## Current Todo
-- validate the fully bootstrapped local happy path end to end from issue comment through live Gitea review webhook delivery without manual patch-up steps
-  The listener path itself now works with real Gitea-style payloads, but this run did not yet observe the live forge review delivery reaching it automatically.
+- validate the fully bootstrapped local happy path end to end from live issue-comment intake through proposal/CI/review without manual normalization or replay steps
+  Local Gitea review and PR-close deliveries now reach the bootstrap-managed listener after the bootstrap began setting `webhook.ALLOWED_HOST_LIST=external,private` for host callback URLs such as `host.docker.internal`.
 - improve operator-facing artifact browsing or listing now that traceability, CI metadata, and review sync are in place
 - decide how much more of the local operator workflow should be consolidated into the default bootstrap before moving on to broader Phase 2 concerns
 - keep the Phase 1 slice narrow and avoid pulling in broader observability, multi-source intake, or deployment concerns too early

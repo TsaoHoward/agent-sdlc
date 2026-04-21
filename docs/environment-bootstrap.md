@@ -17,7 +17,7 @@ It complements `docs/environment-requirements.md` by describing how maintainers 
 ## Current Bootstrap Surfaces
 | Environment ID | Current Bootstrap Path | Current Posture |
 |---|---|---|
-| ENV-001 | `scripts/dev/manage-dev-environment.ps1 -Command up`; `npm run dev:env:up`; `npm run dev:gitea-repo -- ensure-local-repo ...` | Starts a local Gitea development stack from repo-owned config and now has a repo-local helper to provision the default local owner/repository path for proposal-flow testing. The default local path uses PostgreSQL-backed Gitea, explicit high-port forwarding, non-interactive installation with an admin user bootstrap, and repo-hook configuration for both issue-comment intake and review-follow-up sync. |
+| ENV-001 | `scripts/dev/manage-dev-environment.ps1 -Command up`; `npm run dev:env:up`; `npm run dev:gitea-repo -- ensure-local-repo ...` | Starts a local Gitea development stack from repo-owned config and now has a repo-local helper to provision the default local owner/repository path for proposal-flow testing. The default local path uses PostgreSQL-backed Gitea, explicit high-port forwarding, non-interactive installation with an admin user bootstrap, a repo-owned webhook allowed-host list for host callbacks, and repo-hook configuration for both issue-comment intake and review-follow-up sync. |
 | ENV-002 | `npm install`; `npm run validate:platform`; `npm run task-gateway:webhook`; `node scripts/agent-control.js ...`; `node scripts/proposal-surface.js ...`; `node scripts/review-surface.js ...`; `npm run review-surface:webhook`; `scripts/dev/manage-dev-environment.ps1 -Command up -SkipGitea` | Prepares the npm-managed control-plane baseline and exposes repo-local webhook, session-start, proposal-surface, and review-surface CLIs. The current slice supports actual Gitea issue-comment webhook delivery, source-event retention, normalized task-request persistence, direct handoff into the worker runtime scaffold, PR creation against the local Gitea forge, explicit review-outcome synchronization back into durable traceability records, and bootstrap-managed task/review webhook listeners for the default local repo posture. |
 | ENV-003 | `docker build -f docker/worker-runtime/Dockerfile ...`; `node scripts/agent-control.js ...` | Builds and exercises the first repo-owned worker-runtime image scaffold on top of the host-local Docker-compatible runner. The current runtime handoff launches a per-session container, prepares a fresh workspace checkout from the forge target repository and branch, and exports runtime launch artifacts under `.agent-sdlc/runtime/`. |
 | ENV-004 | `npm run dev:gitea-runner -- ensure-runner`; `.gitea/workflows/phase1-ci.yml` | Boots a local Gitea Actions runner and executes the first PR-triggered CI workflow. The current skeleton collects verification metadata into `.agent-sdlc/ci/verification-metadata.json`, emits it in job logs and step summaries, attaches CI run references and final verification status to the traceability artifact, refreshes the PR traceability block for reviewers, and uploads those artifacts as persisted workflow outputs even when the local forge root URL is localhost-backed. The tracked workflow also supports `workflow_dispatch` as an operator fallback for targeted reruns or local debugging. |
@@ -103,6 +103,7 @@ The local forge bootstrap config currently owns:
 - the explicit forwarded host ports and bind address
 - the default Gitea database mode
 - the default local Gitea app settings
+- the local Gitea webhook allowed-host list needed for host callback delivery from the forge container
 - the local bootstrap admin user values for the dev stack
 - the default local owner/repo bootstrap target
 - the callback host plus route/port settings for the task-intake and review-follow-up webhook paths
@@ -167,14 +168,14 @@ The bootstrap script now covers:
 Starting the containers is no longer the only bootstrap step, but several workflow-specific initialization tasks still remain:
 - create an API token for later branch, PR, or webhook automation
 - add webhook and branch-protection setup when the task gateway and PR path are implemented
-- confirm live local Gitea review webhook delivery reaches the bootstrap-managed review listener without manual replay
+- validate the default bootstrap path from live issue-comment intake through proposal/CI/review without manual normalization or replay steps
 - investigate local Gitea artifact listing visibility if operator-facing browsing of stored workflow artifacts becomes a near-term need
 
 ## Known Local Friction Points
 - the rootless Gitea image expects writable data and config mounts; if host-mounted directories behave badly on Windows, switch the service data to named Docker volumes before spending time on deeper debugging
 - the first PostgreSQL bring-up can take noticeably longer than a normal restart because the database has to initialize before Gitea can connect
 - under the localhost-rooted local forge topology, the runner helper now shifts runner and job containers onto host networking and injects an `agent-sdlc-gitea` host alias so checkout and artifact upload both succeed; during validation, local Gitea still returned an empty artifact listing response even though uploaded chunks were persisted on disk
-- the bootstrap-managed review listener now accepts real Gitea-style review payloads and replayed local callbacks, but this validation pass did not yet observe a live review delivery from local Gitea reaching that listener automatically
+- local Gitea host callbacks require a non-default webhook allowlist because `host.docker.internal` resolves to a private address from inside the forge container; the bootstrap now sets `webhook.ALLOWED_HOST_LIST=external,private` so the default issue-comment and review listeners are reachable
 - if an older local data set was created before this bootstrap synced the admin `mustChangePassword` flag during password refresh, run `powershell -File scripts/dev/manage-dev-environment.ps1 -Command up` once to reconcile the existing admin account with the tracked bootstrap setting
 
 ## Non-Goals
@@ -199,3 +200,4 @@ Starting the containers is no longer the only bootstrap step, but several workfl
 - 2026-04-20: Updated the bootstrap posture after landing review-outcome synchronization and promoting `review-surface` to the repo-owned operator command set.
 - 2026-04-21: Updated the bootstrap posture after adding review-event replay and webhook entrypoints so Gitea review/close events can drive traceability refresh without a session-specific manual command.
 - 2026-04-21: Updated the bootstrap posture after wiring the default local repo webhook set and managed control-host listeners into the repo-owned local startup path.
+- 2026-04-21: Updated the bootstrap posture after confirming that local Gitea host callbacks need `webhook.ALLOWED_HOST_LIST=external,private`, then validating live PR close/reopen delivery into the bootstrap-managed review listener.

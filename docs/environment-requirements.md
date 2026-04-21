@@ -65,6 +65,7 @@ Phase 0 is therefore not just document writing; it is the work of making environ
   - local Gitea bootstrap is scaffolded in repo-owned config
   - helper exists to provision a local owner/repo path for proposal flow testing
   - default bootstrap config now identifies the local development repo and its control-host callback URLs
+  - local Gitea bootstrap now also sets a webhook allowed-host list that admits host callback URLs resolved through Docker-private networking
   - repo bootstrap now ensures both issue-comment and review-follow-up webhooks exist for the default local repo
   - bootstrap settings now include explicit host ports and non-interactive install behavior
 - Readiness check:
@@ -243,3 +244,4 @@ Environment requirements are centralized here, but implementation responsibility
 - 2026-04-16: Marked ENV-004 partially scaffolded after landing the local Gitea Actions runner helper, PR-triggered workflow skeleton, and verification-metadata output path.
 - 2026-04-16: Updated ENV-004 after validating localhost-topology artifact upload in local Gitea run `#19` and narrowing the remaining gap to artifact listing visibility.
 - 2026-04-21: Updated ENV-001 and ENV-002 after wiring the default local repo webhook set and bootstrap-managed control-host listeners into the local development posture.
+- 2026-04-21: Updated ENV-001 after confirming the local Gitea webhook allowlist must include private host callbacks for bootstrap-managed listener delivery.

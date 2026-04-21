@@ -85,6 +85,11 @@ $GiteaImage = if ($env:AGENT_SDLC_GITEA_IMAGE) {
 }
 $GiteaHostName = if ($BootstrapConfig.gitea.hostName) { [string]$BootstrapConfig.gitea.hostName } else { "localhost" }
 $GiteaRootUrl = if ($BootstrapConfig.gitea.rootUrl) { [string]$BootstrapConfig.gitea.rootUrl } else { "http://$GiteaHostName`:$GiteaHttpPort/" }
+$GiteaWebhookAllowedHostList = if ($BootstrapConfig.gitea.webhook.allowedHostList) {
+    [string]$BootstrapConfig.gitea.webhook.allowedHostList
+} else {
+    "external,private"
+}
 $GiteaAppName = if ($BootstrapConfig.gitea.appName) { [string]$BootstrapConfig.gitea.appName } else { "Agent SDLC Dev Forge" }
 $GiteaInstallLock = if ($null -ne $BootstrapConfig.gitea.installLock) { [bool]$BootstrapConfig.gitea.installLock } else { $true }
 $GiteaDisableRegistration = if ($null -ne $BootstrapConfig.gitea.disableRegistration) { [bool]$BootstrapConfig.gitea.disableRegistration } else { $true }
@@ -467,6 +472,9 @@ function Initialize-ProjectState {
             databaseMode = $GiteaDatabaseMode
             rootUrl = $GiteaRootUrl
             hostName = $GiteaHostName
+            webhook = @{
+                allowedHostList = $GiteaWebhookAllowedHostList
+            }
             httpPort = $GiteaHttpPort
             sshPort = $GiteaSshPort
             appName = $GiteaAppName
@@ -808,6 +816,7 @@ function Get-GiteaEnvironmentVariables {
         "-e", "GITEA__server__SSH_PORT=$GiteaSshPort",
         "-e", "GITEA__server__SSH_LISTEN_PORT=2222",
         "-e", "GITEA__server__START_SSH_SERVER=true",
+        "-e", "GITEA__webhook__ALLOWED_HOST_LIST=$GiteaWebhookAllowedHostList",
         "-e", "GITEA__security__INSTALL_LOCK=$($GiteaInstallLock.ToString().ToLowerInvariant())",
         "-e", "GITEA__security__SECRET_KEY=$($Secrets.secretKey)",
         "-e", "GITEA__security__INTERNAL_TOKEN=$($Secrets.internalToken)",
@@ -877,6 +886,9 @@ function Write-GiteaBootstrapSummary {
         baseUrl = $GiteaRootUrl
         bindAddress = $PortBindAddress
         databaseMode = $GiteaDatabaseMode
+        webhook = @{
+            allowedHostList = $GiteaWebhookAllowedHostList
+        }
         httpPort = $GiteaHttpPort
         sshPort = $GiteaSshPort
         postgresPort = if ($GiteaDatabaseMode -eq "postgres") { $GiteaPostgresHostPort } else { $null }

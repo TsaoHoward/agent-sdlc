@@ -14,6 +14,9 @@
     "databaseMode": "postgres",
     "hostName": "localhost",
     "rootUrl": "http://localhost:43000/",
+    "webhook": {
+      "allowedHostList": "external,private"
+    },
     "appName": "Agent SDLC Dev Forge",
     "installLock": true,
     "disableRegistration": true,

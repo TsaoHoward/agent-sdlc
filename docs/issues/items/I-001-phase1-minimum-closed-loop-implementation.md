@@ -56,7 +56,11 @@ The repository is intentionally still in an early-phase, structure-first posture
 - The localhost-rooted local forge topology now uploads workflow artifacts successfully after the runner helper aligned runner and job-container networking with host loopback expectations and injected an `agent-sdlc-gitea` host alias for local job containers; local artifact listing visibility in Gitea remains a narrower follow-up if operator browsing becomes necessary.
 - A 2026-04-21 local e2e pass against a fresh task request (`trq-8a0f9df00705`) and PR `#6` confirmed that the repo-owned commands can still carry a new task through session start, proposal creation, auto-created CI runs, successful `pull_request_sync` validation (`run #26`), and explicit reviewer approval sync into both PR body and durable traceability. That same pass also surfaced two narrower follow-ups:
   - `review-surface --proposal` needed to preserve CI state from local Gitea Actions runs when no canonical root traceability file existed yet, because otherwise a proposal-based review sync could regress the PR body from `CI: success` back to `CI: pending`
-  - the bootstrap-managed review listener accepted real Gitea-style review payloads when exercised directly, but the pass did not yet observe a live local Gitea review delivery reaching that listener automatically
+  - local Gitea webhook delivery to `host.docker.internal` callbacks was still blocked by the forge's default `webhook.ALLOWED_HOST_LIST`, so the bootstrap-managed listeners could be replayed directly but had not yet been reached by live forge deliveries
+- A same-day bootstrap follow-up then traced the missing live review delivery to Gitea's webhook allowlist rather than to the listener path itself:
+  - `hook_task` rows for the review hook showed `webhook can only call allowed HTTP servers` while dialing `host.docker.internal:4011`
+  - the repo-owned bootstrap now sets `webhook.ALLOWED_HOST_LIST=external,private`, which admits the Docker-private callback address used by `host.docker.internal`
+  - after restarting local Gitea with that setting, live PR `#6` close and reopen events created successful webhook deliveries in `hook_task`, refreshed `.agent-sdlc/traceability/trq-8a0f9df00705.json`, and updated the PR body through the bootstrap-managed review listener without manual replay
 
 ## Dependencies And Constraints
 - Work should stay aligned to Phase 1 and WBS 3 rather than pulling Phase 2 observability or multi-source scope forward.
@@ -80,7 +84,7 @@ Steps 1 through 5 now have working implementation slices, with WBS 3.1 reaching 
 - keep the current control-plane growth path inside the npm-managed package baseline
 - keep the local forge seed path aligned to the active workspace `HEAD` so workflow and platform files match the code under test
 - keep runtime workspace preparation sourced from the forge target repository and target branch so proposal heads inherit active workflow files and other forge-truth content
-- keep the current explicit review-outcome sync surface aligned with the traceability contract and validate the new default-bootstrap happy path end to end
+- keep the current explicit review-outcome sync surface aligned with the traceability contract and validate the remaining live issue-comment portion of the default-bootstrap happy path end to end
 - treat the now-resolved PR-trigger / branch-dispatch gap as a content-source problem unless a narrower follow-up repro shows a remaining forge-level trigger defect
 - investigate local artifact listing visibility only if operator-facing browsing of stored workflow artifacts becomes a near-term requirement
 - do that without collapsing task gateway, agent control, worker, forge proposal, and CI responsibilities together
@@ -93,7 +97,7 @@ This issue exits the active dashboard when the first implementation slice is und
 If implementation uncovers a major unresolved decision, the issue should stay active until the decision is captured in `docs/decisions/decision-backlog.md` and, if needed, promoted to an ADR.
 
 ## Next Actions
-- validate the now-wired default bootstrap path from issue-comment intake through live local Gitea review delivery without manual patch-up steps
+- validate the now-wired default bootstrap path from live issue-comment intake through proposal/CI/review without manual normalization or replay steps
 - keep the forge-repository runtime clone path in place and reseed local forge `main` from current `HEAD` before local proposal-flow validation when the operator is testing unpushed changes
 - investigate local artifact listing visibility only if operator-facing browsing of stored workflow artifacts becomes necessary
 - expand the current project-local bootstrap entrypoints as those WBS 3 interfaces become real services or commands
@@ -120,4 +124,5 @@ If implementation uncovers a major unresolved decision, the issue should stay ac
 - 2026-04-20: Recorded the new review-outcome sync surface, the canonical root-traceability writeback rule, and the live local Gitea approval validation that updated PR `#5` to `approved by reviewer`.
 - 2026-04-21: Recorded the automation-ready review-follow-up expansion after adding proposal-based sync, review-event replay, and a dedicated review webhook listener.
 - 2026-04-21: Recorded the default-bootstrap integration that now starts both managed webhook listeners and ensures the default local repo hook set points at those control-host callbacks.
-- 2026-04-21: Recorded the fresh PR `#6` e2e validation pass, the CI-preservation fix in proposal-based review sync, and the remaining gap that live local Gitea review delivery still needs to be observed at the bootstrap-managed review listener.
+- 2026-04-21: Recorded the fresh PR `#6` e2e validation pass, the CI-preservation fix in proposal-based review sync, and the follow-up gap that local Gitea host callbacks still needed webhook-allowlist support.
+- 2026-04-21: Recorded the local Gitea webhook-allowlist fix and the successful live PR `#6` close/reopen deliveries that reached the bootstrap-managed review listener automatically.
