@@ -20,6 +20,7 @@
     "agent-control": "node scripts/agent-control.js",
     "proposal-surface": "node scripts/proposal-surface.js",
     "review-surface": "node scripts/review-surface.js",
+    "review-surface:webhook": "node scripts/review-surface.js serve-gitea-review-webhook --host 127.0.0.1 --port 4011 --route /hooks/gitea/pull-request-review",
     "dev:gitea-repo": "node scripts/dev/ensure-local-gitea-repo.js",
     "dev:gitea-runner": "node scripts/dev/ensure-local-gitea-runner.js",
     "typecheck": "node ./node_modules/typescript/bin/tsc --noEmit",

@@ -3,7 +3,7 @@
 ## Document Metadata
 - Version: 0.1
 - Status: Draft
-- Last Updated: 2026-04-20
+- Last Updated: 2026-04-21
 - Owner: Project Maintainer
 - Source Template: docs/templates/wbs.template.md
 
@@ -250,7 +250,7 @@
 - Dependencies: 2.5, 3.2, 3.4, 3.5
 - Critical-Path-Candidate: Yes
 - Status: Done
-- Notes: The first proposal-linked traceability artifact exists. `proposal-surface create-gitea-pr` writes `.agent-sdlc/traceability/<task_request_id>.json` into the proposal branch and records `proposal_ref` / `proposal_url` back into the session record. CI now extends that linkage by generating `.agent-sdlc/ci/verification-metadata.json`, reviewer-visible job-log and step-summary metadata, a linked traceability artifact enriched with `ci_run_ref`, workflow metadata, and final verification status, and a refreshed PR traceability block that shows whether the proposal is ready for human review. `review-surface sync-gitea-pr-review-outcome` now completes the minimum Phase 1 traceability path by syncing Gitea review decisions back into the canonical root traceability record, mirroring updates into session-local copies, and refreshing the PR body with explicit review decision and reviewer metadata.
+- Notes: The first proposal-linked traceability artifact exists. `proposal-surface create-gitea-pr` writes `.agent-sdlc/traceability/<task_request_id>.json` into the proposal branch and records `proposal_ref` / `proposal_url` back into the session record. CI now extends that linkage by generating `.agent-sdlc/ci/verification-metadata.json`, reviewer-visible job-log and step-summary metadata, a linked traceability artifact enriched with `ci_run_ref`, workflow metadata, and final verification status, and a refreshed PR traceability block that shows whether the proposal is ready for human review. `review-surface sync-gitea-pr-review-outcome` now completes the minimum Phase 1 traceability path by syncing Gitea review decisions back into the canonical root traceability record, mirroring updates into session-local copies, and refreshing the PR body with explicit review decision and reviewer metadata. The same surface now also resolves proposal-linked syncs from file-backed review events or a dedicated review webhook listener so review follow-up no longer depends on a specific session path.
 
 ### WBS 4 — Controlled Expansion
 - Parent:
@@ -402,3 +402,4 @@
 - 2026-04-20: Updated WBS 3.3 and 3.5 after fixing runtime workspace sourcing to clone the forge target repo/branch, which restored proposal-branch workflow presence and live PR `#5` run creation in local Gitea.
 - 2026-04-20: Updated WBS 3.4 after pre-seeding traceability for already-open PRs, reducing the local Gitea existing-PR refresh path to one new sync-triggered run.
 - 2026-04-20: Updated WBS 3.6 after landing review-outcome synchronization from local Gitea PR reviews into the canonical traceability record and reviewer-facing PR body.
+- 2026-04-21: Updated WBS 3.6 after adding proposal-based review sync plus review-event replay/webhook entrypoints for automation-ready review follow-up.

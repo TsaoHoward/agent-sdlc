@@ -18,7 +18,7 @@ It complements `docs/environment-requirements.md` by describing how maintainers 
 | Environment ID | Current Bootstrap Path | Current Posture |
 |---|---|---|
 | ENV-001 | `scripts/dev/manage-dev-environment.ps1 -Command up`; `npm run dev:env:up`; `npm run dev:gitea-repo -- ensure-local-repo ...` | Starts a local Gitea development stack from repo-owned config and now has a repo-local helper to provision a local owner/repository path for proposal-flow testing. The default local path uses PostgreSQL-backed Gitea, explicit high-port forwarding, and non-interactive installation with an admin user bootstrap. |
-| ENV-002 | `npm install`; `npm run validate:platform`; `npm run task-gateway:webhook`; `node scripts/agent-control.js ...`; `node scripts/proposal-surface.js ...`; `node scripts/review-surface.js ...` | Prepares the npm-managed control-plane baseline and exposes repo-local webhook, session-start, proposal-surface, and review-surface CLIs. The current slice supports actual Gitea issue-comment webhook delivery, source-event retention, normalized task-request persistence, direct handoff into the worker runtime scaffold, PR creation against the local Gitea forge, and explicit review-outcome synchronization back into durable traceability records. |
+| ENV-002 | `npm install`; `npm run validate:platform`; `npm run task-gateway:webhook`; `node scripts/agent-control.js ...`; `node scripts/proposal-surface.js ...`; `node scripts/review-surface.js ...`; `npm run review-surface:webhook` | Prepares the npm-managed control-plane baseline and exposes repo-local webhook, session-start, proposal-surface, and review-surface CLIs. The current slice supports actual Gitea issue-comment webhook delivery, source-event retention, normalized task-request persistence, direct handoff into the worker runtime scaffold, PR creation against the local Gitea forge, explicit review-outcome synchronization back into durable traceability records, and a review-event webhook surface for automation-ready follow-up sync. |
 | ENV-003 | `docker build -f docker/worker-runtime/Dockerfile ...`; `node scripts/agent-control.js ...` | Builds and exercises the first repo-owned worker-runtime image scaffold on top of the host-local Docker-compatible runner. The current runtime handoff launches a per-session container, prepares a fresh workspace checkout from the forge target repository and branch, and exports runtime launch artifacts under `.agent-sdlc/runtime/`. |
 | ENV-004 | `npm run dev:gitea-runner -- ensure-runner`; `.gitea/workflows/phase1-ci.yml` | Boots a local Gitea Actions runner and executes the first PR-triggered CI workflow. The current skeleton collects verification metadata into `.agent-sdlc/ci/verification-metadata.json`, emits it in job logs and step summaries, attaches CI run references and final verification status to the traceability artifact, refreshes the PR traceability block for reviewers, and uploads those artifacts as persisted workflow outputs even when the local forge root URL is localhost-backed. The tracked workflow also supports `workflow_dispatch` as an operator fallback for targeted reruns or local debugging. |
 | ENV-005 | `scripts/dev/manage-dev-environment.ps1 -Command init` | Creates the `.agent-sdlc/state/` and `.agent-sdlc/traceability/` surfaces used by the first implementation slice. |
@@ -44,12 +44,16 @@ npm install
 npm run validate:platform
 npm run typecheck
 npm run task-gateway:webhook
+npm run review-surface:webhook
 npm run dev:gitea-repo -- ensure-local-repo --owner howard --repo agent-sdlc --seed-from .
 npm run dev:gitea-runner -- ensure-runner
 node scripts/task-gateway.js normalize-gitea-issue-comment --event docs/examples/gitea-issue-comment-event.example.json
 node scripts/agent-control.js start-session --task-request .agent-sdlc/state/task-requests/<task_request_id>.json
 node scripts/proposal-surface.js create-gitea-pr --session .agent-sdlc/state/agent-sessions/<agent_session_id>.json
 node scripts/review-surface.js sync-gitea-pr-review-outcome --session .agent-sdlc/state/agent-sessions/<agent_session_id>.json
+node scripts/review-surface.js sync-gitea-pr-review-outcome --proposal gitea:<host>/<owner>/<repo>#pull/<index>
+node scripts/review-surface.js sync-gitea-pr-review-event --event docs/examples/gitea-pull-request-review-event.example.json
+node scripts/review-surface.js serve-gitea-review-webhook --host 127.0.0.1 --port 4011 --route /hooks/gitea/pull-request-review
 docker build -f docker/worker-runtime/Dockerfile -t agent-sdlc-worker-runtime:test .
 ```
 
@@ -65,12 +69,16 @@ Command behavior:
 - `npm run validate:platform` performs syntax validation for the current platform CLI scaffolds
 - `npm run typecheck` runs the selected TypeScript baseline in no-emit mode across the current platform package
 - `npm run task-gateway:webhook` starts the Phase 1 webhook listener at `http://127.0.0.1:4010/hooks/gitea/issue-comment`
+- `npm run review-surface:webhook` starts the Phase 1 review-follow-up webhook listener at `http://127.0.0.1:4011/hooks/gitea/pull-request-review`
 - `npm run dev:gitea-repo -- ensure-local-repo --owner <owner> --repo <repo> --seed-from <path>` provisions a local Gitea owner/repository path and can seed its `main` branch from the local repository
 - `npm run dev:gitea-runner -- ensure-runner` provisions or refreshes the local Gitea Actions runner container and adapts the runner/job-container network topology when the tracked local forge base URL points at host loopback
 - `node scripts/task-gateway.js normalize-gitea-issue-comment --event <path>` normalizes one file-backed Gitea issue-comment event into `.agent-sdlc/state/task-requests/<task_request_id>.json`
 - `node scripts/agent-control.js start-session --task-request <path>` creates `.agent-sdlc/state/agent-sessions/<agent_session_id>.json`, launches the worker-runtime container, and prepares a session-local workspace plus runtime artifacts under `.agent-sdlc/runtime/`
 - `node scripts/proposal-surface.js create-gitea-pr --session <path>` creates or updates the Phase 1 proposal branch and Gitea PR while force-adding the linked traceability artifact into the prepared workspace
-- `node scripts/review-surface.js sync-gitea-pr-review-outcome --session <path>` reads the linked Gitea PR review state, updates the canonical root traceability artifact plus any session-local traceability copy, and refreshes the PR traceability block with explicit review decision metadata
+- `node scripts/review-surface.js sync-gitea-pr-review-outcome --session <path>` reads the linked Gitea PR review state, updates the canonical root traceability artifact plus all matching session-local traceability copies for the same proposal, and refreshes the PR traceability block with explicit review decision metadata
+- `node scripts/review-surface.js sync-gitea-pr-review-outcome --proposal <proposal_ref>` resolves the latest matching session set from a known Gitea PR reference and performs the same review-outcome sync without requiring a specific session path
+- `node scripts/review-surface.js sync-gitea-pr-review-event --event <path>` accepts a file-backed Gitea `pull_request_review` or review-relevant `pull_request` event, resolves the linked proposal, and syncs the durable review outcome for that PR
+- `node scripts/review-surface.js serve-gitea-review-webhook --host <host> --port <port> --route <path>` exposes the same review-event sync path over HTTP so local Gitea review or PR-close events can drive traceability refresh without a manual command hop
 - `docker build -f docker/worker-runtime/Dockerfile -t agent-sdlc-worker-runtime:test .` builds the first worker-runtime image scaffold defined in the repository
 
 Seed behavior:
@@ -99,10 +107,11 @@ The package and runtime files currently own:
 - the selected npm-managed platform package baseline
 - the TypeScript no-emit validation baseline for platform code
 - the first webhook-listener command surface for Gitea issue-comment delivery
+- the first review-follow-up webhook command surface for Gitea PR review and close events
 - the local Gitea Actions runner helper and first PR-triggered CI workflow skeleton
 - the first repo-owned worker-runtime image definition
 - the current per-session runtime-launch behavior and exported runtime-launch artifacts
-- the first branch/PR proposal command surface and traceability-artifact writer
+- the first branch/PR proposal command surface, review-follow-up sync surface, and traceability-artifact writer
 
 ## Configuration Knobs
 The current bootstrap script supports these optional environment variables:
@@ -151,6 +160,7 @@ The bootstrap script now covers:
 Starting the containers is no longer the only bootstrap step, but several workflow-specific initialization tasks still remain:
 - create an API token for later branch, PR, or webhook automation
 - add webhook and branch-protection setup when the task gateway and PR path are implemented
+- decide whether and how local Gitea review or PR-close webhooks should be wired into the new `review-surface` webhook entrypoint by default
 - investigate local Gitea artifact listing visibility if operator-facing browsing of stored workflow artifacts becomes a near-term need
 
 ## Known Local Friction Points
@@ -179,3 +189,4 @@ Starting the containers is no longer the only bootstrap step, but several workfl
 - 2026-04-16: Added the local Gitea Actions runner helper and recorded the first PR-triggered CI verification skeleton.
 - 2026-04-16: Updated the local runner bootstrap notes after validating successful localhost-topology artifact upload in local Gitea run `#19`.
 - 2026-04-20: Updated the bootstrap posture after landing review-outcome synchronization and promoting `review-surface` to the repo-owned operator command set.
+- 2026-04-21: Updated the bootstrap posture after adding review-event replay and webhook entrypoints so Gitea review/close events can drive traceability refresh without a session-specific manual command.

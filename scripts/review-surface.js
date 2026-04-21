@@ -1,4 +1,5 @@
 const fs = require("fs");
+const http = require("http");
 const path = require("path");
 
 const {
@@ -10,26 +11,130 @@ const {
 const { ensureProjectState, getRepoRoot, toRepoRelativePath, writeJson } = require("./lib/project-state");
 const { buildTraceabilityBlock, labelForReviewStatus, replaceTraceabilityBlock } = require("./lib/traceability");
 
+const DEFAULT_WEBHOOK_HOST = "127.0.0.1";
+const DEFAULT_WEBHOOK_PORT = 4011;
+const DEFAULT_WEBHOOK_ROUTE = "/hooks/gitea/pull-request-review";
+
 function printUsage() {
   console.error(
-    "Usage: node scripts/review-surface.js sync-gitea-pr-review-outcome --session <agent-session-json-path>",
+    [
+      "Usage:",
+      "  node scripts/review-surface.js sync-gitea-pr-review-outcome --session <agent-session-json-path>",
+      "  node scripts/review-surface.js sync-gitea-pr-review-outcome --proposal <gitea:host/owner/repo#pull/index>",
+      "  node scripts/review-surface.js sync-gitea-pr-review-event --event <event-json-path>",
+      "  node scripts/review-surface.js serve-gitea-review-webhook [--host <host>] [--port <port>] [--route <path>]",
+    ].join("\n"),
   );
 }
 
 function parseArguments(argv) {
-  if (
-    argv.length !== 5 ||
-    argv[2] !== "sync-gitea-pr-review-outcome" ||
-    argv[3] !== "--session" ||
-    !argv[4]
-  ) {
+  if (argv.length < 3) {
     printUsage();
     process.exit(1);
   }
 
-  return {
-    sessionRecordPath: path.resolve(argv[4]),
-  };
+  const command = argv[2];
+  if (command === "sync-gitea-pr-review-outcome") {
+    const options = {
+      command,
+      sessionRecordPath: null,
+      proposalRef: null,
+    };
+
+    for (let index = 3; index < argv.length; index += 1) {
+      const token = argv[index];
+      if (token === "--session") {
+        options.sessionRecordPath = path.resolve(argv[index + 1]);
+        index += 1;
+        continue;
+      }
+
+      if (token === "--proposal") {
+        options.proposalRef = argv[index + 1];
+        index += 1;
+        continue;
+      }
+
+      printUsage();
+      process.exit(1);
+    }
+
+    if ((options.sessionRecordPath && options.proposalRef) || (!options.sessionRecordPath && !options.proposalRef)) {
+      printUsage();
+      process.exit(1);
+    }
+
+    return options;
+  }
+
+  if (command === "sync-gitea-pr-review-event") {
+    const options = {
+      command,
+      eventPath: null,
+    };
+
+    for (let index = 3; index < argv.length; index += 1) {
+      const token = argv[index];
+      if (token === "--event") {
+        options.eventPath = path.resolve(argv[index + 1]);
+        index += 1;
+        continue;
+      }
+
+      printUsage();
+      process.exit(1);
+    }
+
+    if (!options.eventPath) {
+      printUsage();
+      process.exit(1);
+    }
+
+    return options;
+  }
+
+  if (command === "serve-gitea-review-webhook") {
+    const options = {
+      command,
+      host: DEFAULT_WEBHOOK_HOST,
+      port: DEFAULT_WEBHOOK_PORT,
+      route: DEFAULT_WEBHOOK_ROUTE,
+    };
+
+    for (let index = 3; index < argv.length; index += 1) {
+      const token = argv[index];
+      if (token === "--host") {
+        options.host = argv[index + 1];
+        index += 1;
+        continue;
+      }
+
+      if (token === "--port") {
+        options.port = Number(argv[index + 1]);
+        index += 1;
+        continue;
+      }
+
+      if (token === "--route") {
+        options.route = argv[index + 1];
+        index += 1;
+        continue;
+      }
+
+      printUsage();
+      process.exit(1);
+    }
+
+    if (!options.host || !options.route || !Number.isInteger(options.port) || options.port < 1) {
+      printUsage();
+      process.exit(1);
+    }
+
+    return options;
+  }
+
+  printUsage();
+  process.exit(1);
 }
 
 function utcNow() {
@@ -38,6 +143,62 @@ function utcNow() {
 
 function readJson(filePath) {
   return JSON.parse(fs.readFileSync(filePath, "utf8"));
+}
+
+function firstDefined(...values) {
+  return values.find((value) => value !== undefined && value !== null && value !== "");
+}
+
+function parseHostFromUrl(urlValue) {
+  if (!urlValue) {
+    return null;
+  }
+
+  try {
+    return new URL(urlValue).host;
+  } catch (error) {
+    return null;
+  }
+}
+
+function buildNormalizedEnvelope({ rawText, payload, headers, eventData = null }) {
+  return {
+    rawText,
+    eventData,
+    payload,
+    headers,
+    eventType: firstDefined(
+      eventData && eventData.eventType,
+      eventData && eventData.source_event_type,
+      headers["x-gitea-event"],
+      headers["X-Gitea-Event"],
+      headers["x-gogs-event"],
+      headers["X-Gogs-Event"],
+    ),
+    deliveryId: firstDefined(
+      eventData && eventData.delivery,
+      eventData && eventData.deliveryId,
+      eventData && eventData.source_event_id,
+      headers["x-gitea-delivery"],
+      headers["X-Gitea-Delivery"],
+      headers["x-gogs-delivery"],
+      headers["X-Gogs-Delivery"],
+    ),
+  };
+}
+
+function normalizeEventEnvelopeFromFile(filePath) {
+  const rawText = fs.readFileSync(filePath, "utf8");
+  const eventData = JSON.parse(rawText);
+  const payload = eventData.payload || eventData;
+  const headers = eventData.headers || {};
+
+  return buildNormalizedEnvelope({
+    rawText,
+    payload,
+    headers,
+    eventData,
+  });
 }
 
 function parseProposalRef(proposalRef) {
@@ -54,36 +215,56 @@ function parseProposalRef(proposalRef) {
   };
 }
 
-function resolveTraceabilityTargets(repoRoot, statePaths, sessionRecord) {
-  const stateTraceabilityPath =
-    sessionRecord.task_request_id &&
-    path.join(statePaths.traceabilityDir, `${sessionRecord.task_request_id}.json`);
-  const sessionTraceabilityPath =
-    sessionRecord.traceability_metadata_ref &&
-    path.join(repoRoot, sessionRecord.traceability_metadata_ref);
+function normalizeWebhookEventType(eventType) {
+  return String(eventType || "").trim().toLowerCase();
+}
 
-  const syncPaths = [stateTraceabilityPath, sessionTraceabilityPath].filter((candidate, index, values) => {
-    return candidate && fs.existsSync(candidate) && values.indexOf(candidate) === index;
-  });
+function resolveProposalRefFromEvent(envelope) {
+  const eventType = normalizeWebhookEventType(envelope.eventType);
+  const payload = envelope.payload || {};
+  const pullRequest = payload.pull_request || payload.pullRequest || null;
 
-  if (syncPaths.length === 0) {
-    throw new Error("Traceability metadata file was not found for the provided session record.");
+  if (!["pull_request_review", "pull_request"].includes(eventType)) {
+    return {
+      status: "ignored",
+      message: `Expected 'pull_request_review' or 'pull_request' but received '${envelope.eventType || "unknown"}'.`,
+    };
+  }
+
+  if (!payload.repository || !pullRequest) {
+    throw new Error("The review event payload must include repository and pull_request objects.");
+  }
+
+  if (eventType === "pull_request") {
+    const action = String(payload.action || "").trim().toLowerCase();
+    if (action && !["closed", "reopened"].includes(action)) {
+      return {
+        status: "ignored",
+        message: `Review sync ignores pull_request action '${payload.action}'.`,
+      };
+    }
+  }
+
+  const repositoryFullName = payload.repository.full_name;
+  const proposalIndex = pullRequest.number || pullRequest.index || payload.number || null;
+  const repositoryHost =
+    parseHostFromUrl(payload.repository.html_url) ||
+    parseHostFromUrl(payload.repository.clone_url) ||
+    parseHostFromUrl(payload.repository.ssh_url) ||
+    parseHostFromUrl(pullRequest.html_url) ||
+    "localhost";
+
+  if (!repositoryFullName || !proposalIndex) {
+    throw new Error("The review event payload must include repository.full_name and pull_request.number.");
   }
 
   return {
-    primaryPath:
-      stateTraceabilityPath && fs.existsSync(stateTraceabilityPath)
-        ? stateTraceabilityPath
-        : sessionTraceabilityPath,
-    syncPaths,
+    status: "accepted",
+    proposalRef: `gitea:${repositoryHost}/${repositoryFullName}#pull/${proposalIndex}`,
+    eventType,
+    action: payload.action || null,
+    deliveryId: envelope.deliveryId || null,
   };
-}
-
-function writeTraceabilityCopies(filePaths, value) {
-  filePaths.forEach((filePath) => {
-    fs.mkdirSync(path.dirname(filePath), { recursive: true });
-    writeJson(filePath, value);
-  });
 }
 
 function buildReviewDecisionRef(proposalInfo, reviewId) {
@@ -174,6 +355,174 @@ function deriveReviewOutcome(pullRequest, reviews, proposalInfo) {
   };
 }
 
+function listSessionRecordPaths(statePaths) {
+  if (!fs.existsSync(statePaths.agentSessionStateDir)) {
+    return [];
+  }
+
+  return fs
+    .readdirSync(statePaths.agentSessionStateDir)
+    .filter((entry) => entry.toLowerCase().endsWith(".json"))
+    .map((entry) => path.join(statePaths.agentSessionStateDir, entry));
+}
+
+function loadSessionRecords(statePaths) {
+  return listSessionRecordPaths(statePaths).map((filePath) => ({
+    filePath,
+    sessionRecord: readJson(filePath),
+  }));
+}
+
+function sessionSortKey(sessionRecord) {
+  return Date.parse(
+    sessionRecord.updated_at ||
+      sessionRecord.completed_at ||
+      sessionRecord.runtime_completed_at ||
+      sessionRecord.created_at ||
+      0,
+  );
+}
+
+function findSessionsByProposalRef(statePaths, proposalRef) {
+  return loadSessionRecords(statePaths)
+    .filter(({ sessionRecord }) => sessionRecord.proposal_ref === proposalRef)
+    .sort((left, right) => sessionSortKey(right.sessionRecord) - sessionSortKey(left.sessionRecord));
+}
+
+function dedupePaths(paths) {
+  return paths.filter((candidate, index, values) => candidate && values.indexOf(candidate) === index);
+}
+
+function resolveTraceabilityTargets(repoRoot, statePaths, options) {
+  const {
+    sessionEntries,
+    taskRequestId = null,
+    proposalRef = null,
+    explicitSessionTraceabilityPath = null,
+  } = options;
+  const uniqueTaskRequestIds = [...new Set(
+    sessionEntries.map(({ sessionRecord }) => sessionRecord.task_request_id).filter((value) => value),
+  )];
+
+  if (!taskRequestId && uniqueTaskRequestIds.length > 1) {
+    throw new Error(
+      `Proposal '${proposalRef}' maps to multiple task_request_id values: ${uniqueTaskRequestIds.join(", ")}.`,
+    );
+  }
+
+  const resolvedTaskRequestId = taskRequestId || uniqueTaskRequestIds[0] || null;
+  const stateTraceabilityPath =
+    resolvedTaskRequestId && path.join(statePaths.traceabilityDir, `${resolvedTaskRequestId}.json`);
+  const sessionTraceabilityPaths = sessionEntries
+    .map(({ sessionRecord }) => {
+      if (!sessionRecord.traceability_metadata_ref) {
+        return null;
+      }
+
+      const absolutePath = path.join(repoRoot, sessionRecord.traceability_metadata_ref);
+      return fs.existsSync(absolutePath) ? absolutePath : null;
+    })
+    .filter((value) => value);
+  const syncPaths = dedupePaths([
+    stateTraceabilityPath,
+    explicitSessionTraceabilityPath,
+    ...sessionTraceabilityPaths,
+  ]);
+  const existingPrimaryCandidates = dedupePaths([
+    stateTraceabilityPath && fs.existsSync(stateTraceabilityPath) ? stateTraceabilityPath : null,
+    explicitSessionTraceabilityPath && fs.existsSync(explicitSessionTraceabilityPath)
+      ? explicitSessionTraceabilityPath
+      : null,
+    ...sessionTraceabilityPaths,
+  ]);
+
+  if (existingPrimaryCandidates.length === 0) {
+    throw new Error("Traceability metadata file was not found for the requested review sync target.");
+  }
+
+  return {
+    taskRequestId: resolvedTaskRequestId,
+    primaryPath: existingPrimaryCandidates[0],
+    syncPaths,
+    matchedSessionIds: sessionEntries
+      .map(({ sessionRecord }) => sessionRecord.agent_session_id)
+      .filter((value) => value),
+  };
+}
+
+function resolveSyncContextBySession(repoRoot, statePaths, sessionRecordPath) {
+  const sessionRecord = readJson(sessionRecordPath);
+
+  if (sessionRecord.proposal_ref) {
+    const matchingSessions = findSessionsByProposalRef(statePaths, sessionRecord.proposal_ref);
+    if (matchingSessions.length > 0) {
+      return {
+        proposalRef: sessionRecord.proposal_ref,
+        sessionEntries: matchingSessions,
+        traceabilityTargets: resolveTraceabilityTargets(repoRoot, statePaths, {
+          sessionEntries: matchingSessions,
+          proposalRef: sessionRecord.proposal_ref,
+        }),
+      };
+    }
+  }
+
+  const singleSessionEntry = [{ filePath: sessionRecordPath, sessionRecord }];
+  const explicitSessionTraceabilityPath =
+    sessionRecord.traceability_metadata_ref &&
+    path.join(repoRoot, sessionRecord.traceability_metadata_ref);
+
+  return {
+    proposalRef: sessionRecord.proposal_ref || null,
+    sessionEntries: singleSessionEntry,
+    traceabilityTargets: resolveTraceabilityTargets(repoRoot, statePaths, {
+      sessionEntries: singleSessionEntry,
+      taskRequestId: sessionRecord.task_request_id || null,
+      proposalRef: sessionRecord.proposal_ref || null,
+      explicitSessionTraceabilityPath,
+    }),
+  };
+}
+
+function resolveSyncContextByProposalRef(repoRoot, statePaths, proposalRef) {
+  const matchingSessions = findSessionsByProposalRef(statePaths, proposalRef);
+  if (matchingSessions.length === 0) {
+    throw new Error(`No session record was found for proposal '${proposalRef}'.`);
+  }
+
+  return {
+    proposalRef,
+    sessionEntries: matchingSessions,
+    traceabilityTargets: resolveTraceabilityTargets(repoRoot, statePaths, {
+      sessionEntries: matchingSessions,
+      proposalRef,
+    }),
+  };
+}
+
+function resolveSyncContextByEvent(repoRoot, statePaths, envelope) {
+  const eventResolution = resolveProposalRefFromEvent(envelope);
+  if (eventResolution.status !== "accepted") {
+    return eventResolution;
+  }
+
+  const syncContext = resolveSyncContextByProposalRef(repoRoot, statePaths, eventResolution.proposalRef);
+  syncContext.eventType = eventResolution.eventType;
+  syncContext.eventAction = eventResolution.action;
+  syncContext.deliveryId = eventResolution.deliveryId;
+  return {
+    status: "accepted",
+    syncContext,
+  };
+}
+
+function writeTraceabilityCopies(filePaths, value) {
+  filePaths.forEach((filePath) => {
+    fs.mkdirSync(path.dirname(filePath), { recursive: true });
+    writeJson(filePath, value);
+  });
+}
+
 async function syncProposalBody(settings, repositoryRef, proposalInfo, traceability) {
   const currentPullRequest = await getPullRequest(
     settings,
@@ -221,17 +570,23 @@ async function syncProposalBody(settings, repositoryRef, proposalInfo, traceabil
   );
 }
 
-async function main() {
-  const repoRoot = getRepoRoot();
-  const statePaths = ensureProjectState(repoRoot);
-  const { sessionRecordPath } = parseArguments(process.argv);
-  const sessionRecord = readJson(sessionRecordPath);
-  const traceabilityTargets = resolveTraceabilityTargets(repoRoot, statePaths, sessionRecord);
+async function syncReviewOutcome(repoRoot, statePaths, syncContext) {
+  const { traceabilityTargets, proposalRef } = syncContext;
   const traceabilityPath = traceabilityTargets.primaryPath;
   const traceability = readJson(traceabilityPath);
 
+  if (traceability.proposal_ref && proposalRef && traceability.proposal_ref !== proposalRef) {
+    throw new Error(
+      `Traceability record proposal_ref '${traceability.proposal_ref}' did not match requested proposal '${proposalRef}'.`,
+    );
+  }
+
   if (!traceability.proposal_ref) {
-    throw new Error("Traceability record does not include proposal_ref.");
+    if (!proposalRef) {
+      throw new Error("Traceability record does not include proposal_ref.");
+    }
+
+    traceability.proposal_ref = proposalRef;
   }
 
   const proposalInfo = parseProposalRef(traceability.proposal_ref);
@@ -300,21 +655,143 @@ async function main() {
 
   writeTraceabilityCopies(traceabilityTargets.syncPaths, traceability);
 
-  console.log(
-    JSON.stringify(
-      {
-        status: "review-outcome-synced",
-        task_request_id: traceability.task_request_id,
-        proposal_ref: traceability.proposal_ref,
-        review_status: traceability.review.status,
-        review_decision_ref: traceability.review.review_decision_ref,
-        reviewer_login: traceability.review.reviewer_login,
-        traceability_metadata_ref: toRepoRelativePath(repoRoot, traceabilityPath),
-      },
-      null,
-      2,
-    ),
-  );
+  return {
+    status: "review-outcome-synced",
+    task_request_id: traceability.task_request_id,
+    proposal_ref: traceability.proposal_ref,
+    review_status: traceability.review.status,
+    review_decision_ref: traceability.review.review_decision_ref,
+    reviewer_login: traceability.review.reviewer_login,
+    traceability_metadata_ref: toRepoRelativePath(repoRoot, traceabilityPath),
+    matched_session_ids: traceabilityTargets.matchedSessionIds,
+    synced_copy_count: traceabilityTargets.syncPaths.length,
+  };
+}
+
+function writeJsonResponse(response, statusCode, payload) {
+  response.writeHead(statusCode, {
+    "content-type": "application/json; charset=utf-8",
+  });
+  response.end(`${JSON.stringify(payload, null, 2)}\n`);
+}
+
+function startWebhookServer(repoRoot, options) {
+  const statePaths = ensureProjectState(repoRoot);
+  const server = http.createServer((request, response) => {
+    if (request.method !== "POST" || request.url !== options.route) {
+      writeJsonResponse(response, request.method === "POST" ? 404 : 405, {
+        status: "rejected",
+        message: "Only POST requests to the configured review webhook route are supported.",
+      });
+      return;
+    }
+
+    const chunks = [];
+    request.on("data", (chunk) => {
+      chunks.push(chunk);
+    });
+
+    request.on("end", () => {
+      void (async () => {
+        try {
+          const rawText = Buffer.concat(chunks).toString("utf8");
+          const payload = JSON.parse(rawText);
+          const envelope = buildNormalizedEnvelope({
+            rawText,
+            payload,
+            headers: request.headers,
+          });
+          const resolution = resolveSyncContextByEvent(repoRoot, statePaths, envelope);
+
+          if (resolution.status !== "accepted") {
+            writeJsonResponse(response, 202, resolution);
+            return;
+          }
+
+          const syncResult = await syncReviewOutcome(repoRoot, statePaths, resolution.syncContext);
+          writeJsonResponse(response, 202, {
+            ...syncResult,
+            source_event_type: resolution.syncContext.eventType,
+            source_event_action: resolution.syncContext.eventAction,
+            source_event_id: resolution.syncContext.deliveryId,
+          });
+        } catch (error) {
+          writeJsonResponse(response, 500, {
+            status: "error",
+            message: error.message,
+          });
+        }
+      })();
+    });
+
+    request.on("error", (error) => {
+      writeJsonResponse(response, 500, {
+        status: "error",
+        message: error.message,
+      });
+    });
+  });
+
+  server.listen(options.port, options.host, () => {
+    console.log(
+      JSON.stringify(
+        {
+          status: "listening",
+          host: options.host,
+          port: options.port,
+          route: options.route,
+        },
+        null,
+        2,
+      ),
+    );
+  });
+}
+
+async function handleSyncFromEvent(repoRoot, statePaths, eventPath) {
+  const envelope = normalizeEventEnvelopeFromFile(eventPath);
+  const resolution = resolveSyncContextByEvent(repoRoot, statePaths, envelope);
+  if (resolution.status !== "accepted") {
+    return resolution;
+  }
+
+  const syncResult = await syncReviewOutcome(repoRoot, statePaths, resolution.syncContext);
+  return {
+    ...syncResult,
+    source_event_type: resolution.syncContext.eventType,
+    source_event_action: resolution.syncContext.eventAction,
+    source_event_id: resolution.syncContext.deliveryId,
+  };
+}
+
+async function main() {
+  const repoRoot = getRepoRoot();
+  const statePaths = ensureProjectState(repoRoot);
+  const options = parseArguments(process.argv);
+
+  if (options.command === "sync-gitea-pr-review-outcome") {
+    const syncContext = options.sessionRecordPath
+      ? resolveSyncContextBySession(repoRoot, statePaths, options.sessionRecordPath)
+      : resolveSyncContextByProposalRef(repoRoot, statePaths, options.proposalRef);
+    const result = await syncReviewOutcome(repoRoot, statePaths, syncContext);
+    console.log(JSON.stringify(result, null, 2));
+    return;
+  }
+
+  if (options.command === "sync-gitea-pr-review-event") {
+    const result = await handleSyncFromEvent(repoRoot, statePaths, options.eventPath);
+    console.log(JSON.stringify(result, null, 2));
+    process.exit(result.status === "ignored" ? 2 : 0);
+    return;
+  }
+
+  if (options.command === "serve-gitea-review-webhook") {
+    startWebhookServer(repoRoot, options);
+    return;
+  }
+
+  printUsage();
+  process.exit(1);
 }
 
 main().catch((error) => {
