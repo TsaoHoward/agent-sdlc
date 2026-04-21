@@ -2,8 +2,8 @@
 
 ## Metadata
 - Test ID: TC-002
-- Status: In Progress
-- Last Updated: 2026-04-21
+- Status: Passed
+- Last Updated: 2026-04-22
 - Owner: Project Maintainer
 - Mode: CLI half-live
 - Related Docs / WBS: `docs/testing/local-test-procedures.md`; `docs/architecture/pr-and-ci-path-definition.md`; `docs/architecture/lifecycle-traceability-contract.md`; WBS `3.4`, `3.5`, `3.6`
@@ -14,10 +14,10 @@
 Verify that the local forge can receive a proposal from the CLI path, produce traceability metadata, and accept direct review-sync refreshes without requiring a live issue-comment trigger.
 
 Latest known result:
-- Date: 2026-04-21
-- Task request: `trq-route1-postfix-20260421111452`
-- Proposal PR: `#18`
-- Result: the post-fix proposal path created one successful `pull_request` CI run (`#37`) without the earlier duplicate sync-triggered second run, and the PR body converged automatically to `CI: success` / `ready for human review`, but the host root traceability file and session-local workspace copy still stayed at pre-CI state until a later host-side sync event refreshed them
+- Date: 2026-04-22
+- Task request: `trq-route1-hostsync-final-20260421225724`
+- Proposal PR: `#23`
+- Result: the seeded post-fix proposal path created one successful `pull_request` CI run (`#41`) without the earlier duplicate sync-triggered second run, and the PR body, host root traceability file, and session-local workspace copy all converged automatically to `CI: success` / `ready for human review`
 
 ## Scope
 This case covers:
@@ -79,3 +79,4 @@ Close or keep the test PR according to the current validation window. If it rema
 - 2026-04-21: Initial version.
 - 2026-04-21: Recorded the remaining host-side traceability-refresh gap after proposal PR `#12` showed CI success in the PR body before the root traceability file converged.
 - 2026-04-21: Updated the latest known result after post-fix proposal PR `#18` confirmed that duplicate new-PR CI runs were removed while the host-side traceability-refresh gap remained.
+- 2026-04-22: Marked the case passed after seeded local PR `#23` completed successful run `#41` and automatically converged the PR body plus both durable traceability copies.

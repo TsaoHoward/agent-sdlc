@@ -3,7 +3,7 @@
 ## Document Metadata
 - Version: 0.1
 - Status: Active
-- Last Updated: 2026-04-21
+- Last Updated: 2026-04-22
 - Owner: Project Maintainer
 
 ## Purpose
@@ -45,7 +45,7 @@ The latest reproducible local full-flow reference is:
 Current nuance:
 - the strengthened listener path now auto-creates the proposal and root traceability file from the live issue-comment path
 - after CI success, the reviewer-facing PR body converges automatically
-- the host root traceability file can still lag behind CI completion until a later host-side sync event such as review follow-up or a manual `review-surface` refresh
+- after CI success, the host root traceability file and session-local workspace copy now converge automatically through the CI-to-host traceability callback path
 
 ## Stable Local Test Data
 These defaults assume the tracked local bootstrap config is active and no environment overrides have changed the values.
@@ -281,8 +281,7 @@ Expected behavior:
 - the PR body converges to the latest CI result automatically
 
 Current nuance:
-- the host root traceability file may still show pre-CI state until a later host-side sync event occurs
-- if you need to refresh that canonical host-side record immediately after CI completes, run:
+- if you want to refresh review state directly from the proposal without replaying a webhook, run:
 
 ```powershell
 node scripts/review-surface.js sync-gitea-pr-review-outcome --proposal gitea:localhost:43000/howard/agent-sdlc#pull/<index>
@@ -332,3 +331,4 @@ PRs and issues created for local smoke tests may be left as evidence during the 
 - 2026-04-21: Initial version.
 - 2026-04-21: Reframed the GUI procedure after a fresh issue-comment validation showed that the current default path stops at `workspace-prepared` and still requires a manual `proposal-surface` step to create the PR.
 - 2026-04-21: Updated the GUI procedure after the strengthened listener path restored automatic proposal creation from live issue comments and narrowed the remaining gap to host-side canonical traceability refresh after CI.
+- 2026-04-22: Updated the procedure after seeded local PR `#23` confirmed automatic host-side traceability convergence through the CI callback path.

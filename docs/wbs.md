@@ -3,7 +3,7 @@
 ## Document Metadata
 - Version: 0.1
 - Status: Draft
-- Last Updated: 2026-04-21
+- Last Updated: 2026-04-22
 - Owner: Project Maintainer
 - Source Template: docs/templates/wbs.template.md
 
@@ -241,7 +241,7 @@
 - Dependencies: 2.4, 3.4
 - Critical-Path-Candidate: Yes
 - Status: Done
-- Notes: The first PR-triggered CI workflow now exists at `.gitea/workflows/phase1-ci.yml`, and the repo-local runner helper now exists at `node scripts/dev/ensure-local-gitea-runner.js ensure-runner`. The current workflow collects `.agent-sdlc/ci/verification-metadata.json` from the proposal branch, runs `npm ci`, `npm run validate:platform`, and `npm run typecheck`, and was smoke-tested successfully against the local Gitea stack with run `#19` completing successfully after the localhost-rooted topology was updated to use host networking plus an injected `agent-sdlc-gitea` host alias for runner-triggered job containers. After the runtime workspace source switched from local-workspace cloning to forge-repository cloning, a live PR `#5` revalidation also restored successful auto-created `pull_request_sync` runs and successful branch-local `workflow_dispatch` execution for the proposal branch. Uploaded artifact chunks now persist in local Gitea storage, while operator-facing artifact listing visibility remains a narrower follow-up.
+- Notes: The first PR-triggered CI workflow now exists at `.gitea/workflows/phase1-ci.yml`, and the repo-local runner helper now exists at `node scripts/dev/ensure-local-gitea-runner.js ensure-runner`. The current workflow collects `.agent-sdlc/ci/verification-metadata.json` from the proposal branch, runs `npm ci`, `npm run validate:platform`, and `npm run typecheck`, and was smoke-tested successfully against the local Gitea stack with run `#19` completing successfully after the localhost-rooted topology was updated to use host networking plus an injected `agent-sdlc-gitea` host alias for runner-triggered job containers. After the runtime workspace source switched from local-workspace cloning to forge-repository cloning, a live PR `#5` revalidation also restored successful auto-created `pull_request_sync` runs and successful branch-local `workflow_dispatch` execution for the proposal branch. The same workflow now also posts CI completion back to the host review-surface listener through the local `host.docker.internal` callback path, which was validated on seeded PR `#23` with successful run `#41`. Uploaded artifact chunks now persist in local Gitea storage, while operator-facing artifact listing visibility remains a narrower follow-up.
 
 ### WBS 3.6 — Lifecycle Traceability Scaffold
 - Parent: 3
@@ -251,7 +251,7 @@
 - Dependencies: 2.5, 3.2, 3.4, 3.5
 - Critical-Path-Candidate: Yes
 - Status: Done
-- Notes: The first proposal-linked traceability artifact exists. `proposal-surface create-gitea-pr` writes `.agent-sdlc/traceability/<task_request_id>.json` into the proposal branch and records `proposal_ref` / `proposal_url` back into the session record. CI now extends that linkage by generating `.agent-sdlc/ci/verification-metadata.json`, reviewer-visible job-log and step-summary metadata, a linked traceability artifact enriched with `ci_run_ref`, workflow metadata, and final verification status, and a refreshed PR traceability block that shows whether the proposal is ready for human review. `review-surface sync-gitea-pr-review-outcome` now completes the minimum Phase 1 traceability path by syncing Gitea review decisions back into the canonical root traceability record, mirroring updates into session-local copies, and refreshing the PR body with explicit review decision and reviewer metadata. The same surface now also resolves proposal-linked syncs from file-backed review events or a dedicated review webhook listener so review follow-up no longer depends on a specific session path, and the local bootstrap now starts that review listener, ensures the default local repo is wired to the matching callback, and has been validated against live local PR close/reopen deliveries after the Gitea webhook allowlist was expanded for host callbacks.
+- Notes: The first proposal-linked traceability artifact exists. `proposal-surface create-gitea-pr` writes `.agent-sdlc/traceability/<task_request_id>.json` into the proposal branch and records `proposal_ref` / `proposal_url` back into the session record. CI now extends that linkage by generating `.agent-sdlc/ci/verification-metadata.json`, reviewer-visible job-log and step-summary metadata, a linked traceability artifact enriched with `ci_run_ref`, workflow metadata, and final verification status, and a refreshed PR traceability block that shows whether the proposal is ready for human review. `review-surface sync-gitea-pr-review-outcome` now completes the minimum Phase 1 traceability path by syncing Gitea review decisions back into the canonical root traceability record, mirroring updates into session-local copies, and refreshing the PR body with explicit review decision and reviewer metadata. The same surface now also resolves proposal-linked review follow-up from file-backed review events or a dedicated review webhook listener, and it now supports proposal-traceability sync for CI completion so canonical and session-local copies converge automatically after successful PR verification. The local bootstrap now starts that review listener, ensures the default local repo is wired to the matching callback, and the end-to-end CI-to-host convergence path was validated against seeded PR `#23` and run `#41`.
 
 ### WBS 3.7 — Testing Workflow Baseline
 - Parent: 3
@@ -419,3 +419,4 @@
 - 2026-04-21: Updated WBS 3.1 and 3.6 after wiring the default local bootstrap to start the managed issue-comment and review-follow-up listeners and to configure the default local repo hook set.
 - 2026-04-21: Updated WBS 3.1 and 3.6 after adding the local Gitea webhook allowlist needed for host callback delivery and validating live PR close/reopen webhook sync into the bootstrap-managed review listener.
 - 2026-04-21: Added WBS 3.7 for the durable local testing workflow baseline, including test plan, framework, dashboard, archive, and canonical CLI/GUI cases.
+- 2026-04-22: Updated WBS 3.5 and 3.6 after landing the CI-to-host traceability callback path and validating automatic canonical/session-local convergence on seeded PR `#23`.
