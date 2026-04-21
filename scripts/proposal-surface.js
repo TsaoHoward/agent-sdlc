@@ -232,6 +232,16 @@ function writeTraceabilityWorkspaceArtifact(workspaceDir, taskRequest, artifact)
   };
 }
 
+function writeTraceabilityStateArtifact(statePaths, taskRequest, artifact) {
+  const absoluteArtifactPath = path.join(
+    statePaths.traceabilityDir,
+    `${taskRequest.task_request_id}.json`,
+  );
+  fs.mkdirSync(path.dirname(absoluteArtifactPath), { recursive: true });
+  writeJson(absoluteArtifactPath, artifact);
+  return absoluteArtifactPath;
+}
+
 function findExistingPullRequest(pullRequests, owner, branchName, baseBranch) {
   return pullRequests.find((pullRequest) => {
     const headRef = pullRequest.head && pullRequest.head.ref;
@@ -356,7 +366,7 @@ async function createOrUpdatePullRequest(
 async function main() {
   try {
     const repoRoot = getRepoRoot();
-    ensureProjectState(repoRoot);
+    const statePaths = ensureProjectState(repoRoot);
     const { sessionRecordPath } = parseArguments(process.argv);
     const sessionRecord = readJson(sessionRecordPath);
     const taskRequestPath = path.join(repoRoot, sessionRecord.task_request_path);
@@ -470,6 +480,14 @@ async function main() {
       pushBranch(workspaceDir, remoteUrls.gitUrl, branchName, basicAuthHeader);
     }
 
+    const stateTraceabilityPath = writeTraceabilityStateArtifact(
+      statePaths,
+      taskRequest,
+      traceabilityArtifact,
+    );
+    const stateTraceabilityRef = toRepoRelativePath(repoRoot, stateTraceabilityPath);
+    const workspaceTraceabilityRef = toRepoRelativePath(repoRoot, traceabilityPath.absoluteArtifactPath);
+
     sessionRecord.session_state = "completed";
     sessionRecord.updated_at = utcNow();
     sessionRecord.completed_at = sessionRecord.updated_at;
@@ -477,10 +495,11 @@ async function main() {
     sessionRecord.proposal_url = proposalInfo.proposalUrl;
     sessionRecord.proposal_title = proposalInfo.proposalTitle;
     sessionRecord.proposal_branch_ref = branchName;
-    sessionRecord.traceability_metadata_ref = toRepoRelativePath(repoRoot, traceabilityPath.absoluteArtifactPath);
+    sessionRecord.traceability_metadata_ref = stateTraceabilityRef;
     sessionRecord.artifact_refs = [
       ...(sessionRecord.artifact_refs || []),
-      sessionRecord.traceability_metadata_ref,
+      stateTraceabilityRef,
+      workspaceTraceabilityRef,
     ].filter((value, index, values) => values.indexOf(value) === index);
     writeJson(sessionRecordPath, sessionRecord);
 
@@ -495,7 +514,7 @@ async function main() {
           proposal_url: proposalInfo.proposalUrl,
           proposal_title: proposalInfo.proposalTitle,
           branch_ref: branchName,
-          traceability_metadata_ref: sessionRecord.traceability_metadata_ref,
+          traceability_metadata_ref: stateTraceabilityRef,
           session_record_path: toRepoRelativePath(repoRoot, sessionRecordPath),
         },
         null,

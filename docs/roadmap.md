@@ -3,7 +3,7 @@
 ## Document Metadata
 - Version: 0.1
 - Status: Draft
-- Last Updated: 2026-04-15
+- Last Updated: 2026-04-21
 - Owner: Project Maintainer
 - Source Template: docs/templates/roadmap.template.md
 
@@ -130,6 +130,7 @@ Implement the smallest working path from task trigger to independently verified 
 - isolated worker runtime scaffold
 - branch/PR proposal path
 - CI workflow skeleton
+- repeatable local testing workflow with canonical CLI and GUI cases plus a durable testing dashboard
 - traceable task lifecycle contract and minimal logging
 
 ### Entry Criteria
@@ -141,6 +142,7 @@ Implement the smallest working path from task trigger to independently verified 
 - a supported task trigger can produce a bounded agent-run change proposal
 - CI validates the proposed change independently
 - human review remains the merge gate
+- maintainers can execute documented local CLI and GUI validation procedures and capture the resulting evidence without relying on transient chat context
 
 ### Dependencies
 - task model definition
@@ -266,3 +268,4 @@ This phase should only proceed when prior boundaries are understood and defended
 - 2026-04-14: Synchronized selected Phase 1 detail defaults for command parsing, policy file schema, session record storage, and PR traceability conventions.
 - 2026-04-15: Added a durable issue dashboard, archive, and supporting-note workflow to the Phase 0 baseline.
 - 2026-04-15: Recorded the platform implementation-stack baseline for TypeScript/Node.js, npm, repo-owned Dockerfiles, and later compose packaging.
+- 2026-04-21: Expanded the Phase 1 deliverables and exit criteria to include a durable local testing workflow with canonical cases and active dashboard tracking.

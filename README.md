@@ -20,6 +20,7 @@ The repo is no longer planning-only. It now has a working minimum closed-loop sc
 - proposal surfacing as branch plus PR
 - local Gitea Actions verification with traceability metadata
 - reviewer-facing traceability that now extends through explicit review outcomes
+- a repo-owned testing workflow baseline with local CLI and GUI procedures plus an active test dashboard
 
 The goal is still **not** to deliver the full platform immediately. The current focus is to harden the smallest useful issue-driven experience without collapsing architecture boundaries.
 
@@ -38,8 +39,8 @@ Current progress:
 - `review follow-up automation`: working through a default bootstrap-managed review webhook plus event-driven replay/sync entrypoints
 
 ## Current Todo
-- validate the fully bootstrapped local happy path end to end from live issue-comment intake through proposal/CI/review without manual normalization or replay steps
-  Local Gitea review and PR-close deliveries now reach the bootstrap-managed listener after the bootstrap began setting `webhook.ALLOWED_HOST_LIST=external,private` for host callback URLs such as `host.docker.internal`.
+- close the remaining host-side canonical traceability gap after CI success
+  The live issue-comment path now auto-creates task, session, proposal PR, and root traceability again, but the host root traceability file can still lag behind CI completion until a later host-side sync event refreshes it.
 - improve operator-facing artifact browsing or listing now that traceability, CI metadata, and review sync are in place
 - decide how much more of the local operator workflow should be consolidated into the default bootstrap before moving on to broader Phase 2 concerns
 - keep the Phase 1 slice narrow and avoid pulling in broader observability, multi-source intake, or deployment concerns too early
@@ -54,8 +55,9 @@ Use these files as the primary planning sources of truth:
 5. `docs/wbs.md`
 6. `docs/issues/`
 7. `docs/decisions/`
-8. `docs/policies/`
-9. `AGENTS.md`
+8. `docs/testing/`
+9. `docs/policies/`
+10. `AGENTS.md`
 
 ## Repository Guide
 - `AGENTS.md`: agent working rules and update requirements
@@ -66,6 +68,7 @@ Use these files as the primary planning sources of truth:
 - `docs/roadmap.md`: current project roadmap
 - `docs/wbs.md`: current work breakdown structure
 - `docs/issues/`: active issue dashboard, archive, and supporting issue notes
+- `docs/testing/`: testing workflow index, test plan, framework, local procedures, active dashboard, archive, and canonical test procedures
 - `docs/architecture/`: system boundaries, context, task lifecycle
 - `docs/decisions/`: architecture decisions
 - `docs/decisions/decision-backlog.md`: decision dashboard for pending and recently selected choices
@@ -107,8 +110,10 @@ This initialization package does **not** assume:
 5. Use `prompts/init-project.prompt.md` to initialize future agent runs
 6. Review `docs/issues/issue-dashboard.md` for active near-term project issues
 7. Read any supporting note linked from an active dashboard item under `docs/issues/items/`
-8. Review `docs/decisions/decision-backlog.md` for pending and recently selected decisions
-9. Update roadmap/WBS and issue/decision docs through their templates when scope changes
+8. Read `docs/testing/README.md` as the entrypoint to the local testing workflow
+9. Review `docs/testing/test-dashboard.md` for active near-term validation work and any referenced canonical test case under `docs/testing/items/`
+10. Review `docs/decisions/decision-backlog.md` for pending and recently selected decisions
+11. Update roadmap/WBS plus issue/testing/decision docs through their templates when scope changes
 
 ## Project-Local Dev Startup
 Phase 1 environment dependencies do not all need to be bundled inside the repository, but the current operator surface should still be startable from project-owned entrypoints.
@@ -146,8 +151,8 @@ docker build -f docker/worker-runtime/Dockerfile -t agent-sdlc-worker-runtime:te
 ```
 
 When `--seed-from .` is used, the local Gitea repo is seeded from the source repo's current `HEAD` into remote `main` so the local forge sees the same tracked workflow and platform files as the active workspace.
-If the local forge does not auto-create Actions runs for fresh PR events, the tracked workflow also supports `workflow_dispatch` so maintainers can manually dispatch `phase1-ci` against the proposal branch while the local trigger gap is being investigated.
+If a local regression ever prevents auto-created Actions runs for fresh PR events, the tracked workflow also supports `workflow_dispatch` so maintainers can manually dispatch `phase1-ci` against the proposal branch during troubleshooting.
 
 The default local ports come from `config/dev/gitea-bootstrap.json` and are intentionally forwarded to higher, non-common host ports.
 
-See `docs/environment-bootstrap.md` for the current bootstrap posture and what each command covers.
+See `docs/environment-bootstrap.md` for the current bootstrap posture and what each command covers, then use `docs/testing/README.md` and `docs/testing/local-test-procedures.md` for the repeatable operator test flow.

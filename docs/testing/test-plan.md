@@ -1,0 +1,111 @@
+# Test Plan
+
+## Document Metadata
+- Version: 0.1
+- Status: Active
+- Last Updated: 2026-04-21
+- Owner: Project Maintainer
+
+## Purpose
+This document defines the stable local testing scope for the Phase 1 closed-loop implementation.
+
+It answers:
+- what must be tested locally
+- which execution modes matter
+- which default local data and credentials the operator should expect
+- what counts as a useful validation pass
+
+Use `docs/testing/README.md` as the navigation entrypoint for this workflow.
+
+## Goals
+- give maintainers one stable local test plan for the current Phase 1 closed loop
+- make CLI replay, half-live, and full-live validation paths explicit
+- keep test scope aligned to the current roadmap and WBS
+- support repeatable manual observation of intake, runtime, proposal, CI, and review behavior
+
+## Non-Goals
+- replacing CI as the independent verifier
+- defining a production-grade automated test platform in Phase 1
+- mirroring every individual workflow run or shell session in repository docs
+
+## Scope
+This plan currently covers local validation of the Phase 1 closed loop for:
+- issue-comment intake
+- task normalization and session start
+- runtime workspace preparation
+- branch and PR proposal creation
+- CI verification linkage
+- review-follow-up and PR close/reopen synchronization
+
+## Related Phase And WBS
+- Related Phase: `docs/roadmap.md` Phase 1
+- Primary WBS: `docs/wbs.md` WBS `3`, `3.1`, `3.2`, `3.3`, `3.4`, `3.5`, `3.6`, `3.7`
+
+## Environment Matrix
+| Environment / Mode | Purpose | Primary Entry Point | Typical Evidence |
+|---|---|---|---|
+| CLI replay | inspect normalization and session handoff without depending on live webhook delivery | `node scripts/task-gateway.js ...`; `node scripts/agent-control.js ...` | task-request JSON, session JSON, runtime artifacts |
+| CLI half-live | exercise real local Gitea proposal and traceability surfaces with direct operator commands | `node scripts/proposal-surface.js ...`; `node scripts/review-surface.js ...` | PR body, traceability JSON, local Actions runs |
+| GUI live | exercise the real local operator workflow through Gitea UI | Gitea web UI at `http://localhost:43000/` | issue/comment history, PR UI, Actions UI, review or close/reopen state |
+| CI-linked validation | confirm independent verifier behavior on the PR path | local Gitea Actions runner plus `.gitea/workflows/phase1-ci.yml` | workflow runs, verification metadata, PR traceability updates |
+
+## Default Local Test Data
+These defaults assume the tracked local bootstrap config is being used without environment overrides.
+
+| Field | Value | Notes |
+|---|---|---|
+| Gitea UI base URL | `http://localhost:43000/` | default local forge UI |
+| Gitea admin user | `agent-admin` | bootstrap-managed admin account |
+| Gitea admin password | `agent-dev-password` | from `config/dev/gitea-bootstrap.json` |
+| Working operator user | `howard` | created by `ensure-local-gitea-repo` when missing |
+| Working operator password | `agent-dev-password` | defaults to the local Gitea admin password unless `AGENT_SDLC_LOCAL_GITEA_USER_PASSWORD` overrides it |
+| Default local repo | `howard/agent-sdlc` | ensured during bootstrap |
+| Default branch | `main` | tracked bootstrap default |
+| Issue-comment command | `@agent run code` plus `summary:` | see `docs/policies/task-intake.md` |
+| Issue-comment listener | `http://127.0.0.1:4010/hooks/gitea/issue-comment` | health or local direct-post observation path |
+| Review-follow-up listener | `http://127.0.0.1:4011/hooks/gitea/pull-request-review` | health or local direct-post observation path |
+| Review callback host | `host.docker.internal` | default forge-to-host callback target |
+| Runner container | `agent-sdlc-gitea-runner` | local Gitea Actions runner |
+
+## Entry Criteria
+Before running the current local regression pack:
+- Docker is available and the local daemon is reachable
+- `npm install` has completed at least once in the workspace
+- `powershell -ExecutionPolicy Bypass -File scripts/dev/manage-dev-environment.ps1 -Command up` succeeds
+- `npm run dev:gitea-runner -- ensure-runner` reports an online local runner when CI-linked validation is in scope
+- the default local repo `howard/agent-sdlc` exists
+
+## Exit Criteria
+The current local validation window is considered healthy when:
+- canonical CLI replay procedures still produce stable task and session records
+- proposal and traceability procedures still produce a real PR plus linked metadata
+- the local CI workflow still produces a visible Actions run for the proposal path
+- at least one live GUI-driven follow-up path can refresh durable traceability without manual replay
+- any new or reopened live-gap item is explicitly tracked in `docs/testing/test-dashboard.md` and, when needed, in `docs/issues/issue-dashboard.md`
+
+## Canonical Regression Pack
+| Test ID | Title | Mode | Objective |
+|---|---|---|---|
+| `TC-001` | CLI Replay Intake And Session Smoke | CLI replay | verify normalization, task persistence, and direct session start |
+| `TC-002` | CLI Proposal And Traceability Smoke | CLI half-live | verify proposal creation, traceability writeback, and direct review sync entrypoints |
+| `TC-003` | GUI Full Live Issue-Comment Smoke | GUI live | verify the operator-facing happy path from live issue comment through PR, CI, and follow-up review/close behavior |
+
+## Cadence And Triggers
+Run the relevant local regression cases when:
+- `scripts/task-gateway.js`, `scripts/agent-control.js`, `scripts/proposal-surface.js`, or `scripts/review-surface.js` change
+- local bootstrap config or Gitea callback settings change
+- CI workflow files or runner topology change
+- an issue or dashboard item identifies a new closed-loop regression risk
+
+## Evidence Handling
+The current local test plan expects evidence to remain in:
+- `.agent-sdlc/state/`
+- `.agent-sdlc/runtime/`
+- `.agent-sdlc/traceability/`
+- control-host webhook logs under `.agent-sdlc/dev-env/control-host/logs/`
+- Gitea UI and Actions history
+
+The testing dashboard should summarize near-term attention items, while canonical case notes hold the repeatable procedures.
+
+## Change Log
+- 2026-04-21: Initial version.

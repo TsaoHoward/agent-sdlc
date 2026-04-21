@@ -307,6 +307,10 @@ function buildEnsureRunnerResult(
   };
 }
 
+function isRunnerOnline(runnerState) {
+  return !!runnerState && String(runnerState.status || "").toLowerCase() === "online";
+}
+
 async function findRunner(settings) {
   const runners = await requestJson(settings, {
     method: "GET",
@@ -330,15 +334,17 @@ async function ensureRunner(repoRoot) {
   if (existingStatus === "running") {
     const currentNetworkMode = getContainerNetworkMode(DEFAULT_RUNNER_CONTAINER);
     const currentInstanceUrl = getContainerEnvValue(DEFAULT_RUNNER_CONTAINER, "GITEA_INSTANCE_URL");
+    const currentRunnerState = await findRunner(settings);
     if (
       !runnerConfigState.changed &&
       !runnerRegistrationState.changed &&
       currentNetworkMode === runnerContainerNetwork &&
-      currentInstanceUrl === instanceUrl
+      currentInstanceUrl === instanceUrl &&
+      isRunnerOnline(currentRunnerState)
     ) {
       return buildEnsureRunnerResult(
         existingStatus,
-        await findRunner(settings),
+        currentRunnerState,
         runnerConfigState.containerNetwork,
         runnerContainerNetwork,
         instanceUrl,
@@ -390,7 +396,7 @@ async function ensureRunner(repoRoot) {
   const deadline = Date.now() + 30000;
   while (Date.now() < deadline) {
     runnerState = await findRunner(settings);
-    if (runnerState) {
+    if (isRunnerOnline(runnerState)) {
       break;
     }
     await new Promise((resolve) => {

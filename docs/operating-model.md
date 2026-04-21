@@ -35,6 +35,8 @@ This document defines how humans and agents collaborate in this repository.
 - `docs/wbs.md`
 - `docs/issues/issue-dashboard.md`
 - `docs/issues/items/*.md` when active issues need supporting notes
+- `docs/testing/test-dashboard.md`
+- `docs/testing/items/*.md` when active test cases need supporting notes
 - task-specific implementation notes if later added
 
 ### Documents that should change less often
@@ -61,6 +63,17 @@ This document defines how humans and agents collaborate in this repository.
 - meaningful active issues or blockers are created, split, merged, reframed, blocked, deferred, completed, or closed
 - a dashboard item needs an explicit exit path
 - a work item needs durable cross-run handoff context that does not belong only in chat
+
+### Update test dashboard when:
+- meaningful active validation items are created, reframed, blocked, failed, passed, deferred, or retired
+- a dashboard item needs an explicit next action or exit path
+- a local or GUI test procedure needs durable cross-run handoff context that does not belong only in chat
+
+### Update canonical test notes when:
+- a dashboard summary is no longer sufficient
+- exact CLI or GUI steps changed
+- default local data, credentials, repo names, or evidence paths changed
+- an active test item needs deeper reusable procedure detail than the dashboard should hold
 
 ### Update supporting issue notes when:
 - a dashboard summary is no longer sufficient
@@ -97,6 +110,7 @@ Agents should:
 - not treat recent chat context as the only authority
 - not implement broad product features during planning phases
 - use `docs/issues/issue-dashboard.md` as the durable dashboard for active near-term issue state
+- use `docs/testing/test-dashboard.md` as the durable dashboard for active near-term validation state
 - use `docs/decisions/decision-backlog.md` as the durable dashboard for near-term decision state
 
 ## 7. Early-Phase Bias

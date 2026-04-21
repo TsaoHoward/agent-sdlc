@@ -462,11 +462,15 @@ function normalizeTaskRequest(repoRoot, statePaths, envelope, sourcePayloadRef) 
   };
 }
 
-function startAgentSession(repoRoot, taskRequestPath) {
+function startAgentSession(repoRoot, taskRequestPath, options = {}) {
   const agentControlPath = path.join(repoRoot, "scripts", "agent-control.js");
+  const args = [agentControlPath, "start-session", "--task-request", taskRequestPath];
+  if (options.autoCreateProposal) {
+    args.push("--auto-create-proposal");
+  }
   const result = spawnSync(
     process.execPath,
-    [agentControlPath, "start-session", "--task-request", taskRequestPath],
+    args,
     {
       cwd: repoRoot,
       encoding: "utf8",
@@ -526,7 +530,9 @@ function handleNormalizeFromFile(repoRoot, eventPath, autoStartSession) {
 
   let sessionStartResult = null;
   if (autoStartSession && normalizeResult.approvalState === "auto-approved") {
-    sessionStartResult = startAgentSession(repoRoot, normalizeResult.taskRequestPath);
+    sessionStartResult = startAgentSession(repoRoot, normalizeResult.taskRequestPath, {
+      autoCreateProposal: true,
+    });
   }
 
   return buildAcceptedOutput(repoRoot, normalizeResult, sessionStartResult);
@@ -579,7 +585,9 @@ function startWebhookServer(repoRoot, options) {
 
         let sessionStartResult = null;
         if (options.autoStartSession && normalizeResult.approvalState === "auto-approved") {
-          sessionStartResult = startAgentSession(repoRoot, normalizeResult.taskRequestPath);
+          sessionStartResult = startAgentSession(repoRoot, normalizeResult.taskRequestPath, {
+            autoCreateProposal: true,
+          });
         }
 
         writeJsonResponse(

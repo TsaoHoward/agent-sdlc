@@ -1,9 +1,9 @@
 # Decision Backlog
 
 ## Document Metadata
-- Version: 0.4
+- Version: 0.5
 - Status: Active
-- Last Updated: 2026-04-15
+- Last Updated: 2026-04-21
 - Owner: Project Maintainer
 - Source Template: docs/templates/decision-backlog.template.md
 
@@ -50,3 +50,4 @@ No active major decision items are currently tracked here. Resolved major items 
 - 2026-04-14: Closed and moved out D-002, D-003, D-004, and D-006 after writing their selected defaults back into architecture and planning docs.
 - 2026-04-15: Moved the issue-document workflow choice directly to ADR-0005 and kept the active dashboard empty because no unresolved major decision remains.
 - 2026-04-15: Promoted the platform implementation stack and packaging baseline directly to ADR-0006 and kept the active dashboard empty because no unresolved major decision remains.
+- 2026-04-21: Promoted the testing workflow choice directly to ADR-0007 and kept the active dashboard empty because no unresolved major decision remains.

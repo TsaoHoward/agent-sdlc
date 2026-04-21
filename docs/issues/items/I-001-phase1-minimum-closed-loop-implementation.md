@@ -5,7 +5,7 @@
 - Status: In Progress
 - Last Updated: 2026-04-21
 - Owner: Project Maintainer
-- Related Docs / WBS: `docs/roadmap.md` Phase 1; `docs/wbs.md` WBS `3`, `3.1`, `3.2`, `3.3`, `3.4`, `3.5`, `3.6`
+- Related Docs / WBS: `docs/roadmap.md` Phase 1; `docs/wbs.md` WBS `3`, `3.1`, `3.2`, `3.3`, `3.4`, `3.5`, `3.6`, `3.7`
 - Source Dashboard: docs/issues/issue-dashboard.md
 - Source Template: docs/templates/issue-note.template.md
 
@@ -61,6 +61,22 @@ The repository is intentionally still in an early-phase, structure-first posture
   - `hook_task` rows for the review hook showed `webhook can only call allowed HTTP servers` while dialing `host.docker.internal:4011`
   - the repo-owned bootstrap now sets `webhook.ALLOWED_HOST_LIST=external,private`, which admits the Docker-private callback address used by `host.docker.internal`
   - after restarting local Gitea with that setting, live PR `#6` close and reopen events created successful webhook deliveries in `hook_task`, refreshed `.agent-sdlc/traceability/trq-8a0f9df00705.json`, and updated the PR body through the bootstrap-managed review listener without manual replay
+- A same-day testing workflow follow-up then promoted local validation into a durable repo-owned surface:
+  - `docs/testing/test-plan.md` now defines the stable local test scope, environments, and default data
+  - `docs/testing/test-framework.md` now defines replay, half-live, and full-live execution modes plus write-back rules
+  - `docs/testing/local-test-procedures.md` now provides one operator-facing CLI and GUI walkthrough with concrete credentials, repo names, and observation points
+  - `docs/testing/test-dashboard.md`, `docs/testing/test-archive.md`, and canonical case notes under `docs/testing/items/` now preserve the current regression workflow and the current GUI-path understanding without leaving that knowledge only in issue notes or chat
+- A fresh 2026-04-21 GUI validation against issue `#7` then corrected that understanding:
+  - the live issue comment created task request `trq-21b5684940ee`
+  - the task gateway auto-started session `ags-923b5c3e7217`
+  - the session reached `runtime_handoff_status: workspace-prepared`
+  - no PR was created automatically from that live issue-comment path
+  - the current reproducible boundary is therefore live intake plus session preparation, followed by a manual `proposal-surface create-gitea-pr --session <path>` step when the operator wants to continue into proposal, CI, and review follow-up
+- A same-day strengthening pass then closed that GUI boundary and exposed the next narrower gap:
+  - `agent-control start-session` now supports automatic proposal continuation for the live issue-comment path, and `proposal-surface create-gitea-pr` now mirrors proposal traceability into the repo-root `.agent-sdlc/traceability/` state path as well as the session workspace copy
+  - after a full listener restart, a fresh live run on issue `#11` created task request `trq-bd85673302e7`, auto-started session `ags-335855297620`, auto-created PR `#12`, and wrote `.agent-sdlc/traceability/trq-bd85673302e7.json` without manual `proposal-surface` intervention
+  - `ensure-local-gitea-runner ensure-runner` now treats an `offline` runner as rebuild-worthy after forge restarts, which restored queued CI runs for PR `#12`
+  - the remaining narrower gap is now host-side canonical traceability convergence after CI success: the PR body updates to the successful run automatically, but the host root traceability file can still lag until a later host-side sync event such as review follow-up or manual proposal-based review refresh
 
 ## Dependencies And Constraints
 - Work should stay aligned to Phase 1 and WBS 3 rather than pulling Phase 2 observability or multi-source scope forward.
@@ -84,7 +100,8 @@ Steps 1 through 5 now have working implementation slices, with WBS 3.1 reaching 
 - keep the current control-plane growth path inside the npm-managed package baseline
 - keep the local forge seed path aligned to the active workspace `HEAD` so workflow and platform files match the code under test
 - keep runtime workspace preparation sourced from the forge target repository and target branch so proposal heads inherit active workflow files and other forge-truth content
-- keep the current explicit review-outcome sync surface aligned with the traceability contract and validate the remaining live issue-comment portion of the default-bootstrap happy path end to end
+- keep the current explicit review-outcome sync surface aligned with the traceability contract and close the remaining host-side canonical traceability convergence gap after CI success
+- keep the new testing workflow baseline aligned with the active command surface, local credentials, and evidence paths as the Phase 1 closed loop evolves
 - treat the now-resolved PR-trigger / branch-dispatch gap as a content-source problem unless a narrower follow-up repro shows a remaining forge-level trigger defect
 - investigate local artifact listing visibility only if operator-facing browsing of stored workflow artifacts becomes a near-term requirement
 - do that without collapsing task gateway, agent control, worker, forge proposal, and CI responsibilities together
@@ -97,7 +114,9 @@ This issue exits the active dashboard when the first implementation slice is und
 If implementation uncovers a major unresolved decision, the issue should stay active until the decision is captured in `docs/decisions/decision-backlog.md` and, if needed, promoted to an ADR.
 
 ## Next Actions
-- validate the now-wired default bootstrap path from live issue-comment intake through proposal/CI/review without manual normalization or replay steps
+- rerun and maintain the canonical CLI and GUI procedures under `docs/testing/` when intake, runtime, proposal, CI, review, or bootstrap behavior changes
+- keep the strengthened live issue-comment path in place now that it auto-creates the proposal and root traceability file
+- close the remaining host-side canonical traceability sync gap so `.agent-sdlc/traceability/<task_request_id>.json` converges automatically after CI success without waiting for a later host-side sync event
 - keep the forge-repository runtime clone path in place and reseed local forge `main` from current `HEAD` before local proposal-flow validation when the operator is testing unpushed changes
 - investigate local artifact listing visibility only if operator-facing browsing of stored workflow artifacts becomes necessary
 - expand the current project-local bootstrap entrypoints as those WBS 3 interfaces become real services or commands
@@ -126,3 +145,7 @@ If implementation uncovers a major unresolved decision, the issue should stay ac
 - 2026-04-21: Recorded the default-bootstrap integration that now starts both managed webhook listeners and ensures the default local repo hook set points at those control-host callbacks.
 - 2026-04-21: Recorded the fresh PR `#6` e2e validation pass, the CI-preservation fix in proposal-based review sync, and the follow-up gap that local Gitea host callbacks still needed webhook-allowlist support.
 - 2026-04-21: Recorded the local Gitea webhook-allowlist fix and the successful live PR `#6` close/reopen deliveries that reached the bootstrap-managed review listener automatically.
+- 2026-04-21: Recorded the repo-owned testing workflow baseline, including the test plan, framework, canonical case notes, active test dashboard, and archive for the Phase 1 regression workflow.
+- 2026-04-21: Reframed the testing follow-up after the same-day local e2e pass confirmed the full live issue-comment path and moved that proof into the durable testing workflow.
+- 2026-04-21: Corrected the GUI-path understanding after a fresh run on issue `#7` showed that live issue-comment handling currently stops at `workspace-prepared` and still needs manual proposal continuation.
+- 2026-04-21: Recorded the strengthened live issue-comment path on issue `#11`, the automatic proposal/root-traceability restoration, the runner offline-recovery fix after forge restart, and the remaining host-side canonical traceability convergence gap after CI success.

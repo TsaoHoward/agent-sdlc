@@ -39,6 +39,7 @@
 | 3.4 | PR Proposal Path | 3 | Phase 1 | branch/PR proposal flow with task/session linkage |
 | 3.5 | CI Verification Skeleton | 3 | Phase 1 | independent CI workflow with proposal/task linkage |
 | 3.6 | Lifecycle Traceability Scaffold | 3 | Phase 1 | minimal end-to-end traceability record |
+| 3.7 | Testing Workflow Baseline | 3 | Phase 1 | repeatable local test plan, dashboard, and canonical CLI/GUI procedures |
 | 4 | Controlled Expansion | - | Phase 2 | structured expansion without boundary collapse |
 | 4.1 | Additional Intake Paths | 4 | Phase 2 | more adapters |
 | 4.2 | Policy Pack Expansion | 4 | Phase 2 | richer policy definitions |
@@ -252,6 +253,16 @@
 - Status: Done
 - Notes: The first proposal-linked traceability artifact exists. `proposal-surface create-gitea-pr` writes `.agent-sdlc/traceability/<task_request_id>.json` into the proposal branch and records `proposal_ref` / `proposal_url` back into the session record. CI now extends that linkage by generating `.agent-sdlc/ci/verification-metadata.json`, reviewer-visible job-log and step-summary metadata, a linked traceability artifact enriched with `ci_run_ref`, workflow metadata, and final verification status, and a refreshed PR traceability block that shows whether the proposal is ready for human review. `review-surface sync-gitea-pr-review-outcome` now completes the minimum Phase 1 traceability path by syncing Gitea review decisions back into the canonical root traceability record, mirroring updates into session-local copies, and refreshing the PR body with explicit review decision and reviewer metadata. The same surface now also resolves proposal-linked syncs from file-backed review events or a dedicated review webhook listener so review follow-up no longer depends on a specific session path, and the local bootstrap now starts that review listener, ensures the default local repo is wired to the matching callback, and has been validated against live local PR close/reopen deliveries after the Gitea webhook allowlist was expanded for host callbacks.
 
+### WBS 3.7 — Testing Workflow Baseline
+- Parent: 3
+- Related Phase: Phase 1
+- Description: Establish a repeatable local testing workflow with durable planning, case-definition, and current-state tracking surfaces for the Phase 1 closed loop.
+- Deliverable: repo-owned local test plan, testing framework, active test dashboard, archive, and canonical CLI/GUI procedures
+- Dependencies: 3.1, 3.2, 3.4, 3.5, 3.6
+- Critical-Path-Candidate: Yes
+- Status: Done
+- Notes: The repo now has a stable testing workflow baseline under `docs/testing/`, including `test-plan.md`, `test-framework.md`, `local-test-procedures.md`, `test-dashboard.md`, `test-archive.md`, and canonical case notes under `docs/testing/items/`. The current testing workflow defines repeatable CLI replay, CLI half-live, and GUI full-live procedures for the Phase 1 closed loop, tracks active near-term validation items separately from canonical cases, and records the default local Gitea credentials, repo name, URLs, evidence paths, and webhook-delivery debug surfaces needed for manual local verification.
+
 ### WBS 4 — Controlled Expansion
 - Parent:
 - Related Phase: Phase 2
@@ -355,6 +366,7 @@
 | 3.4 | 3.1, 3.2, 3.3 | proposal path depends on intake, control, and runtime |
 | 3.5 | 2.4, 3.4 | CI path depends on proposal definition and working proposal path |
 | 3.6 | 2.5, 3.2, 3.4, 3.5 | traceability scaffold depends on designed identifiers and working lifecycle checkpoints |
+| 3.7 | 3.1, 3.2, 3.4, 3.5, 3.6 | the testing workflow baseline depends on a real closed-loop path worth validating and observing |
 | 4 | 3 | expansion should follow first working loop |
 | 5 | 4 | governance evolution should follow practical expansion experience |
 
@@ -378,6 +390,7 @@
 - 3.4
 - 3.5
 - 3.6
+- 3.7
 
 ## Open Questions
 - No current WBS-level open questions block WBS 3 start.
@@ -405,3 +418,4 @@
 - 2026-04-21: Updated WBS 3.6 after adding proposal-based review sync plus review-event replay/webhook entrypoints for automation-ready review follow-up.
 - 2026-04-21: Updated WBS 3.1 and 3.6 after wiring the default local bootstrap to start the managed issue-comment and review-follow-up listeners and to configure the default local repo hook set.
 - 2026-04-21: Updated WBS 3.1 and 3.6 after adding the local Gitea webhook allowlist needed for host callback delivery and validating live PR close/reopen webhook sync into the bootstrap-managed review listener.
+- 2026-04-21: Added WBS 3.7 for the durable local testing workflow baseline, including test plan, framework, dashboard, archive, and canonical CLI/GUI cases.

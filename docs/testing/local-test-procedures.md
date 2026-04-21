@@ -1,0 +1,334 @@
+# Local Test Procedures
+
+## Document Metadata
+- Version: 0.1
+- Status: Active
+- Last Updated: 2026-04-21
+- Owner: Project Maintainer
+
+## Purpose
+This document is the operator-facing walkthrough for manually testing the current Phase 1 closed loop.
+
+It gives one place to:
+- bring up the local environment
+- run CLI replay procedures
+- run GUI-driven live procedures
+- observe each stage of the lifecycle
+- use stable local credentials and repo names without rediscovering them
+
+See also:
+- `docs/testing/README.md`
+- `docs/testing/test-plan.md`
+- `docs/testing/test-framework.md`
+- `docs/testing/test-dashboard.md`
+- `docs/testing/items/`
+
+## Recommended Run Order
+Use this sequence when you want a full operator-facing regression pass:
+1. complete Environment Bring-Up
+2. run CLI Procedure A to confirm intake and session-start boundaries
+3. run CLI Procedure B to confirm proposal and traceability surfaces
+4. run GUI Procedure C to confirm the live Gitea experience
+5. write any new gap back into `docs/testing/test-dashboard.md`
+
+You may also run any procedure independently when you only need one layer.
+
+## Latest Known Reference
+The latest reproducible local full-flow reference is:
+- issue: `howard/agent-sdlc#11`
+- task request: `trq-bd85673302e7`
+- session: `ags-335855297620`
+- proposal PR: `#12`
+- CI evidence: successful `pull_request_sync` run `#31`
+- follow-up evidence: successful PR close/reopen webhook refresh through the bootstrap-managed review listener
+
+Current nuance:
+- the strengthened listener path now auto-creates the proposal and root traceability file from the live issue-comment path
+- after CI success, the reviewer-facing PR body converges automatically
+- the host root traceability file can still lag behind CI completion until a later host-side sync event such as review follow-up or a manual `review-surface` refresh
+
+## Stable Local Test Data
+These defaults assume the tracked local bootstrap config is active and no environment overrides have changed the values.
+
+| Item | Value | Notes |
+|---|---|---|
+| Gitea UI base URL | `http://localhost:43000/` | local forge UI |
+| Gitea login page | `http://localhost:43000/user/login` | use when the UI does not already show a sign-in form |
+| Admin username | `agent-admin` | bootstrap-managed admin |
+| Admin password | `agent-dev-password` | from `config/dev/gitea-bootstrap.json` |
+| Operator username | `howard` | created by `ensure-local-gitea-repo` if missing |
+| Operator password | `agent-dev-password` | defaults to the same password as the admin account |
+| Default local repo | `howard/agent-sdlc` | ensured by bootstrap |
+| Default branch | `main` | tracked repo default |
+| Task-intake health URL | `http://127.0.0.1:4010/hooks/gitea/issue-comment` | `GET` returns `405`, which still proves the listener is up |
+| Review-follow-up health URL | `http://127.0.0.1:4011/hooks/gitea/pull-request-review` | `GET` returns `405`, which still proves the listener is up |
+| Review callback host | `host.docker.internal` | used by local Gitea callbacks |
+| Runner container | `agent-sdlc-gitea-runner` | local Actions runner |
+
+If the `howard` account does not exist or cannot log in, rerun:
+
+```powershell
+npm run dev:gitea-repo -- ensure-local-repo --owner howard --repo agent-sdlc --seed-from .
+```
+
+## Environment Bring-Up
+Run these commands from the repository root:
+
+```powershell
+npm install
+powershell -ExecutionPolicy Bypass -File scripts/dev/manage-dev-environment.ps1 -Command up
+npm run dev:gitea-runner -- ensure-runner
+powershell -ExecutionPolicy Bypass -File scripts/dev/manage-dev-environment.ps1 -Command status
+```
+
+Expected posture:
+- local Gitea is running at `http://localhost:43000/`
+- task gateway webhook is running on port `4010`
+- review-follow-up webhook is running on port `4011`
+- the default repo `howard/agent-sdlc` exists in local Gitea
+- the local Actions runner is online
+
+## Observation Map
+Use these surfaces to observe each stage of the lifecycle:
+
+| Stage | What To Look At | Example Command Or Surface |
+|---|---|---|
+| bootstrap health | overall environment status | `powershell -ExecutionPolicy Bypass -File scripts/dev/manage-dev-environment.ps1 -Command status` |
+| issue webhook intake | task-gateway listener activity | `.agent-sdlc/dev-env/control-host/logs/task-gateway-webhook.stdout.log` |
+| source event retention | retained raw webhook evidence | `.agent-sdlc/state/source-events/` |
+| normalized task | latest task-request JSON | `.agent-sdlc/state/task-requests/` |
+| session start | latest session JSON | `.agent-sdlc/state/agent-sessions/` |
+| runtime workspace | workspace and launch artifacts | `.agent-sdlc/runtime/` |
+| proposal surface | PR UI and traceability file | local Gitea PR page plus `.agent-sdlc/traceability/` |
+| CI linkage | Actions UI and verification metadata | local Gitea Actions page plus `.agent-sdlc/ci/verification-metadata.json` |
+| review follow-up | review-surface listener log and PR body | `.agent-sdlc/dev-env/control-host/logs/review-surface-webhook.stdout.log` plus PR UI |
+| deep webhook debug | local Gitea hook-task rows | PostgreSQL query against `hook_task` |
+
+Useful PowerShell helpers for inspecting the latest records:
+
+```powershell
+$latestTask = Get-ChildItem .agent-sdlc/state/task-requests/*.json | Sort-Object LastWriteTime -Descending | Select-Object -First 1
+$latestSession = Get-ChildItem .agent-sdlc/state/agent-sessions/*.json | Sort-Object LastWriteTime -Descending | Select-Object -First 1
+$latestTraceability = Get-ChildItem .agent-sdlc/traceability/*.json | Sort-Object LastWriteTime -Descending | Select-Object -First 1
+
+Get-Content $latestTask.FullName
+Get-Content $latestSession.FullName
+Get-Content $latestTraceability.FullName
+```
+
+Optional deep webhook debug:
+
+```powershell
+docker exec agent-sdlc-gitea-db psql -U gitea -d gitea -P pager=off -c "select id, hook_id, event_type, is_succeed, left(coalesce(response_content,''), 240) as response_prefix from hook_task order by id desc limit 10;"
+```
+
+## CLI Procedure A - Replay Intake And Session
+Canonical case: `TC-001`
+
+1. Confirm the environment is up, or at minimum run:
+
+```powershell
+powershell -ExecutionPolicy Bypass -File scripts/dev/manage-dev-environment.ps1 -Command up -SkipGitea
+```
+
+2. Normalize the tracked example issue-comment event:
+
+```powershell
+node scripts/task-gateway.js normalize-gitea-issue-comment --event docs/examples/gitea-issue-comment-event.example.json
+```
+
+3. Inspect the newest task-request record:
+
+```powershell
+$latestTask = Get-ChildItem .agent-sdlc/state/task-requests/*.json | Sort-Object LastWriteTime -Descending | Select-Object -First 1
+Get-Content $latestTask.FullName
+```
+
+4. Start a session from that task request:
+
+```powershell
+node scripts/agent-control.js start-session --task-request $latestTask.FullName
+```
+
+5. Inspect the newest session record and runtime artifacts:
+
+```powershell
+$latestSession = Get-ChildItem .agent-sdlc/state/agent-sessions/*.json | Sort-Object LastWriteTime -Descending | Select-Object -First 1
+Get-Content $latestSession.FullName
+Get-ChildItem .agent-sdlc/runtime -Recurse
+```
+
+What to observe:
+- a new task request appears under `.agent-sdlc/state/task-requests/`
+- the task request contains `task_request_id`, `task_class`, `execution_profile_id`, and `approval_state`
+- a new session appears under `.agent-sdlc/state/agent-sessions/`
+- runtime workspace and artifact paths appear under `.agent-sdlc/runtime/`
+
+## CLI Procedure B - Proposal And Traceability
+Canonical case: `TC-002`
+
+1. Ensure the local forge and runner are up:
+
+```powershell
+powershell -ExecutionPolicy Bypass -File scripts/dev/manage-dev-environment.ps1 -Command up
+npm run dev:gitea-runner -- ensure-runner
+```
+
+2. If needed, reseed and re-ensure the default local repo:
+
+```powershell
+npm run dev:gitea-repo -- ensure-local-repo --owner howard --repo agent-sdlc --seed-from .
+```
+
+3. Reuse the latest session from Procedure A, or create a fresh one, then create a PR:
+
+```powershell
+$latestSession = Get-ChildItem .agent-sdlc/state/agent-sessions/*.json | Sort-Object LastWriteTime -Descending | Select-Object -First 1
+node scripts/proposal-surface.js create-gitea-pr --session $latestSession.FullName
+```
+
+4. Inspect the newest traceability file:
+
+```powershell
+$latestTraceability = Get-ChildItem .agent-sdlc/traceability/*.json | Sort-Object LastWriteTime -Descending | Select-Object -First 1
+Get-Content $latestTraceability.FullName
+```
+
+5. Open the PR URL from the traceability file in the local Gitea UI and observe the `## Agent Traceability` block.
+
+6. When you want to refresh review state directly from the proposal without replaying a webhook, run:
+
+```powershell
+node scripts/review-surface.js sync-gitea-pr-review-outcome --proposal gitea:localhost:43000/howard/agent-sdlc#pull/<index>
+```
+
+What to observe:
+- `proposal_ref` and `proposal_url` are present in the traceability file
+- the PR body includes task request, session, source, execution profile, CI, and review status fields
+- if no human review exists yet, the review block remains in an awaiting state rather than failing silently
+
+## GUI Procedure C - Full Live Issue-Comment To PR Follow-Up
+Canonical case: `TC-003`
+
+This is the operator-facing walkthrough for the current GUI live path.
+
+### Part 1 - Sign In And Prepare The Repo
+1. Open `http://localhost:43000/user/login`.
+2. Sign in as the normal operator:
+   - Username: `howard`
+   - Password: `agent-dev-password`
+3. Open the repo at `http://localhost:43000/howard/agent-sdlc`.
+4. If the repo is missing, stop and run:
+
+```powershell
+npm run dev:gitea-repo -- ensure-local-repo --owner howard --repo agent-sdlc --seed-from .
+```
+
+### Part 2 - Create A Live Issue Comment Task
+1. In the repo UI, open the `Issues` tab.
+2. Create a new issue with a distinct title such as:
+   - `TC-003 full live issue-comment smoke 20260421-001`
+3. After the issue is created, add this exact comment:
+
+```text
+@agent run code
+summary: TC-003 full live issue-comment smoke
+```
+
+4. Immediately observe the task-gateway log locally:
+
+```powershell
+Get-Content .agent-sdlc/dev-env/control-host/logs/task-gateway-webhook.stdout.log
+```
+
+5. Inspect the newest task and session records:
+
+```powershell
+$latestTask = Get-ChildItem .agent-sdlc/state/task-requests/*.json | Sort-Object LastWriteTime -Descending | Select-Object -First 1
+$latestSession = Get-ChildItem .agent-sdlc/state/agent-sessions/*.json | Sort-Object LastWriteTime -Descending | Select-Object -First 1
+Get-Content $latestTask.FullName
+Get-Content $latestSession.FullName
+```
+
+Expected behavior:
+- the issue comment produces a retained source event
+- a new task request is written
+- a session starts automatically for the auto-approved task class
+
+### Part 3 - Observe Proposal And CI
+Current Phase 1 behavior:
+- the live issue comment auto-creates the task request
+- the live issue comment auto-starts the session
+- the strengthened listener path now auto-creates the proposal PR and root traceability file
+
+Then:
+1. In the repo UI, open the `Pull Requests` tab.
+2. Open the newest PR whose title starts with `agent:`.
+3. Confirm the PR body contains the `## Agent Traceability` block.
+4. Open the `Actions` tab for the repo, or the PR-linked run surface, and wait for the PR run to appear.
+5. Confirm the PR body eventually shows a CI run reference instead of staying empty.
+
+Optional local inspection:
+
+```powershell
+$latestTraceability = Get-ChildItem .agent-sdlc/traceability/*.json | Sort-Object LastWriteTime -Descending | Select-Object -First 1
+Get-Content $latestTraceability.FullName
+```
+
+Expected behavior:
+- the newest session record includes `proposal_ref` and `proposal_url`
+- the newest root traceability file includes proposal metadata immediately after PR creation
+- the PR body converges to the latest CI result automatically
+
+Current nuance:
+- the host root traceability file may still show pre-CI state until a later host-side sync event occurs
+- if you need to refresh that canonical host-side record immediately after CI completes, run:
+
+```powershell
+node scripts/review-surface.js sync-gitea-pr-review-outcome --proposal gitea:localhost:43000/howard/agent-sdlc#pull/<index>
+```
+
+### Part 4 - Observe Live Follow-Up Behavior
+Use at least one live follow-up action from the PR UI.
+
+The currently validated local proof path is:
+- close the PR
+- reopen the PR
+
+Steps:
+1. In the open PR UI, use the PR state control to close the PR.
+2. Wait a few seconds, then reopen the same PR.
+3. Observe the review-follow-up listener log:
+
+```powershell
+Get-Content .agent-sdlc/dev-env/control-host/logs/review-surface-webhook.stdout.log
+```
+
+4. Re-open the newest traceability file:
+
+```powershell
+$latestTraceability = Get-ChildItem .agent-sdlc/traceability/*.json | Sort-Object LastWriteTime -Descending | Select-Object -First 1
+Get-Content $latestTraceability.FullName
+```
+
+Expected behavior:
+- local Gitea delivers the live PR close and reopen events to the bootstrap-managed review listener
+- `.agent-sdlc/traceability/<task_request_id>.json` updates automatically
+- the PR body refreshes automatically
+
+Optional additional check:
+- if you want to inspect webhook delivery status directly, run the `hook_task` query from the Observation Map section and confirm the newest rows for the review hook show `is_succeed = true`
+
+## Cleanup
+After local testing, you may leave the environment running, or shut it down:
+
+```powershell
+powershell -ExecutionPolicy Bypass -File scripts/dev/manage-dev-environment.ps1 -Command down
+```
+
+PRs and issues created for local smoke tests may be left as evidence during the current validation window, then closed or cleaned up during the next maintenance pass.
+
+## Change Log
+- 2026-04-21: Initial version.
+- 2026-04-21: Reframed the GUI procedure after a fresh issue-comment validation showed that the current default path stops at `workspace-prepared` and still requires a manual `proposal-surface` step to create the PR.
+- 2026-04-21: Updated the GUI procedure after the strengthened listener path restored automatic proposal creation from live issue comments and narrowed the remaining gap to host-side canonical traceability refresh after CI.
