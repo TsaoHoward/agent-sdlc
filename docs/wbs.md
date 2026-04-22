@@ -41,6 +41,7 @@
 | 3.6 | Lifecycle Traceability Scaffold | 3 | Phase 1 | minimal end-to-end traceability record |
 | 3.7 | Testing Workflow Baseline | 3 | Phase 1 | repeatable local test plan, dashboard, and canonical CLI/GUI procedures |
 | 3.8 | User Capability Matrix | 3 | Phase 1 | durable user-facing matrix for supported `@agent` and operator workflows |
+| 3.9 | Minimal Real Agent Execution | 3 | Phase 1 | one provider-backed bounded execution path for a supported task class |
 | 4 | Controlled Expansion | - | Phase 2 | structured expansion without boundary collapse |
 | 4.1 | Additional Intake Paths | 4 | Phase 2 | more adapters |
 | 4.2 | Policy Pack Expansion | 4 | Phase 2 | richer policy definitions |
@@ -274,6 +275,16 @@
 - Status: Done
 - Notes: The repo now has a dedicated user capability matrix at `docs/user-capability-matrix.md` that ties the project vision to the current Phase 1 implementation packaging. The document separates live `@agent` entrypoints, manual operator commands, unsupported surfaces, current lifecycle coverage, and durable evidence surfaces so future changes to intake, proposal, CI, or review flow can update one current-state document instead of relying on scattered issue notes or chat summaries.
 
+### WBS 3.9 — Minimal Real Agent Execution
+- Parent: 3
+- Related Phase: Phase 1
+- Description: Implement one real provider-backed agent execution path for a single supported task class so the Phase 1 loop includes bounded AI-generated repository changes instead of only classification, runtime preparation, and proposal scaffolding.
+- Deliverable: one validated provider-backed execution path, expected to start with `bounded_code_change`, plus the supporting documentation and evidence needed to operate it repeatably
+- Dependencies: 3.2, 3.3, 3.4, 3.5, 3.6, 3.7, 3.8
+- Critical-Path-Candidate: Yes
+- Status: Not Started
+- Notes: This item intentionally deepens one task class before broadening intake surfaces or task-token coverage. The goal is to keep the Phase 1 slice narrow while making `agent-run change proposal` mean real bounded agent work inside the isolated runtime. Provider choice, tool surface, and context assembly should remain replaceable and may require follow-up decision tracking if the integration shape exposes a new architecture or governance boundary.
+
 ### WBS 4 — Controlled Expansion
 - Parent:
 - Related Phase: Phase 2
@@ -379,6 +390,7 @@
 | 3.6 | 2.5, 3.2, 3.4, 3.5 | traceability scaffold depends on designed identifiers and working lifecycle checkpoints |
 | 3.7 | 3.1, 3.2, 3.4, 3.5, 3.6 | the testing workflow baseline depends on a real closed-loop path worth validating and observing |
 | 3.8 | 1.2, 3.1, 3.2, 3.4, 3.5, 3.6, 3.7 | the capability matrix depends on both the planned user experience and the implemented lifecycle surfaces it describes |
+| 3.9 | 3.2, 3.3, 3.4, 3.5, 3.6, 3.7, 3.8 | the first real agent execution path depends on working session/runtime/proposal/verification handoffs plus current-state workflow and validation surfaces |
 | 4 | 3 | expansion should follow first working loop |
 | 5 | 4 | governance evolution should follow practical expansion experience |
 
@@ -404,6 +416,7 @@
 - 3.6
 - 3.7
 - 3.8
+- 3.9
 
 ## Open Questions
 - No current WBS-level open questions block WBS 3 start.
@@ -434,3 +447,4 @@
 - 2026-04-21: Added WBS 3.7 for the durable local testing workflow baseline, including test plan, framework, dashboard, archive, and canonical CLI/GUI cases.
 - 2026-04-22: Updated WBS 3.5 and 3.6 after landing the CI-to-host traceability callback path and validating automatic canonical/session-local convergence on seeded PR `#23`.
 - 2026-04-22: Added WBS 3.8 for the durable user capability matrix that ties live `@agent` entrypoints to the current Phase 1 lifecycle.
+- 2026-04-22: Added WBS 3.9 to make the first real provider-backed agent execution path an explicit Phase 1 work item instead of an implicit expectation.

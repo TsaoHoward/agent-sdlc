@@ -3,7 +3,7 @@
 ## Document Metadata
 - Version: 0.5
 - Status: Active
-- Last Updated: 2026-04-21
+- Last Updated: 2026-04-22
 - Owner: Project Maintainer
 - Source Template: docs/templates/decision-backlog.template.md
 
@@ -35,10 +35,16 @@ It is not an ADR. It tracks active, narrowed, recently selected, and deferred ma
 ## Dashboard
 | Decision ID | Title | Status | Related Docs / WBS | Next Action |
 |---|---|---|---|---|
-No active major decision items currently require operator attention.
+| D-009 | Phase 1 Minimal Real Agent Execution Shape | Open | `docs/roadmap.md` Phase 1; `docs/wbs.md` WBS `3.9` | Narrow the first provider/tooling/context shape for one supported task class without collapsing task gateway, agent control, runtime, and CI boundaries |
 
 ## Decision Items
-No active major decision items are currently tracked here. Resolved major items were moved to `docs/decisions/decision-archive.md`, and remaining field-level defaults live in the supporting design notes and architecture docs.
+### D-009 - Phase 1 Minimal Real Agent Execution Shape
+- Status: `Open`
+- Related Docs / WBS: `docs/roadmap.md` Phase 1; `docs/wbs.md` WBS `3.9`; `docs/architecture/agent-control-integration-plan.md`; `docs/architecture/runtime-isolation.md`
+- Why It Matters: Phase 1 now explicitly requires one real provider-backed agent execution slice, but the repo should still avoid turning one model/provider/tool surface into a hidden architecture decision.
+- Current State: The current Phase 1 loop reaches live intake, session startup, isolated runtime preparation, proposal PR creation, CI verification, and durable traceability. Task tokens currently influence classification and policy, but execution behavior remains scaffold-first rather than provider-backed real agent work.
+- Next Action: Decide the first supported task class, provider boundary, bounded tool surface, and evidence expectations for the first real execution slice. Promote to an ADR only if the chosen shape changes architecture boundaries, source-of-truth ownership, runtime isolation, or cross-cutting governance assumptions.
+- Exit Path: Move this item out once WBS `3.9` is either narrowed into implementation-ready defaults in existing docs or promoted to an ADR because the decision changes cross-cutting architecture/governance assumptions.
 
 ## Change Log
 - 2026-04-14: Initial version.
@@ -51,3 +57,4 @@ No active major decision items are currently tracked here. Resolved major items 
 - 2026-04-15: Moved the issue-document workflow choice directly to ADR-0005 and kept the active dashboard empty because no unresolved major decision remains.
 - 2026-04-15: Promoted the platform implementation stack and packaging baseline directly to ADR-0006 and kept the active dashboard empty because no unresolved major decision remains.
 - 2026-04-21: Promoted the testing workflow choice directly to ADR-0007 and kept the active dashboard empty because no unresolved major decision remains.
+- 2026-04-22: Added D-009 to track the still-open provider/tooling/context shape for the first real Phase 1 agent execution slice under WBS `3.9`.

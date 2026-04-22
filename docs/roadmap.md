@@ -119,6 +119,7 @@ Implement the smallest working path from task trigger to independently verified 
 - one traceability contract across lifecycle handoffs
 - one agent control integration
 - one isolated execution runtime
+- one minimal real agent execution path for one supported task class
 - one PR creation flow
 - one CI verification flow
 - one human review point
@@ -129,6 +130,7 @@ Implement the smallest working path from task trigger to independently verified 
 - normalized task request model with stable identifiers and policy references
 - agent session starter
 - isolated worker runtime scaffold
+- minimal real agent execution adapter for one supported task class
 - branch/PR proposal path
 - CI workflow skeleton
 - repeatable local testing workflow with canonical CLI and GUI cases plus a durable testing dashboard
@@ -142,6 +144,7 @@ Implement the smallest working path from task trigger to independently verified 
 
 ### Exit Criteria
 - a supported task trigger can produce a bounded agent-run change proposal
+- at least one supported task class produces repository changes through a real bounded agent execution path rather than only generic workspace/proposal scaffolding
 - CI validates the proposed change independently
 - human review remains the merge gate
 - maintainers can execute documented local CLI and GUI validation procedures and capture the resulting evidence without relying on transient chat context
@@ -273,3 +276,4 @@ This phase should only proceed when prior boundaries are understood and defended
 - 2026-04-15: Recorded the platform implementation-stack baseline for TypeScript/Node.js, npm, repo-owned Dockerfiles, and later compose packaging.
 - 2026-04-21: Expanded the Phase 1 deliverables and exit criteria to include a durable local testing workflow with canonical cases and active dashboard tracking.
 - 2026-04-22: Expanded the Phase 1 workflow packaging to include a durable user capability matrix linked to the live `@agent` entrypoints and current lifecycle coverage.
+- 2026-04-22: Clarified that Phase 1 is not complete until one supported task class reaches a minimal real agent execution path inside the bounded runtime.
