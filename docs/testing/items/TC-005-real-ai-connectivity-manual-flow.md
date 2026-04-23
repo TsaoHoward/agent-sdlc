@@ -2,7 +2,7 @@
 
 ## Metadata
 - Test ID: TC-005
-- Status: Passed
+- Status: In Progress
 - Last Updated: 2026-04-23
 - Owner: Project Maintainer
 - Mode: CLI half-live
@@ -27,10 +27,10 @@ It does not replace long-term automation.
 - Config source: ignored `config/agent-execution.yaml`
 - Provider: `deepseek` / `remote` / `deepseek-chat`
 - `@agent run code`: `trq-4faac7e2a74b` -> `ags-cd9d3e289f02` -> `PR #24` -> run `#45`
-- `@agent run docs`: `trq-2de69af748b1` -> `ags-0e18b7db5b88` -> `PR #25` -> run `#46`
-- `@agent run review`: `trq-2644a836e239` -> `ags-94e3f03d2f6b` -> `PR #26` -> run `#47`
-- `@agent run ci`: `trq-859264e0df7f` -> `ags-c742088383aa` -> `PR #27` -> run `#48`
-- Traceability convergence: all four proposals reached `review.status=ready-for-human-review` with `proposal_body_sync_status=synced`
+- `@agent run docs`: `trq-2de69af748b1` -> `ags-0e18b7db5b88` -> `PR #25` -> latest local run failed in `#46` after stale-branch finalize 401
+- `@agent run review`: `trq-2644a836e239` -> `ags-94e3f03d2f6b` -> `PR #26` -> latest local run failed in `#47` after stale-branch finalize 401
+- `@agent run ci`: `trq-859264e0df7f` -> `ags-c742088383aa` -> `PR #27` -> latest local run failed in `#48` after stale-branch finalize 401
+- Correction summary: local runs `#46`-`#49` showed the same stale-seeded-branch `Finalize CI Traceability` failure mode; forge `main` reseed plus proposal preflight has landed and multi-token manual-flow convergence is pending revalidation
 
 ## Preconditions
 - local environment and runner are up
@@ -92,3 +92,4 @@ Close or keep smoke-test PRs based on the current validation window and issue-da
 
 ## Change Log
 - 2026-04-23: Initial version.
+- 2026-04-23: Reopened after correcting local CI evidence for PRs `#25`-`#29`; stale forge-seeded proposal branches caused `Finalize CI Traceability` 401 failures in runs `#46`-`#49`, so post-fix multi-token manual-flow revalidation is required.

@@ -187,6 +187,8 @@ npm run dev:gitea-runner -- ensure-runner
 npm run dev:gitea-repo -- ensure-local-repo --owner howard --repo agent-sdlc --seed-from .
 ```
 
+If proposal creation fails with a stale-forge preflight message, run the reseed command above and retry with a fresh session.
+
 3. Reuse the latest session from Procedure A, or create a fresh one, then create a PR:
 
 ```powershell
@@ -255,9 +257,13 @@ agentExecution:
 
 Only enable this mode when the operator intends to spend API credits and validate real provider-backed edits. The latest provider-enabled validation now covers four task classes:
 - `bounded_code_change`: session `ags-cd9d3e289f02`, local PR `#24`, changed `docs/examples/provider-live-smoke.md`, passing revalidation run `#45`
-- `documentation_update`: session `ags-0e18b7db5b88`, local PR `#25`, changed `docs/examples/provider-docs-smoke.md`, passing run `#46`
-- `review_follow_up`: session `ags-94e3f03d2f6b`, local PR `#26`, changed `docs/examples/provider-review-smoke.md`, passing run `#47`
-- `ci_failure_investigation`: session `ags-c742088383aa`, local PR `#27`, changed `docs/examples/provider-ci-investigation-smoke.md`, passing run `#48`
+- `documentation_update`: session `ags-0e18b7db5b88`, local PR `#25`, changed `docs/examples/provider-docs-smoke.md` (fresh post-fix CI revalidation pending)
+- `review_follow_up`: session `ags-94e3f03d2f6b`, local PR `#26`, changed `docs/examples/provider-review-smoke.md` (fresh post-fix CI revalidation pending)
+- `ci_failure_investigation`: session `ags-c742088383aa`, local PR `#27`, changed `docs/examples/provider-ci-investigation-smoke.md` (fresh post-fix CI revalidation pending)
+
+Current correction:
+- local runs `#46`-`#49` failed at `Finalize CI Traceability` with `401 PATCH /pulls/*` because proposal branches were created from stale forge `main`
+- reseeding local forge `main` plus proposal preflight has now landed to prevent repeating the same failure mode
 
 When this path creates a proposal and CI runs, the workflow may finalize branch-local verification metadata before the host-side review-surface listener refreshes the PR body. This is expected when the CI checkout does not have ignored local Gitea credentials; reviewer-facing PR traceability should still converge through the CI-to-host callback or a direct `sync-gitea-proposal-traceability` run.
 
@@ -428,3 +434,4 @@ PRs and issues created for local smoke tests may be left as evidence during the 
 - 2026-04-23: Recorded the first provider-enabled `TC-004` session/proposal validation and the expected host-side PR body sync behavior.
 - 2026-04-23: Expanded the `TC-004` note with provider-enabled `documentation_update` evidence from session `ags-0e18b7db5b88`, PR `#25`, and run `#46`.
 - 2026-04-23: Added CLI Procedure E (`TC-005`) as the manual real-AI connectivity flow across `code`, `docs`, `review`, and `ci`.
+- 2026-04-23: Corrected CI evidence for runs `#46`-`#49` after identifying stale forge seeding as the failure root cause, and documented the new proposal stale-seed preflight behavior.

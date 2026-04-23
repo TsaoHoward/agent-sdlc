@@ -2,7 +2,7 @@
 
 ## Metadata
 - Test ID: TC-004
-- Status: Passed
+- Status: In Progress
 - Last Updated: 2026-04-23
 - Owner: Project Maintainer
 - Mode: CLI replay
@@ -36,24 +36,11 @@ It does not replace the full proposal, CI, or GUI live cases.
   - Changed file in session workspace: `docs/examples/provider-live-smoke.md`
   - Provider-requested validation: `npm run validate:platform` passed
   - CI/traceability note: local Actions run `#42` completed repository validation successfully but initially failed on direct PR body PATCH because the workflow checkout did not have ignored local Gitea credentials; the CI finalize path now defers that PR body refresh to host-side review-surface sync, and revalidation run `#45` completed successfully with the PR traceability block automatically refreshed to `CI: success` / `ready for human review`
-- `documentation_update` run:
-  - Task request: `trq-2de69af748b1`
-  - Session: `ags-0e18b7db5b88`
-  - Local proposal: `gitea:localhost:43000/howard/agent-sdlc#pull/25`
-  - Changed file in session workspace: `docs/examples/provider-docs-smoke.md`
-  - CI/traceability note: local Actions run `#46` completed successfully and host-side proposal traceability sync converged reviewer-facing PR status to `ready for human review`
-- `review_follow_up` run:
-  - Task request: `trq-2644a836e239`
-  - Session: `ags-94e3f03d2f6b`
-  - Local proposal: `gitea:localhost:43000/howard/agent-sdlc#pull/26`
-  - Changed file in session workspace: `docs/examples/provider-review-smoke.md`
-  - CI/traceability note: local Actions run `#47` completed successfully and proposal traceability sync converged to `ready for human review`
-- `ci_failure_investigation` run:
-  - Task request: `trq-859264e0df7f`
-  - Session: `ags-c742088383aa`
-  - Local proposal: `gitea:localhost:43000/howard/agent-sdlc#pull/27`
-  - Changed file in session workspace: `docs/examples/provider-ci-investigation-smoke.md`
-  - CI/traceability note: local Actions run `#48` completed successfully and proposal traceability sync converged to `ready for human review`
+- `documentation_update`, `review_follow_up`, and `ci_failure_investigation` follow-up runs were generated as local PRs `#25`, `#26`, and `#27`, but a same-day correction found those branches inherited stale forge `main` content and their local CI runs (`#46`-`#49`) failed at `Finalize CI Traceability` with `401 PATCH /pulls/*` from an older script revision.
+- Post-correction status:
+  - local forge `main` has been reseeded from current workspace `HEAD`
+  - proposal creation now fails fast with a reseed instruction when local forge `main` lags workspace `HEAD`
+  - the three non-`code` provider-enabled classes are pending fresh post-fix CI revalidation
 
 ## Preconditions
 - the workspace has `npm install` completed
@@ -113,5 +100,5 @@ Temporary smoke directories under `$env:TEMP` can be removed after inspection.
 ## Change Log
 - 2026-04-23: Initial version.
 - 2026-04-23: Marked provider-enabled validation passed after session `ags-cd9d3e289f02` created local proposal `PR #24` with DeepSeek-generated documentation and passed provider-requested validation.
-- 2026-04-23: Expanded latest known result to include provider-enabled `documentation_update` validation through session `ags-0e18b7db5b88`, local proposal `PR #25`, and CI run `#46`.
-- 2026-04-23: Expanded latest known result to include provider-enabled `review_follow_up` (`PR #26`, run `#47`) and `ci_failure_investigation` (`PR #27`, run `#48`).
+- 2026-04-23: Expanded latest known result to include provider-enabled proposals for `documentation_update`, `review_follow_up`, and `ci_failure_investigation` through PRs `#25`-`#27`.
+- 2026-04-23: Corrected CI evidence for PRs `#25`-`#29` after identifying stale forge seeding as the `Finalize CI Traceability` 401 root cause in runs `#46`-`#49`; reopened for fresh post-fix validation.

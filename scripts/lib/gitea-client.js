@@ -221,6 +221,15 @@ async function getRepository(settings, owner, repo, repositoryRef = null) {
   });
 }
 
+async function getRepositoryBranch(settings, owner, repo, branchName, repositoryRef = null) {
+  return requestJson(settings, {
+    method: "GET",
+    pathname: `api/v1/repos/${owner}/${repo}/branches/${encodeURIComponent(branchName)}`,
+    baseUrl: getForgeBaseUrl(settings, repositoryRef),
+    allowNotFound: true,
+  });
+}
+
 async function createRepositoryForUser(settings, owner, body) {
   return requestJson(settings, {
     method: "POST",
@@ -328,6 +337,7 @@ module.exports = {
   getForgeBaseUrl,
   getPullRequest,
   getRepository,
+  getRepositoryBranch,
   getUser,
   listRepositoryActionRuns,
   listPullReviews,

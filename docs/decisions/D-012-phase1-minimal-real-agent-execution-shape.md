@@ -479,9 +479,10 @@ A same-day follow-up kept the same boundaries while expanding coverage to `docum
 - task request `trq-2de69af748b1` started session `ags-0e18b7db5b88`
 - the configured DeepSeek adapter changed `docs/examples/provider-docs-smoke.md`
 - proposal creation surfaced local Gitea PR `#25`
-- CI run `#46` completed successfully and reviewer-facing traceability converged to `ready for human review`
+- CI linkage remained unstable in same-day local runs because proposal branches inherited stale forge-seeded workflow/script content
 
 The same boundary model then expanded to `review_follow_up` and `ci_failure_investigation`:
-- `review_follow_up`: task request `trq-2644a836e239`, session `ags-94e3f03d2f6b`, local PR `#26`, CI run `#47`
-- `ci_failure_investigation`: task request `trq-859264e0df7f`, session `ags-c742088383aa`, local PR `#27`, CI run `#48`
+- `review_follow_up`: task request `trq-2644a836e239`, session `ags-94e3f03d2f6b`, local PR `#26`
+- `ci_failure_investigation`: task request `trq-859264e0df7f`, session `ags-c742088383aa`, local PR `#27`
 - the investigation path now enforces docs-scoped edits to keep investigation output evidence-oriented
+- correction: recent local runs `#46`-`#49` failed at `Finalize CI Traceability` with `401 PATCH /pulls/*` from stale forge-seeded branch content, and the mitigation keeps architecture boundaries unchanged by reseeding local forge `main` and adding proposal preflight checks before branch push

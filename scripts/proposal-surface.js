@@ -5,10 +5,12 @@ const { spawnSync } = require("child_process");
 const {
   buildRepositoryUrls,
   createPullRequest,
+  getRepositoryBranch,
   getRepository,
   listPullRequests,
   loadLocalGiteaSettings,
   parseGiteaRepositoryRef,
+  readGiteaBootstrapConfig,
   updatePullRequest,
 } = require("./lib/gitea-client");
 const { ensureProjectState, getRepoRoot, toRepoRelativePath, writeJson } = require("./lib/project-state");
@@ -254,6 +256,78 @@ function writeTraceabilityStateArtifact(statePaths, taskRequest, artifact) {
   return absoluteArtifactPath;
 }
 
+function normalizePathForComparison(value) {
+  const resolved = path.resolve(value);
+  return process.platform === "win32" ? resolved.toLowerCase() : resolved;
+}
+
+function isDefaultSeededLocalRepo(repoRoot, bootstrapConfig, settings, repositoryInfo) {
+  const localRepoConfig = bootstrapConfig.localRepo || {};
+  const expectedHost = new URL(settings.baseUrl).host;
+
+  if (repositoryInfo.host !== expectedHost) {
+    return false;
+  }
+
+  if (localRepoConfig.owner !== repositoryInfo.owner || localRepoConfig.repo !== repositoryInfo.repo) {
+    return false;
+  }
+
+  const seedFrom = localRepoConfig.seedFrom || ".";
+  const resolvedSeedFrom = path.resolve(repoRoot, seedFrom);
+  return normalizePathForComparison(resolvedSeedFrom) === normalizePathForComparison(repoRoot);
+}
+
+function resolveWorkspaceHead(repoRoot) {
+  return runGit(repoRoot, ["rev-parse", "HEAD"]).stdout;
+}
+
+async function assertLocalForgeSeedFresh(repoRoot, settings, taskRequest, repositoryInfo) {
+  const { config: bootstrapConfig } = readGiteaBootstrapConfig(repoRoot);
+  const defaultBranch =
+    (bootstrapConfig.gitea && bootstrapConfig.gitea.defaultBranch) || "main";
+  const targetBranch = taskRequest.target_branch_ref || defaultBranch;
+
+  if (targetBranch !== defaultBranch) {
+    return null;
+  }
+
+  if (!isDefaultSeededLocalRepo(repoRoot, bootstrapConfig, settings, repositoryInfo)) {
+    return null;
+  }
+
+  const branch = await getRepositoryBranch(
+    settings,
+    repositoryInfo.owner,
+    repositoryInfo.repo,
+    targetBranch,
+    taskRequest.repository_ref,
+  );
+
+  if (!branch || !branch.commit || !branch.commit.id) {
+    throw new Error(
+      `Could not resolve remote branch head for '${repositoryInfo.owner}/${repositoryInfo.repo}:${targetBranch}'.`,
+    );
+  }
+
+  const workspaceHead = resolveWorkspaceHead(repoRoot);
+  const forgeBranchHead = branch.commit.id;
+  if (workspaceHead !== forgeBranchHead) {
+    const shortWorkspaceHead = workspaceHead.slice(0, 12);
+    const shortForgeHead = forgeBranchHead.slice(0, 12);
+    throw new Error(
+      `Local forge branch '${targetBranch}' for '${repositoryInfo.owner}/${repositoryInfo.repo}' is stale (forge=${shortForgeHead}, workspace=${shortWorkspaceHead}). Reseed before proposal creation: npm run dev:gitea-repo -- ensure-local-repo --owner ${repositoryInfo.owner} --repo ${repositoryInfo.repo} --seed-from .`,
+    );
+  }
+
+  return {
+    status: "up-to-date",
+    branch_ref: targetBranch,
+    forge_head_ref: forgeBranchHead,
+    workspace_head_ref: workspaceHead,
+  };
+}
+
 function findExistingPullRequest(pullRequests, owner, branchName, baseBranch) {
   return pullRequests.find((pullRequest) => {
     const headRef = pullRequest.head && pullRequest.head.ref;
@@ -406,6 +480,13 @@ async function main() {
       );
     }
 
+    const seedPreflight = await assertLocalForgeSeedFresh(
+      repoRoot,
+      settings,
+      taskRequest,
+      repositoryInfo,
+    );
+
     const branchName = buildBranchName(taskRequest);
     const basicAuthHeader = Buffer.from(`${settings.username}:${settings.password}`, "utf8").toString(
       "base64",
@@ -513,6 +594,7 @@ async function main() {
           proposal_url: proposalInfo.proposalUrl,
           proposal_title: proposalInfo.proposalTitle,
           branch_ref: branchName,
+          seed_preflight: seedPreflight,
           traceability_metadata_ref: stateTraceabilityRef,
           session_record_path: toRepoRelativePath(repoRoot, sessionRecordPath),
         },
