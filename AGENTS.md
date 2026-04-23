@@ -41,6 +41,7 @@ Before planning or implementation, read these files in order:
 5. Keep workflow, policy, and governance logic externalized whenever practical.
 6. Treat CI as an independent verifier, not as part of the agent itself.
 7. Treat deployment as separate from agent execution.
+8. For configurable modules, follow `docs/policies/configuration-management.md`: checked-in templates, ignored local config when values vary by operator/environment, and documented generation commands.
 
 ## Planning Rules
 - `docs/roadmap.md` must follow `docs/templates/roadmap.template.md`.
@@ -62,6 +63,7 @@ Create or update an ADR before implementation if the change affects:
 - CI ownership or verification model
 - deployment responsibility
 - cross-cutting policy or governance rules
+- repository-wide configuration template or local-config governance
 
 ## Drift Prevention Rules
 Before coding:

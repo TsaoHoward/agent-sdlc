@@ -73,7 +73,7 @@
 - Dependencies:
 - Critical-Path-Candidate: Yes
 - Status: Done
-- Notes:
+- Notes: ADR-0008 and `docs/policies/configuration-management.md` now define the repository-wide rule that configurable modules should use checked-in templates plus ignored local config when values may vary per operator or environment.
 
 ### WBS 1.2 — Planning Document Set
 - Parent: 1
@@ -450,3 +450,4 @@
 - 2026-04-22: Added WBS 3.9 to make the first real provider-backed agent execution path an explicit Phase 1 work item instead of an implicit expectation.
 - 2026-04-22: Narrowed WBS 3.9 toward a config-selected remote/local-capable execution adapter with `DeepSeek API` as the short-term remote default.
 - 2026-04-23: Moved WBS 3.9 to in progress after adding the first config-selected agent execution adapter slice and session evidence wiring.
+- 2026-04-23: Added ADR-0008-backed configuration template governance to WBS 1.4.

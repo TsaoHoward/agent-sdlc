@@ -75,6 +75,7 @@ Use these files as the primary planning sources of truth:
 - `docs/decisions/decision-backlog.md`: decision dashboard for pending and recently selected choices
 - `docs/issues/issue-dashboard.md`: issue dashboard for active near-term project issues and blockers
 - `docs/policies/`: intake, issue-management, and change-control rules
+- `docs/policies/configuration-management.md`: repository-wide config template and local-config policy
 - `docs/templates/`: formatting templates for AI-maintained planning docs
 - `prompts/init-project.prompt.md`: initialization prompt for Codex or similar agents
 
@@ -145,6 +146,7 @@ npm run validate:platform
 npm run typecheck
 npm run task-gateway:webhook
 npm run review-surface:webhook
+npm run dev:agent-execution-config
 npm run dev:gitea-repo -- ensure-local-repo --owner howard --repo agent-sdlc --seed-from .
 npm run dev:gitea-runner -- ensure-runner
 npm run proposal-surface -- create-gitea-pr --session .agent-sdlc/state/agent-sessions/<agent_session_id>.json

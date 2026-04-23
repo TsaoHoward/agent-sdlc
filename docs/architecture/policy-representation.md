@@ -151,6 +151,16 @@ Source-specific mapping should be split as follows:
 - adapter code owns raw webhook parsing, payload authentication, and source-specific field extraction
 - docs own the rationale for why those mappings and approvals exist
 
+### 7.1 Config Template Guidance
+Configurable modules should follow ADR-0008 and `docs/policies/configuration-management.md`.
+
+The default pattern is:
+- checked-in templates define safe defaults and schema shape
+- generated local config files carry operator-specific values and are ignored by Git when they may vary per environment
+- loaders prefer local config, then template, then emergency code defaults
+
+Machine-readable policy files under `config/policy/` are currently committed source-of-truth policy inputs, not generated local config. If a future policy unit needs operator-local overrides, it should add a template/local split explicitly rather than silently changing policy ownership.
+
 ## 8. Enforcement Points
 
 ### Task Gateway

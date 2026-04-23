@@ -24,6 +24,7 @@ Changes that modify:
 - system boundaries
 - source-of-truth ownership
 - policy ownership
+- configuration template or local-config governance
 - runtime isolation assumptions
 - CI or deploy ownership
 - replaceability assumptions
@@ -57,6 +58,7 @@ Return to roadmap/WBS/ADR review when:
 - a task adds a new control-plane assumption
 - a task changes which layer owns a responsibility
 - a task weakens replaceability between layers
+- a task changes whether module configuration is committed, generated, ignored, or template-backed
 - a task changes who verifies or deploys
 
 ## 4. Silent Drift Is Not Allowed

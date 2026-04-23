@@ -101,6 +101,7 @@ The repository is intentionally still in an early-phase, structure-first posture
 Steps 1 through 5 now have working implementation slices, with WBS 3.1 reaching a real trigger path, WBS 3.2/3.3 handing off into the worker image scaffold, WBS 3.4 creating a real Gitea proposal path, and WBS 3.5 exercising a real PR-triggered workflow on the local Gitea Actions path. The next packaging boundary is therefore narrower:
 - land one minimal real provider-backed agent execution slice for a supported task class before broadening intake surfaces or token-specific workflows
 - use a repo-owned API-oriented execution adapter that can switch between remote and local backends through configuration rather than hard-coding one provider into workflow orchestration
+- apply ADR-0008 for future configurable modules so templates are checked in and operator-local config is generated and ignored when values vary by environment
 - use `DeepSeek API` as the short-term remote default for that first execution slice while preserving a later local-backend path
 - keep the current control-plane growth path inside the npm-managed package baseline
 - keep the local forge seed path aligned to the active workspace `HEAD` so workflow and platform files match the code under test
@@ -167,3 +168,4 @@ If implementation uncovers a major unresolved decision, the issue should stay ac
 - 2026-04-22: Added the explicit packaging follow-up to land one real provider-backed agent execution slice in Phase 1, with `bounded_code_change` as the preferred first target.
 - 2026-04-22: Narrowed the first real execution slice toward a config-selected remote/local-capable adapter with `DeepSeek API` as the short-term remote default.
 - 2026-04-23: Recorded the first implementation slice for `config/agent-execution.template.yaml`, local generated `config/agent-execution.yaml`, `scripts/lib/agent-execution.js`, and session-record execution evidence.
+- 2026-04-23: Recorded the repository-wide configuration template policy from ADR-0008.

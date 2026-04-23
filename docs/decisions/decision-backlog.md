@@ -62,3 +62,4 @@ It is not an ADR. It tracks active, narrowed, recently selected, and deferred ma
 - 2026-04-22: Marked D-012 `Decided` after selecting a config-switched remote/local-capable adapter direction with `DeepSeek API` as the short-term remote default.
 - 2026-04-23: Renumbered the active execution-shape decision from D-009 to D-012 to avoid conflicting with archived D-009.
 - 2026-04-23: Recorded the first implementation defaults for config path, DeepSeek model, API key environment variable, and execution evidence artifact.
+- 2026-04-23: Promoted repository-wide configuration template and local-config handling directly to ADR-0008 and policy docs.

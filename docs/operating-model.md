@@ -92,6 +92,7 @@ This document defines how humans and agents collaborate in this repository.
 - architecture boundaries shift
 - replaceability assumptions shift
 - governance or control-plane assumptions shift
+- repository-wide configuration template or local-config rules change
 - verification or deployment ownership changes
 
 ### Update decision backlog when:
@@ -120,6 +121,7 @@ Agents should:
 - use `docs/issues/issue-dashboard.md` as the durable dashboard for active near-term issue state
 - use `docs/testing/test-dashboard.md` as the durable dashboard for active near-term validation state
 - use `docs/decisions/decision-backlog.md` as the durable dashboard for near-term decision state
+- follow `docs/policies/configuration-management.md` when adding configurable modules
 
 ## 7. Early-Phase Bias
 In early phases, prefer:
@@ -127,3 +129,4 @@ In early phases, prefer:
 - interfaces over deep implementation
 - scaffolding over heavy integration
 - replaceable adapters over direct lock-in
+- checked-in config templates plus ignored local config over ad hoc machine-specific settings
