@@ -68,13 +68,13 @@ This matrix therefore separates:
 | Operator Capability | Entry Point | What It Is Used For | Status | Related Docs |
 |---|---|---|---|---|
 | Replay issue-comment intake from file | `node scripts/task-gateway.js normalize-gitea-issue-comment --event <path>` | deterministic local intake debugging without live Gitea delivery | Implemented | `docs/testing/items/TC-001-cli-replay-intake-and-session-smoke.md` |
-| Run live issue-comment webhook listener | `node scripts/task-gateway.js serve-gitea-webhook ...` | local control-host intake endpoint for Gitea issue-comment delivery | Implemented | `docs/environment-bootstrap.md` |
+| Run live issue-comment webhook listener | `node scripts/task-gateway.js serve-configured-gitea-webhook` | local control-host intake endpoint for Gitea issue-comment delivery, configured from template/local bootstrap config | Implemented | `docs/environment-bootstrap.md` |
 | Start a session from a task request | `node scripts/agent-control.js start-session --task-request <path>` | direct session start from a normalized task request | Implemented | `docs/architecture/agent-control-integration-plan.md` |
 | Auto-create proposal during session start | `node scripts/agent-control.js start-session --task-request <path> --auto-create-proposal` | current live issue-comment continuation path for auto-approved requests | Implemented | `docs/testing/local-test-procedures.md` |
 | Create or refresh a proposal PR | `node scripts/proposal-surface.js create-gitea-pr --session <path>` | branch and PR proposal path from a prepared session workspace | Implemented | `docs/testing/items/TC-002-cli-proposal-and-traceability-smoke.md` |
 | Sync review outcome from a proposal | `node scripts/review-surface.js sync-gitea-pr-review-outcome --proposal <proposal_ref>` | refresh durable review state and PR traceability after review activity | Implemented | `docs/environment-bootstrap.md` |
 | Sync proposal traceability from a proposal | `node scripts/review-surface.js sync-gitea-proposal-traceability --proposal <proposal_ref>` | refresh canonical and session-local traceability copies for proposal/CI convergence or diagnostics | Implemented | `scripts/review-surface.js` |
-| Run review-follow-up webhook listener | `node scripts/review-surface.js serve-gitea-review-webhook ...` | accept PR review and PR state-change events for automatic traceability refresh | Implemented | `docs/environment-bootstrap.md` |
+| Run review-follow-up webhook listener | `node scripts/review-surface.js serve-configured-gitea-review-webhook` | accept PR review and PR state-change events for automatic traceability refresh, configured from template/local bootstrap config | Implemented | `docs/environment-bootstrap.md` |
 
 ## Current End-to-End User Flow
 For the current live Phase 1 `@agent` path, the implemented lifecycle is:

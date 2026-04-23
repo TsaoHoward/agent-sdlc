@@ -11,6 +11,7 @@ const {
   toRepoRelativePath,
   writeJson,
 } = require("./lib/project-state");
+const { readGiteaBootstrapConfig } = require("./lib/gitea-client");
 
 const DEFAULT_WEBHOOK_HOST = "127.0.0.1";
 const DEFAULT_WEBHOOK_PORT = 4010;
@@ -21,6 +22,7 @@ function printUsage() {
     [
       "Usage:",
       "  node scripts/task-gateway.js normalize-gitea-issue-comment --event <event-json-path> [--auto-start-session]",
+      "  node scripts/task-gateway.js serve-configured-gitea-webhook",
       "  node scripts/task-gateway.js serve-gitea-webhook [--host <host>] [--port <port>] [--route <path>] [--no-auto-start-session]",
     ].join("\n"),
   );
@@ -33,6 +35,17 @@ function parseArguments(argv) {
   }
 
   const command = argv[2];
+  if (command === "serve-configured-gitea-webhook") {
+    if (argv.length !== 3) {
+      printUsage();
+      process.exit(1);
+    }
+
+    return {
+      command,
+    };
+  }
+
   if (command === "normalize-gitea-issue-comment") {
     const options = {
       command,
@@ -113,6 +126,39 @@ function parseArguments(argv) {
 
   printUsage();
   process.exit(1);
+}
+
+function normalizeConfiguredRoute(route, fallbackRoute) {
+  const normalized = String(route || fallbackRoute || "").trim();
+  if (!normalized) {
+    return "/";
+  }
+
+  return normalized.startsWith("/") ? normalized : `/${normalized}`;
+}
+
+function resolveConfiguredWebhookOptions(repoRoot) {
+  const { config } = readGiteaBootstrapConfig(repoRoot);
+  const issueCommentWebhook =
+    (config.controlHost && config.controlHost.issueCommentWebhook) || {};
+
+  if (issueCommentWebhook.enabled === false) {
+    throw new Error("Configured issue-comment webhook is disabled in Gitea bootstrap config.");
+  }
+
+  const options = {
+    command: "serve-gitea-webhook",
+    host: issueCommentWebhook.host || DEFAULT_WEBHOOK_HOST,
+    port: Number(issueCommentWebhook.port || DEFAULT_WEBHOOK_PORT),
+    route: normalizeConfiguredRoute(issueCommentWebhook.route, DEFAULT_WEBHOOK_ROUTE),
+    autoStartSession: issueCommentWebhook.autoStartSession !== false,
+  };
+
+  if (!options.host || !options.route || !Number.isInteger(options.port) || options.port < 1) {
+    throw new Error("Configured issue-comment webhook host, port, or route is invalid.");
+  }
+
+  return options;
 }
 
 function sha256(value) {
@@ -643,6 +689,11 @@ function main() {
 
       console.log(JSON.stringify(result, null, 2));
       process.exit(2);
+    }
+
+    if (options.command === "serve-configured-gitea-webhook") {
+      startWebhookServer(repoRoot, resolveConfiguredWebhookOptions(repoRoot));
+      return;
     }
 
     if (options.command === "serve-gitea-webhook") {

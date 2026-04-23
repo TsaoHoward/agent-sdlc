@@ -7,6 +7,7 @@ const {
   listRepositoryActionRuns,
   listPullReviews,
   loadLocalGiteaSettings,
+  readGiteaBootstrapConfig,
   updatePullRequest,
 } = require("./lib/gitea-client");
 const { ensureProjectState, getRepoRoot, toRepoRelativePath, writeJson } = require("./lib/project-state");
@@ -31,6 +32,7 @@ function printUsage() {
       "  node scripts/review-surface.js sync-gitea-pr-review-outcome --session <agent-session-json-path>",
       "  node scripts/review-surface.js sync-gitea-pr-review-outcome --proposal <gitea:host/owner/repo#pull/index>",
       "  node scripts/review-surface.js sync-gitea-pr-review-event --event <event-json-path>",
+      "  node scripts/review-surface.js serve-configured-gitea-review-webhook",
       "  node scripts/review-surface.js serve-gitea-review-webhook [--host <host>] [--port <port>] [--route <path>]",
     ].join("\n"),
   );
@@ -43,6 +45,17 @@ function parseArguments(argv) {
   }
 
   const command = argv[2];
+  if (command === "serve-configured-gitea-review-webhook") {
+    if (argv.length !== 3) {
+      printUsage();
+      process.exit(1);
+    }
+
+    return {
+      command,
+    };
+  }
+
   if (command === "sync-gitea-proposal-traceability") {
     const options = {
       command,
@@ -177,6 +190,37 @@ function parseArguments(argv) {
 
   printUsage();
   process.exit(1);
+}
+
+function normalizeConfiguredRoute(route, fallbackRoute) {
+  const normalized = String(route || fallbackRoute || "").trim();
+  if (!normalized) {
+    return "/";
+  }
+
+  return normalized.startsWith("/") ? normalized : `/${normalized}`;
+}
+
+function resolveConfiguredReviewWebhookOptions(repoRoot) {
+  const { config } = readGiteaBootstrapConfig(repoRoot);
+  const reviewWebhook = (config.controlHost && config.controlHost.reviewWebhook) || {};
+
+  if (reviewWebhook.enabled === false) {
+    throw new Error("Configured review webhook is disabled in Gitea bootstrap config.");
+  }
+
+  const options = {
+    command: "serve-gitea-review-webhook",
+    host: reviewWebhook.host || DEFAULT_WEBHOOK_HOST,
+    port: Number(reviewWebhook.port || DEFAULT_WEBHOOK_PORT),
+    route: normalizeConfiguredRoute(reviewWebhook.route, DEFAULT_WEBHOOK_ROUTE),
+  };
+
+  if (!options.host || !options.route || !Number.isInteger(options.port) || options.port < 1) {
+    throw new Error("Configured review webhook host, port, or route is invalid.");
+  }
+
+  return options;
 }
 
 function utcNow() {
@@ -1062,6 +1106,11 @@ async function main() {
     const result = await handleSyncFromEvent(repoRoot, statePaths, options.eventPath);
     console.log(JSON.stringify(result, null, 2));
     process.exit(result.status === "ignored" ? 2 : 0);
+    return;
+  }
+
+  if (options.command === "serve-configured-gitea-review-webhook") {
+    startWebhookServer(repoRoot, resolveConfiguredReviewWebhookOptions(repoRoot));
     return;
   }
 

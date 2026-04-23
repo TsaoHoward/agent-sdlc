@@ -203,7 +203,7 @@
 - Dependencies: 2.1
 - Critical-Path-Candidate: Yes
 - Status: Done
-- Notes: A working Gitea issue-comment trigger path now exists. The repo-local task gateway still supports file-backed normalization for examples, and it now also exposes `node scripts/task-gateway.js serve-gitea-webhook ...` for actual webhook delivery, retained source-event evidence, normalized task-request persistence, and direct session-start handoff for auto-approved requests. The local bootstrap now starts the default task-gateway webhook listener, ensures the default local repo is wired to the matching issue-comment callback, and sets a local Gitea webhook allowlist that admits the Docker-private host callback used by `host.docker.internal`.
+- Notes: A working Gitea issue-comment trigger path now exists. The repo-local task gateway still supports file-backed normalization for examples, and it now also exposes `node scripts/task-gateway.js serve-configured-gitea-webhook` for actual webhook delivery using template/local bootstrap settings, retained source-event evidence, normalized task-request persistence, and direct session-start handoff for auto-approved requests. The local bootstrap now starts the default task-gateway webhook listener, ensures the default local repo is wired to the matching issue-comment callback, and sets a local Gitea webhook allowlist that admits the Docker-private host callback used by `host.docker.internal`.
 
 ### WBS 3.2 — Agent Session Starter
 - Parent: 3
@@ -452,3 +452,4 @@
 - 2026-04-23: Moved WBS 3.9 to in progress after adding the first config-selected agent execution adapter slice and session evidence wiring.
 - 2026-04-23: Added ADR-0008-backed configuration template governance to WBS 1.4.
 - 2026-04-23: Updated WBS 3 after moving local Gitea/dev bootstrap settings to the ADR-0008 template/local-config pattern.
+- 2026-04-23: Updated WBS 3.1 after moving npm webhook listener startup to template/local bootstrap settings.
