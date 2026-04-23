@@ -445,6 +445,7 @@ The first implementation slice should now be understood as:
 - one repo-owned execution adapter contract
 - one DeepSeek-backed remote implementation
 - one config-selected backend surface designed so a later local backend can plug in without changing task-gateway, proposal, or CI ownership
+- provider-enabled coverage validated first for `bounded_code_change`, then expanded to low-risk `documentation_update` while keeping `review_follow_up` and `ci_failure_investigation` scaffold-first
 
 ## ADR Trigger Check After Selection
 This selected direction still does not require an ADR by itself because it does not change the current architecture boundaries:
@@ -472,3 +473,9 @@ The first DeepSeek-backed validation pass stayed within the selected architectur
 - proposal creation surfaced local Gitea PR `#24`
 
 The run exposed one implementation gap rather than a new architecture decision: CI checkout did not have ignored local Gitea credentials, so direct PR body PATCH from CI returned 401 after validation had already passed. The selected fix keeps project config as the source of truth by allowing CI finalize to defer reviewer-facing PR body refresh to the host-side review-surface callback instead of injecting local credentials into CI.
+
+A same-day follow-up kept the same boundaries while expanding coverage to `documentation_update`:
+- task request `trq-2de69af748b1` started session `ags-0e18b7db5b88`
+- the configured DeepSeek adapter changed `docs/examples/provider-docs-smoke.md`
+- proposal creation surfaced local Gitea PR `#25`
+- CI run `#46` completed successfully and reviewer-facing traceability converged to `ready for human review`

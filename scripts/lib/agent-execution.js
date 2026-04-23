@@ -12,7 +12,7 @@ const DEFAULT_CONFIG = {
   baseUrl: "https://api.deepseek.com",
   model: "deepseek-chat",
   apiKey: "",
-  allowedTaskClasses: ["bounded_code_change"],
+  allowedTaskClasses: ["bounded_code_change", "documentation_update"],
   maxChangedFiles: 3,
   maxPromptBytes: 24000,
   maxFileBytes: 8000,
@@ -129,6 +129,35 @@ function truncateText(value, maxBytes) {
   return buffer.subarray(0, maxBytes).toString("utf8");
 }
 
+function buildTaskClassGuidance(taskClass) {
+  if (taskClass === "documentation_update") {
+    return {
+      intent: "documentation-only update",
+      preferred_paths: ["README.md", "docs/"],
+      avoid: [
+        "source code changes",
+        "runtime or CI workflow changes",
+        "policy or ADR changes unless explicitly requested by the task summary",
+      ],
+    };
+  }
+
+  if (taskClass === "bounded_code_change") {
+    return {
+      intent: "small bounded code, config, or scoped documentation change",
+      avoid: [
+        "architecture boundary changes",
+        "secret handling changes",
+        "deployment or release behavior changes",
+      ],
+    };
+  }
+
+  return {
+    intent: "unsupported for provider execution unless explicitly enabled in project config",
+  };
+}
+
 function buildExecutionPrompt({ taskRequest, sessionRecord, fileList, contextFiles, config }) {
   const payload = {
     task: {
@@ -147,6 +176,7 @@ function buildExecutionPrompt({ taskRequest, sessionRecord, fileList, contextFil
     constraints: {
       max_changed_files: config.maxChangedFiles,
       allowed_validation_commands: config.allowedValidationCommands || [],
+      task_class_guidance: buildTaskClassGuidance(taskRequest.task_class),
       response_schema: {
         summary: "short human-readable summary",
         edits: [

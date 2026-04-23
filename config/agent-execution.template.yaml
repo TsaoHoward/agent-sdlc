@@ -8,6 +8,7 @@ agentExecution:
   apiKey: ""
   allowedTaskClasses:
     - bounded_code_change
+    - documentation_update
   maxChangedFiles: 3
   maxPromptBytes: 24000
   maxFileBytes: 8000

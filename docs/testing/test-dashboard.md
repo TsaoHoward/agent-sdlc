@@ -42,7 +42,7 @@ It does not replace CI run history, forge issue or PR history, roadmap/WBS plann
 |---|---|---|---|---|---|---|
 | TC-001 | CLI Replay Intake And Session Smoke | Ready | CLI replay | `docs/roadmap.md` Phase 1; WBS `3.1`, `3.2`, `3.3` | Re-run when intake or session-start behavior changes and keep the case note current if task/session fields or evidence paths move | Move out after the current validation window once the case no longer needs active dashboard attention; keep the canonical case note as the long-lived procedure |
 | TC-002 | CLI Proposal And Traceability Smoke | Passed | CLI half-live | `docs/roadmap.md` Phase 1; WBS `3.4`, `3.5`, `3.6` | Re-run when proposal, CI, or traceability wiring changes so the host callback and convergence path stay covered | Move out at the next maintenance pass if no new proposal/traceability regression appears |
-| TC-004 | Agent Execution Adapter Smoke | Passed | CLI replay | `docs/roadmap.md` Phase 1; WBS `3.9` | Re-run when agent execution adapter behavior, provider config, or session evidence fields change | Move out at the next maintenance pass if no new provider-enabled regression appears |
+| TC-004 | Agent Execution Adapter Smoke | Passed | CLI replay | `docs/roadmap.md` Phase 1; WBS `3.9` | Re-run when agent execution adapter behavior, provider config, allowed task classes, or session evidence fields change | Move out at the next maintenance pass if no new provider-enabled regression appears |
 
 ## Test Items
 
@@ -75,8 +75,8 @@ It does not replace CI run history, forge issue or PR history, roadmap/WBS plann
 - Mode: `CLI replay`
 - Related Docs / WBS: `docs/testing/items/TC-004-agent-execution-adapter-smoke.md`; WBS `3.9`
 - Why It Matters: This is the first validation surface for the new config-selected agent execution adapter before it is trusted as part of the live issue-to-PR path.
-- Current State: The disabled-by-default adapter path has been smoke-tested without API credentials, and provider-enabled DeepSeek validation has now passed through a real session/proposal path. The 2026-04-23 run created task request `trq-4faac7e2a74b`, session `ags-cd9d3e289f02`, local PR `#24`, `agent-execution.json` evidence, and one provider-generated documentation file in the session workspace. The provider-requested `npm run validate:platform` command passed inside the session. The run also exposed a CI PR-body sync 401 when workflow checkout lacked ignored local Gitea credentials; that was fixed by allowing CI finalize to defer PR body refresh to the host-side review-surface sync while keeping validation status independent, and revalidation run `#45` completed successfully with automatic host-side PR body convergence.
-- Next Action: Re-run when agent execution adapter behavior, provider config, session evidence fields, or CI-to-host traceability sync changes.
+- Current State: The disabled-by-default adapter path has been smoke-tested without API credentials, and provider-enabled DeepSeek validation has now passed through real session/proposal paths for two task classes. The first 2026-04-23 run created task request `trq-4faac7e2a74b`, session `ags-cd9d3e289f02`, and local PR `#24` for `bounded_code_change`; a follow-up run created task request `trq-2de69af748b1`, session `ags-0e18b7db5b88`, and local PR `#25` for `documentation_update`, changing `docs/examples/provider-docs-smoke.md` and completing CI run `#46`. The earlier CI PR-body sync 401 (when workflow checkout lacked ignored local Gitea credentials) remains covered by the landed defer-to-host-sync behavior.
+- Next Action: Re-run when agent execution adapter behavior, provider config, allowed task classes, session evidence fields, or CI-to-host traceability sync changes.
 - Exit Path: Move out at the next maintenance pass if no new provider-enabled regression appears.
 - Canonical Case: `docs/testing/items/TC-004-agent-execution-adapter-smoke.md`
 - Escalation Check: Update the decision backlog or ADRs only if provider validation shows the adapter must move orchestration, runtime, traceability, or policy ownership out of the current repo-owned boundaries.
@@ -91,3 +91,4 @@ It does not replace CI run history, forge issue or PR history, roadmap/WBS plann
 - 2026-04-22: Marked `TC-002` passed after seeded local PR `#23` completed successful run `#41` and automatically converged the PR body plus both durable traceability copies.
 - 2026-04-23: Added `TC-004` for the first config-selected agent execution adapter smoke path.
 - 2026-04-23: Marked `TC-004` passed after provider-enabled DeepSeek execution created session `ags-cd9d3e289f02`, local proposal `PR #24`, passed provider-requested validation, and completed successful revalidation run `#45` with automatic host-side PR body sync for CI traceability.
+- 2026-04-23: Expanded `TC-004` validation coverage to `documentation_update` through session `ags-0e18b7db5b88`, local proposal `PR #25`, and successful CI run `#46`.

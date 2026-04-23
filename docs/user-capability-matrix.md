@@ -59,7 +59,7 @@ This matrix therefore separates:
 ## Live `@agent` Intent Matrix
 | User Intent | Command Form | Normalized Task Class | Summary Required | Current Automated Path | Current Practical Result | Status |
 |---|---|---|---|---|---|---|
-| Documentation update | `@agent run docs` | `documentation_update` | No | issue comment -> task request -> session start -> workspace prepare -> proposal PR -> CI -> reviewable traceability | The system routes and traces the request end to end, but the runtime still uses the common Phase 1 scaffold rather than a docs-specialized worker implementation | Implemented Scaffold |
+| Documentation update | `@agent run docs` | `documentation_update` | No | issue comment -> task request -> session start -> workspace prepare -> optional configured agent execution -> proposal PR -> CI -> reviewable traceability | The request is classified through `documentation-safe` and can now use the opt-in DeepSeek adapter for bounded documentation-only edits; provider-enabled local validation has passed, while default behavior remains scaffold-first unless the operator enables agent execution in ignored project config | Implemented Scaffold |
 | Bounded code change | `@agent run code` + `summary:` | `bounded_code_change` | Yes | issue comment -> task request -> session start -> workspace prepare -> optional configured agent execution -> proposal PR -> CI -> reviewable traceability | This is the main intended Phase 1 path. The request is classified, auto-started, proposed, verified, and surfaced for human review; the first template-backed DeepSeek adapter has now passed provider-enabled local validation but remains opt-in through ignored project config | Implemented Scaffold |
 | Review follow-up | `@agent run review` | `review_follow_up` | No | issue comment -> task request -> session start -> workspace prepare -> proposal PR -> CI -> reviewable traceability | The request enters the same Phase 1 execution/proposal pipeline, but there is not yet a review-thread-specialized worker loop | Implemented Scaffold |
 | CI failure investigation | `@agent run ci` + `summary:` | `ci_failure_investigation` | Yes | issue comment -> task request -> session start -> workspace prepare -> proposal PR -> CI -> reviewable traceability | The request is classified into the investigation profile, but the current implementation still uses the common session/proposal scaffold instead of a distinct investigation-only user workflow | Implemented Scaffold |
@@ -101,7 +101,7 @@ For the current live Phase 1 `@agent` path, the implemented lifecycle is:
 
 ## Current Boundaries And Gaps
 - Only Gitea issue comments are currently live `@agent` entrypoints.
-- The four task tokens currently drive classification, policy, and traceability. A first opt-in agent execution adapter exists for `bounded_code_change` and has passed provider-enabled local validation, but live default behavior remains scaffold-first unless the operator enables agent execution in ignored project config.
+- The four task tokens currently drive classification, policy, and traceability. The opt-in agent execution adapter now supports `bounded_code_change` and `documentation_update` and has passed provider-enabled local validation for both, but live default behavior remains scaffold-first unless the operator enables agent execution in ignored project config.
 - CI remains an independent verifier and human review remains the merge control point.
 - Operator-facing artifact browsing remains a narrower follow-up outside this matrix's core capability scope.
 
@@ -123,3 +123,4 @@ When a change is substantial enough to alter the supported workflow shape, also 
 - 2026-04-22: Initial version.
 - 2026-04-23: Updated `bounded_code_change` coverage after landing the first opt-in config-selected agent execution adapter slice.
 - 2026-04-23: Updated `bounded_code_change` coverage after provider-enabled DeepSeek validation produced a session-backed local proposal.
+- 2026-04-23: Updated `documentation_update` coverage after provider-enabled DeepSeek validation produced session `ags-0e18b7db5b88`, local PR `#25`, and CI run `#46`.

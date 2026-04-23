@@ -3,7 +3,7 @@
 ## Metadata
 - Issue ID: I-001
 - Status: In Progress
-- Last Updated: 2026-04-22
+- Last Updated: 2026-04-23
 - Owner: Project Maintainer
 - Related Docs / WBS: `docs/roadmap.md` Phase 1; `docs/wbs.md` WBS `3`, `3.1`, `3.2`, `3.3`, `3.4`, `3.5`, `3.6`, `3.7`, `3.8`, `3.9`
 - Source Dashboard: docs/issues/issue-dashboard.md
@@ -87,6 +87,7 @@ The repository is intentionally still in an early-phase, structure-first posture
   - local Actions run `#42` proved that repository validation passed but exposed a CI traceability regression: workflow checkout did not have ignored local Gitea credentials, so direct PR body PATCH returned 401 after validation had already succeeded
   - the fix keeps project config as source of truth by allowing CI finalize to record deferred PR body sync instead of failing validation, while host-side `review-surface` sync refreshes the PR body using the control host's ignored project config
   - revalidation run `#45` then completed successfully on PR `#24` with the reviewer-facing PR body automatically converged to `CI: success` / `ready for human review`
+  - a same-day follow-up expanded provider-enabled coverage to `documentation_update`: task request `trq-2de69af748b1` started session `ags-0e18b7db5b88`, generated `docs/examples/provider-docs-smoke.md`, created local PR `#25`, and completed successful CI run `#46` with synced reviewer-facing traceability
 
 ## Dependencies And Constraints
 - Work should stay aligned to Phase 1 and WBS 3 rather than pulling Phase 2 observability or multi-source scope forward.
@@ -130,7 +131,7 @@ If implementation uncovers a major unresolved decision, the issue should stay ac
 
 ## Next Actions
 - rerun and maintain the canonical CLI and GUI procedures under `docs/testing/` when intake, runtime, proposal, CI, review, or bootstrap behavior changes
-- continue hardening the minimal provider-backed agent execution path from the validated `bounded_code_change` DeepSeek session/proposal smoke
+- continue hardening the minimal provider-backed agent execution path from the validated `bounded_code_change` and `documentation_update` DeepSeek session/proposal smokes
 - keep the newly validated opt-in DeepSeek adapter path bounded and repeatable when real credentials are enabled in ignored project config
 - keep `docs/user-capability-matrix.md` aligned with the actual supported `@agent` locations, task tokens, and manual operator surfaces as the implementation evolves
 - keep the strengthened live issue-comment path in place now that it auto-creates the proposal and root traceability file
@@ -178,3 +179,4 @@ If implementation uncovers a major unresolved decision, the issue should stay ac
 - 2026-04-23: Recorded the first implementation slice for `config/agent-execution.template.yaml`, local generated `config/agent-execution.yaml`, `scripts/lib/agent-execution.js`, and session-record execution evidence.
 - 2026-04-23: Recorded the repository-wide configuration template policy from ADR-0008.
 - 2026-04-23: Recorded provider-enabled DeepSeek validation through session `ags-cd9d3e289f02` and local PR `#24`, plus the CI traceability adjustment that defers PR body refresh to host-side sync when CI checkout lacks ignored local Gitea credentials.
+- 2026-04-23: Expanded provider-enabled DeepSeek coverage to `documentation_update` through session `ags-0e18b7db5b88`, local PR `#25`, and successful run `#46`.

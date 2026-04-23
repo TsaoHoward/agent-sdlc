@@ -3,7 +3,7 @@
 ## Document Metadata
 - Version: 0.1
 - Status: Active
-- Last Updated: 2026-04-22
+- Last Updated: 2026-04-23
 - Owner: Project Maintainer
 
 ## Purpose
@@ -44,7 +44,7 @@ For a fresh local validation pass:
 5. run `TC-003` when you need the full operator-facing GUI path
 6. write any new gap back into `docs/testing/test-dashboard.md`, then update issue or decision docs if the result changes project-level understanding
 
-The latest reproducible live issue-comment reference is the 2026-04-21 run on `howard/agent-sdlc#11`, which created task request `trq-bd85673302e7`, session `ags-335855297620`, root traceability `.agent-sdlc/traceability/trq-bd85673302e7.json`, and proposal `PR #12` automatically after the strengthened listener path was deployed. The latest CLI half-live verification after commit `292f535` then created synthetic task request `trq-route1-hostsync-final-20260421225724`, session `ags-9c860e1f0026`, and proposal `PR #23`, which produced one successful `pull_request` run (`#41`) and automatically converged the PR body, host root traceability file, and session-local workspace copy. The first provider-enabled agent execution validation then created task request `trq-4faac7e2a74b`, session `ags-cd9d3e289f02`, and local proposal `PR #24`; DeepSeek produced `docs/examples/provider-live-smoke.md`, ran `npm run validate:platform` successfully inside the session, and revalidation run `#45` completed successfully after host-side traceability automatically synced the PR body to `CI: success` / `ready for human review`. No active near-term testing gap currently remains in the CLI proposal/traceability or provider-enabled adapter path; the main remaining follow-up is the separate operator-facing artifact-browsing improvement tracked in the issue workflow.
+The latest reproducible live issue-comment reference is the 2026-04-21 run on `howard/agent-sdlc#11`, which created task request `trq-bd85673302e7`, session `ags-335855297620`, root traceability `.agent-sdlc/traceability/trq-bd85673302e7.json`, and proposal `PR #12` automatically after the strengthened listener path was deployed. The latest CLI half-live verification after commit `292f535` then created synthetic task request `trq-route1-hostsync-final-20260421225724`, session `ags-9c860e1f0026`, and proposal `PR #23`, which produced one successful `pull_request` run (`#41`) and automatically converged the PR body, host root traceability file, and session-local workspace copy. Provider-enabled agent execution validation now covers two task classes: `bounded_code_change` through task request `trq-4faac7e2a74b` and local proposal `PR #24` (successful revalidation run `#45`), and `documentation_update` through task request `trq-2de69af748b1` and local proposal `PR #25` (successful run `#46`). No active near-term testing gap currently remains in the CLI proposal/traceability or provider-enabled adapter path; the main remaining follow-up is the separate operator-facing artifact-browsing improvement tracked in the issue workflow.
 
 ## Stable Local Test Data
 | Item | Value |
@@ -73,3 +73,4 @@ See `docs/policies/testing-management.md` for the full governance rule set.
 - 2026-04-21: Initial version.
 - 2026-04-23: Added `TC-004` to the recommended execution order for the first agent execution adapter slice.
 - 2026-04-23: Recorded provider-enabled `TC-004` validation through a session-backed local proposal.
+- 2026-04-23: Recorded provider-enabled `TC-004` validation for `documentation_update` through session `ags-0e18b7db5b88`, PR `#25`, and run `#46`.

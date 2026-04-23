@@ -11,7 +11,7 @@
 - Source Template: docs/templates/test-case.template.md
 
 ## Objective
-Verify that the first config-selected agent execution adapter resolves configuration, writes durable execution evidence, and can be enabled for a real DeepSeek-backed `bounded_code_change` run.
+Verify that the first config-selected agent execution adapter resolves configuration, writes durable execution evidence, and can be enabled for real DeepSeek-backed runs for `bounded_code_change` and `documentation_update`.
 
 ## Scope
 This case covers:
@@ -20,6 +20,7 @@ This case covers:
 - disabled-by-default execution evidence
 - DeepSeek provider metadata in `agent-execution.json`
 - provider-enabled validation when credentials are available
+- task-class gating through `allowedTaskClasses`
 
 It does not replace the full proposal, CI, or GUI live cases.
 
@@ -27,12 +28,19 @@ It does not replace the full proposal, CI, or GUI live cases.
 - Date: 2026-04-23
 - Local config source: ignored `config/agent-execution.yaml`
 - Provider: `deepseek` / `remote` / `deepseek-chat`
-- Task request: `trq-4faac7e2a74b`
-- Session: `ags-cd9d3e289f02`
-- Local proposal: `gitea:localhost:43000/howard/agent-sdlc#pull/24`
-- Changed file in session workspace: `docs/examples/provider-live-smoke.md`
-- Provider-requested validation: `npm run validate:platform` passed
-- CI/traceability note: local Actions run `#42` completed repository validation successfully but initially failed on direct PR body PATCH because the workflow checkout did not have ignored local Gitea credentials; the CI finalize path now defers that PR body refresh to host-side review-surface sync, and revalidation run `#45` completed successfully with the PR traceability block automatically refreshed to `CI: success` / `ready for human review`.
+- `bounded_code_change` run:
+  - Task request: `trq-4faac7e2a74b`
+  - Session: `ags-cd9d3e289f02`
+  - Local proposal: `gitea:localhost:43000/howard/agent-sdlc#pull/24`
+  - Changed file in session workspace: `docs/examples/provider-live-smoke.md`
+  - Provider-requested validation: `npm run validate:platform` passed
+  - CI/traceability note: local Actions run `#42` completed repository validation successfully but initially failed on direct PR body PATCH because the workflow checkout did not have ignored local Gitea credentials; the CI finalize path now defers that PR body refresh to host-side review-surface sync, and revalidation run `#45` completed successfully with the PR traceability block automatically refreshed to `CI: success` / `ready for human review`
+- `documentation_update` run:
+  - Task request: `trq-2de69af748b1`
+  - Session: `ags-0e18b7db5b88`
+  - Local proposal: `gitea:localhost:43000/howard/agent-sdlc#pull/25`
+  - Changed file in session workspace: `docs/examples/provider-docs-smoke.md`
+  - CI/traceability note: local Actions run `#46` completed successfully and host-side proposal traceability sync converged reviewer-facing PR status to `ready for human review`
 
 ## Preconditions
 - the workspace has `npm install` completed
@@ -68,7 +76,7 @@ node -e "const { executeAgentSlice } = require('./scripts/lib/agent-execution');
 npm run dev:agent-execution-config
 ```
 
-5. For provider-enabled validation, set `agentExecution.apiKey` and `agentExecution.enabled: true` in the ignored local config, then run through a bounded task/session path that creates a session record and proposal.
+5. For provider-enabled validation, set `agentExecution.apiKey` and `agentExecution.enabled: true` in the ignored local config, then run through bounded task/session paths for `@agent run code` and `@agent run docs` to confirm both enabled task classes create session evidence and proposals.
 
 ## Expected Results
 - syntax validation passes
@@ -77,6 +85,7 @@ npm run dev:agent-execution-config
 - when enabled with credentials, provider failures fail closed before proposal creation rather than silently producing an unverified proposal
 - when provider execution succeeds, the session record includes `agent_execution.status`, provider metadata, changed files, validation command results, and an `agent-execution.json` artifact reference
 - CI traceability can defer reviewer-facing PR body refresh to the host-side review-surface callback when CI checkout does not have ignored local Gitea credentials
+- `documentation_update` stays docs-bounded through task-class guidance and task-class allowlist gating
 
 ## Evidence To Capture
 - `npm run validate:platform` output
@@ -90,3 +99,4 @@ Temporary smoke directories under `$env:TEMP` can be removed after inspection.
 ## Change Log
 - 2026-04-23: Initial version.
 - 2026-04-23: Marked provider-enabled validation passed after session `ags-cd9d3e289f02` created local proposal `PR #24` with DeepSeek-generated documentation and passed provider-requested validation.
+- 2026-04-23: Expanded latest known result to include provider-enabled `documentation_update` validation through session `ags-0e18b7db5b88`, local proposal `PR #25`, and CI run `#46`.

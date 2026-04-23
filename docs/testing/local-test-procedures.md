@@ -3,7 +3,7 @@
 ## Document Metadata
 - Version: 0.1
 - Status: Active
-- Last Updated: 2026-04-22
+- Last Updated: 2026-04-23
 - Owner: Project Maintainer
 
 ## Purpose
@@ -251,7 +251,9 @@ agentExecution:
   apiKey: "<operator-provided-key>"
 ```
 
-Only enable this mode when the operator intends to spend API credits and validate real provider-backed edits. The latest provider-enabled validation used a bounded session/proposal path, produced session `ags-cd9d3e289f02`, changed `docs/examples/provider-live-smoke.md` in the session workspace, created local PR `#24`, and passed provider-requested `npm run validate:platform`.
+Only enable this mode when the operator intends to spend API credits and validate real provider-backed edits. The latest provider-enabled validation now covers two task classes:
+- `bounded_code_change`: session `ags-cd9d3e289f02`, local PR `#24`, changed `docs/examples/provider-live-smoke.md`, passing revalidation run `#45`
+- `documentation_update`: session `ags-0e18b7db5b88`, local PR `#25`, changed `docs/examples/provider-docs-smoke.md`, passing run `#46`
 
 When this path creates a proposal and CI runs, the workflow may finalize branch-local verification metadata before the host-side review-surface listener refreshes the PR body. This is expected when the CI checkout does not have ignored local Gitea credentials; reviewer-facing PR traceability should still converge through the CI-to-host callback or a direct `sync-gitea-proposal-traceability` run.
 
@@ -382,3 +384,4 @@ PRs and issues created for local smoke tests may be left as evidence during the 
 - 2026-04-22: Updated the procedure after seeded local PR `#23` confirmed automatic host-side traceability convergence through the CI callback path.
 - 2026-04-23: Added optional `TC-004` procedure for the first config-selected agent execution adapter.
 - 2026-04-23: Recorded the first provider-enabled `TC-004` session/proposal validation and the expected host-side PR body sync behavior.
+- 2026-04-23: Expanded the `TC-004` note with provider-enabled `documentation_update` evidence from session `ags-0e18b7db5b88`, PR `#25`, and run `#46`.

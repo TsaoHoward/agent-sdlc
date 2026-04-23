@@ -3,7 +3,7 @@
 ## Document Metadata
 - Version: 0.1
 - Status: Draft
-- Last Updated: 2026-04-22
+- Last Updated: 2026-04-23
 - Owner: Project Maintainer
 - Source Template: docs/templates/wbs.template.md
 
@@ -283,7 +283,7 @@
 - Dependencies: 3.2, 3.3, 3.4, 3.5, 3.6, 3.7, 3.8
 - Critical-Path-Candidate: Yes
 - Status: In Progress
-- Notes: This item intentionally deepens one task class before broadening intake surfaces or task-token coverage. The goal is to keep the Phase 1 slice narrow while making `agent-run change proposal` mean real bounded agent work inside the isolated runtime. The currently selected direction is a repo-owned execution adapter that supports both remote and local backends through configuration, with `DeepSeek API` as the short-term remote default and a later local-backend path preserved behind the same API-oriented execution boundary. The first implementation slice now adds tracked `config/agent-execution.template.yaml`, ignored local `config/agent-execution.yaml` generation, a repo-owned `scripts/lib/agent-execution.js` adapter, and session-record evidence wiring from `agent-control`; provider execution is opt-in while the existing scaffold path remains stable without API credentials. Provider-enabled validation has now passed for a bounded session/proposal smoke: task request `trq-4faac7e2a74b`, session `ags-cd9d3e289f02`, and local PR `#24` produced a DeepSeek-generated documentation change plus passing provider-requested validation. Provider choice, tool surface, and context assembly should remain replaceable and may require follow-up ADR work only if the integration shape exposes a new architecture or governance boundary.
+- Notes: This item intentionally deepens one task class before broadening intake surfaces or task-token coverage. The goal is to keep the Phase 1 slice narrow while making `agent-run change proposal` mean real bounded agent work inside the isolated runtime. The currently selected direction is a repo-owned execution adapter that supports both remote and local backends through configuration, with `DeepSeek API` as the short-term remote default and a later local-backend path preserved behind the same API-oriented execution boundary. The first implementation slice now adds tracked `config/agent-execution.template.yaml`, ignored local `config/agent-execution.yaml` generation, a repo-owned `scripts/lib/agent-execution.js` adapter, and session-record evidence wiring from `agent-control`; provider execution is opt-in while the existing scaffold path remains stable without API credentials. Provider-enabled validation first passed for `bounded_code_change` with task request `trq-4faac7e2a74b`, session `ags-cd9d3e289f02`, and local PR `#24`, then expanded to `documentation_update` with task request `trq-2de69af748b1`, session `ags-0e18b7db5b88`, local PR `#25`, and CI run `#46`. Review and CI task tokens remain scaffold-first and are not yet enabled for provider execution by default.
 
 ### WBS 4 — Controlled Expansion
 - Parent:
@@ -455,3 +455,4 @@
 - 2026-04-23: Updated WBS 3.1 after moving npm webhook listener startup to template/local bootstrap settings.
 - 2026-04-23: Updated WBS 3.3 and 3.5 after moving runner and worker-runtime startup defaults to template/local bootstrap settings.
 - 2026-04-23: Recorded provider-enabled WBS 3.9 validation through local PR `#24` and adjusted CI traceability sync so workflow checkouts can defer PR body refresh to the host-side review surface instead of requiring ignored local Gitea credentials in CI.
+- 2026-04-23: Expanded WBS 3.9 provider-enabled validation coverage to `documentation_update` through local PR `#25` and successful run `#46` while keeping `review_follow_up` and `ci_failure_investigation` on scaffold-first execution.
