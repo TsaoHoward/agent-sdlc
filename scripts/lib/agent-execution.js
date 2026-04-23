@@ -12,7 +12,12 @@ const DEFAULT_CONFIG = {
   baseUrl: "https://api.deepseek.com",
   model: "deepseek-chat",
   apiKey: "",
-  allowedTaskClasses: ["bounded_code_change", "documentation_update"],
+  allowedTaskClasses: [
+    "bounded_code_change",
+    "documentation_update",
+    "review_follow_up",
+    "ci_failure_investigation",
+  ],
   maxChangedFiles: 3,
   maxPromptBytes: 24000,
   maxFileBytes: 8000,
@@ -142,6 +147,32 @@ function buildTaskClassGuidance(taskClass) {
     };
   }
 
+  if (taskClass === "review_follow_up") {
+    return {
+      intent: "review follow-up update",
+      preferred_paths: ["files referenced by review feedback", "docs/"],
+      avoid: [
+        "broad refactors unrelated to review intent",
+        "architecture boundary changes",
+        "deployment or release behavior changes",
+      ],
+    };
+  }
+
+  if (taskClass === "ci_failure_investigation") {
+    return {
+      intent: "ci failure investigation",
+      preferred_paths: ["docs/testing/", "docs/examples/"],
+      avoid: [
+        "application behavior changes",
+        "runtime or policy ownership changes",
+        "non-investigation code edits",
+      ],
+      expected_output:
+        "investigation note that summarizes suspected cause, observations, and next checks",
+    };
+  }
+
   if (taskClass === "bounded_code_change") {
     return {
       intent: "small bounded code, config, or scoped documentation change",
@@ -156,6 +187,18 @@ function buildTaskClassGuidance(taskClass) {
   return {
     intent: "unsupported for provider execution unless explicitly enabled in project config",
   };
+}
+
+function isPathAllowedForTaskClass(taskClass, relativePath) {
+  if (taskClass === "documentation_update") {
+    return relativePath === "README.md" || relativePath.startsWith("docs/");
+  }
+
+  if (taskClass === "ci_failure_investigation") {
+    return relativePath.startsWith("docs/testing/") || relativePath.startsWith("docs/examples/");
+  }
+
+  return true;
 }
 
 function buildExecutionPrompt({ taskRequest, sessionRecord, fileList, contextFiles, config }) {
@@ -177,6 +220,10 @@ function buildExecutionPrompt({ taskRequest, sessionRecord, fileList, contextFil
       max_changed_files: config.maxChangedFiles,
       allowed_validation_commands: config.allowedValidationCommands || [],
       task_class_guidance: buildTaskClassGuidance(taskRequest.task_class),
+      edit_path_policy: {
+        documentation_update: ["README.md", "docs/**"],
+        ci_failure_investigation: ["docs/testing/**", "docs/examples/**"],
+      },
       response_schema: {
         summary: "short human-readable summary",
         edits: [
@@ -280,7 +327,7 @@ async function callDeepSeek({ config, apiKey, prompt }) {
   };
 }
 
-function applyProviderEdits({ workspaceDir, edits, maxChangedFiles }) {
+function applyProviderEdits({ workspaceDir, edits, maxChangedFiles, taskClass }) {
   const normalizedEdits = Array.isArray(edits) ? edits : [];
   if (normalizedEdits.length > maxChangedFiles) {
     throw new Error(
@@ -291,6 +338,9 @@ function applyProviderEdits({ workspaceDir, edits, maxChangedFiles }) {
   const changedFiles = [];
   for (const edit of normalizedEdits) {
     const relativePath = normalizeWorkspacePath(edit.path);
+    if (!isPathAllowedForTaskClass(taskClass, relativePath)) {
+      throw new Error(`Agent edit path is not allowed for task class ${taskClass}: ${relativePath}`);
+    }
     const targetPath = path.resolve(workspaceDir, relativePath);
     const workspaceRoot = path.resolve(workspaceDir);
     if (targetPath !== workspaceRoot && !targetPath.startsWith(`${workspaceRoot}${path.sep}`)) {
@@ -414,6 +464,7 @@ async function executeAgentSlice({ repoRoot, taskRequest, sessionRecord, workspa
     workspaceDir,
     edits: providerResult.parsed.edits,
     maxChangedFiles: Number(config.maxChangedFiles),
+    taskClass: taskRequest.task_class,
   });
   const validationCommands = runValidationCommands({
     workspaceDir,

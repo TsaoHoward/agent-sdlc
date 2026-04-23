@@ -28,8 +28,10 @@ Use this sequence when you want a full operator-facing regression pass:
 1. complete Environment Bring-Up
 2. run CLI Procedure A to confirm intake and session-start boundaries
 3. run CLI Procedure B to confirm proposal and traceability surfaces
-4. run GUI Procedure C to confirm the live Gitea experience
-5. write any new gap back into `docs/testing/test-dashboard.md`
+4. run CLI Procedure D to confirm provider adapter behavior
+5. run CLI Procedure E to confirm real AI connectivity end to end
+6. run GUI Procedure C to confirm the live Gitea experience
+7. write any new gap back into `docs/testing/test-dashboard.md`
 
 You may also run any procedure independently when you only need one layer.
 
@@ -251,11 +253,51 @@ agentExecution:
   apiKey: "<operator-provided-key>"
 ```
 
-Only enable this mode when the operator intends to spend API credits and validate real provider-backed edits. The latest provider-enabled validation now covers two task classes:
+Only enable this mode when the operator intends to spend API credits and validate real provider-backed edits. The latest provider-enabled validation now covers four task classes:
 - `bounded_code_change`: session `ags-cd9d3e289f02`, local PR `#24`, changed `docs/examples/provider-live-smoke.md`, passing revalidation run `#45`
 - `documentation_update`: session `ags-0e18b7db5b88`, local PR `#25`, changed `docs/examples/provider-docs-smoke.md`, passing run `#46`
+- `review_follow_up`: session `ags-94e3f03d2f6b`, local PR `#26`, changed `docs/examples/provider-review-smoke.md`, passing run `#47`
+- `ci_failure_investigation`: session `ags-c742088383aa`, local PR `#27`, changed `docs/examples/provider-ci-investigation-smoke.md`, passing run `#48`
 
 When this path creates a proposal and CI runs, the workflow may finalize branch-local verification metadata before the host-side review-surface listener refreshes the PR body. This is expected when the CI checkout does not have ignored local Gitea credentials; reviewer-facing PR traceability should still converge through the CI-to-host callback or a direct `sync-gitea-proposal-traceability` run.
+
+## CLI Procedure E - Real AI Connectivity Manual Flow
+Canonical case: `TC-005`
+
+Use this procedure when you need operator-facing proof that real provider connectivity is healthy across all currently enabled `@agent run` tokens.
+
+1. Confirm provider config and API-key presence:
+
+```powershell
+node -e "const {resolveAgentExecutionConfig}=require('./scripts/lib/agent-execution'); const r=resolveAgentExecutionConfig(process.cwd()); console.log(JSON.stringify({source:r.configSource, enabled:r.config.enabled, backend:r.config.backend, mode:r.config.mode, model:r.config.model, allowedTaskClasses:r.config.allowedTaskClasses, hasApiKey:Boolean(r.config.apiKey)}, null, 2));"
+```
+
+2. Run baseline checks:
+
+```powershell
+npm run validate:platform
+npm run typecheck
+```
+
+3. Trigger one provider-enabled run for each token (`code`, `docs`, `review`, `ci`) using either:
+- live issue comments in local Gitea
+- deterministic issue-comment replay plus `agent-control --auto-create-proposal`
+
+4. For each resulting task and session, verify:
+- session has `agent_execution.status: completed`
+- provider changed files are bounded and traceable
+- proposal PR exists and is linked to `.agent-sdlc/traceability/<task_request_id>.json`
+
+5. After CI completes, force convergence when needed:
+
+```powershell
+node scripts/review-surface.js sync-gitea-proposal-traceability --proposal gitea:localhost:43000/howard/agent-sdlc#pull/<index>
+```
+
+6. Confirm final traceability posture for each run:
+- `ci.ci_status: success`
+- `review.status: ready-for-human-review`
+- `review.proposal_body_sync_status: synced`
 
 ## GUI Procedure C - Full Live Issue-Comment To PR Follow-Up
 Canonical case: `TC-003`
@@ -385,3 +427,4 @@ PRs and issues created for local smoke tests may be left as evidence during the 
 - 2026-04-23: Added optional `TC-004` procedure for the first config-selected agent execution adapter.
 - 2026-04-23: Recorded the first provider-enabled `TC-004` session/proposal validation and the expected host-side PR body sync behavior.
 - 2026-04-23: Expanded the `TC-004` note with provider-enabled `documentation_update` evidence from session `ags-0e18b7db5b88`, PR `#25`, and run `#46`.
+- 2026-04-23: Added CLI Procedure E (`TC-005`) as the manual real-AI connectivity flow across `code`, `docs`, `review`, and `ci`.

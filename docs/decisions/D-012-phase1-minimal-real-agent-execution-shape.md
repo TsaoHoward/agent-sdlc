@@ -445,7 +445,8 @@ The first implementation slice should now be understood as:
 - one repo-owned execution adapter contract
 - one DeepSeek-backed remote implementation
 - one config-selected backend surface designed so a later local backend can plug in without changing task-gateway, proposal, or CI ownership
-- provider-enabled coverage validated first for `bounded_code_change`, then expanded to low-risk `documentation_update` while keeping `review_follow_up` and `ci_failure_investigation` scaffold-first
+- provider-enabled coverage validated first for `bounded_code_change`, then expanded to `documentation_update`, `review_follow_up`, and `ci_failure_investigation`
+- the `ci_failure_investigation` path remains evidence-oriented by enforcing docs-scoped edit outputs (`docs/testing/` and `docs/examples/`)
 
 ## ADR Trigger Check After Selection
 This selected direction still does not require an ADR by itself because it does not change the current architecture boundaries:
@@ -479,3 +480,8 @@ A same-day follow-up kept the same boundaries while expanding coverage to `docum
 - the configured DeepSeek adapter changed `docs/examples/provider-docs-smoke.md`
 - proposal creation surfaced local Gitea PR `#25`
 - CI run `#46` completed successfully and reviewer-facing traceability converged to `ready for human review`
+
+The same boundary model then expanded to `review_follow_up` and `ci_failure_investigation`:
+- `review_follow_up`: task request `trq-2644a836e239`, session `ags-94e3f03d2f6b`, local PR `#26`, CI run `#47`
+- `ci_failure_investigation`: task request `trq-859264e0df7f`, session `ags-c742088383aa`, local PR `#27`, CI run `#48`
+- the investigation path now enforces docs-scoped edits to keep investigation output evidence-oriented

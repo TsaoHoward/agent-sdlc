@@ -9,6 +9,8 @@ agentExecution:
   allowedTaskClasses:
     - bounded_code_change
     - documentation_update
+    - review_follow_up
+    - ci_failure_investigation
   maxChangedFiles: 3
   maxPromptBytes: 24000
   maxFileBytes: 8000

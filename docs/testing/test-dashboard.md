@@ -43,6 +43,7 @@ It does not replace CI run history, forge issue or PR history, roadmap/WBS plann
 | TC-001 | CLI Replay Intake And Session Smoke | Ready | CLI replay | `docs/roadmap.md` Phase 1; WBS `3.1`, `3.2`, `3.3` | Re-run when intake or session-start behavior changes and keep the case note current if task/session fields or evidence paths move | Move out after the current validation window once the case no longer needs active dashboard attention; keep the canonical case note as the long-lived procedure |
 | TC-002 | CLI Proposal And Traceability Smoke | Passed | CLI half-live | `docs/roadmap.md` Phase 1; WBS `3.4`, `3.5`, `3.6` | Re-run when proposal, CI, or traceability wiring changes so the host callback and convergence path stay covered | Move out at the next maintenance pass if no new proposal/traceability regression appears |
 | TC-004 | Agent Execution Adapter Smoke | Passed | CLI replay | `docs/roadmap.md` Phase 1; WBS `3.9` | Re-run when agent execution adapter behavior, provider config, allowed task classes, or session evidence fields change | Move out at the next maintenance pass if no new provider-enabled regression appears |
+| TC-005 | Real AI Connectivity Manual Flow | Passed | CLI half-live | `docs/roadmap.md` Phase 1; WBS `3.7`, `3.9` | Keep the manual runbook current with real task IDs, PR refs, and CI runs as connectivity behavior evolves | Move out at the next maintenance pass if no new operator-facing manual-flow gap appears |
 
 ## Test Items
 
@@ -75,12 +76,24 @@ It does not replace CI run history, forge issue or PR history, roadmap/WBS plann
 - Mode: `CLI replay`
 - Related Docs / WBS: `docs/testing/items/TC-004-agent-execution-adapter-smoke.md`; WBS `3.9`
 - Why It Matters: This is the first validation surface for the new config-selected agent execution adapter before it is trusted as part of the live issue-to-PR path.
-- Current State: The disabled-by-default adapter path has been smoke-tested without API credentials, and provider-enabled DeepSeek validation has now passed through real session/proposal paths for two task classes. The first 2026-04-23 run created task request `trq-4faac7e2a74b`, session `ags-cd9d3e289f02`, and local PR `#24` for `bounded_code_change`; a follow-up run created task request `trq-2de69af748b1`, session `ags-0e18b7db5b88`, and local PR `#25` for `documentation_update`, changing `docs/examples/provider-docs-smoke.md` and completing CI run `#46`. The earlier CI PR-body sync 401 (when workflow checkout lacked ignored local Gitea credentials) remains covered by the landed defer-to-host-sync behavior.
+- Current State: The disabled-by-default adapter path has been smoke-tested without API credentials, and provider-enabled DeepSeek validation has now passed through real session/proposal paths for all currently enabled issue-comment tokens. The 2026-04-23 runs validated `bounded_code_change` (`trq-4faac7e2a74b` -> `PR #24` -> run `#45`), `documentation_update` (`trq-2de69af748b1` -> `PR #25` -> run `#46`), `review_follow_up` (`trq-2644a836e239` -> `PR #26` -> run `#47`), and `ci_failure_investigation` (`trq-859264e0df7f` -> `PR #27` -> run `#48`). For investigation-class behavior, adapter guardrails now restrict edits to `docs/testing/` and `docs/examples/` to keep the output evidence-oriented.
 - Next Action: Re-run when agent execution adapter behavior, provider config, allowed task classes, session evidence fields, or CI-to-host traceability sync changes.
 - Exit Path: Move out at the next maintenance pass if no new provider-enabled regression appears.
 - Canonical Case: `docs/testing/items/TC-004-agent-execution-adapter-smoke.md`
 - Escalation Check: Update the decision backlog or ADRs only if provider validation shows the adapter must move orchestration, runtime, traceability, or policy ownership out of the current repo-owned boundaries.
 - Notes: This case intentionally separates config/evidence validation from full live GUI validation so WBS `3.9` can harden without destabilizing the already-working closed loop.
+
+### TC-005 - Real AI Connectivity Manual Flow
+- Status: `Passed`
+- Mode: `CLI half-live`
+- Related Docs / WBS: `docs/testing/items/TC-005-real-ai-connectivity-manual-flow.md`; WBS `3.7`, `3.9`
+- Why It Matters: Operators need one practical runbook that proves real provider connectivity with project config, real API key wiring, task/session evidence, proposal creation, and CI convergence.
+- Current State: The first manual-flow runbook pass is validated with provider-enabled execution across all currently enabled task tokens (`code`, `docs`, `review`, `ci`) and confirmed reviewer-facing traceability convergence after CI success.
+- Next Action: Keep the runbook synchronized with current command surfaces, config fields, and latest reproducible evidence IDs.
+- Exit Path: Move out at the next maintenance pass if no operator-facing real-AI connectivity follow-up remains.
+- Canonical Case: `docs/testing/items/TC-005-real-ai-connectivity-manual-flow.md`
+- Escalation Check: Open or update issue/decision surfaces when manual connectivity steps reveal drift between repo policy, local config, and runtime behavior.
+- Notes: This case complements `TC-004` by emphasizing operator workflow and evidence collection instead of adapter internals only.
 
 ## Change Log
 - 2026-04-21: Initial version.
@@ -92,3 +105,5 @@ It does not replace CI run history, forge issue or PR history, roadmap/WBS plann
 - 2026-04-23: Added `TC-004` for the first config-selected agent execution adapter smoke path.
 - 2026-04-23: Marked `TC-004` passed after provider-enabled DeepSeek execution created session `ags-cd9d3e289f02`, local proposal `PR #24`, passed provider-requested validation, and completed successful revalidation run `#45` with automatic host-side PR body sync for CI traceability.
 - 2026-04-23: Expanded `TC-004` validation coverage to `documentation_update` through session `ags-0e18b7db5b88`, local proposal `PR #25`, and successful CI run `#46`.
+- 2026-04-23: Expanded `TC-004` validation coverage to `review_follow_up` (`PR #26`, run `#47`) and `ci_failure_investigation` (`PR #27`, run `#48`) with investigation-path edit guardrails.
+- 2026-04-23: Added `TC-005` and marked the first manual real-AI connectivity flow passed.

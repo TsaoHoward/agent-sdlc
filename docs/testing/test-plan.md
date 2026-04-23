@@ -33,7 +33,7 @@ This plan currently covers local validation of the Phase 1 closed loop for:
 - issue-comment intake
 - task normalization and session start
 - runtime workspace preparation
-- config-template-selected agent execution adapter evidence for `bounded_code_change` and `documentation_update`
+- config-template-selected agent execution adapter evidence for all supported issue-comment task tokens
 - branch and PR proposal creation
 - CI verification linkage
 - review-follow-up and PR close/reopen synchronization
@@ -92,7 +92,8 @@ The current local validation window is considered healthy when:
 | `TC-001` | CLI Replay Intake And Session Smoke | CLI replay | verify normalization, task persistence, and direct session start |
 | `TC-002` | CLI Proposal And Traceability Smoke | CLI half-live | verify proposal creation, traceability writeback, and direct review sync entrypoints |
 | `TC-003` | GUI Full Live Issue-Comment Smoke | GUI live | verify the operator-facing happy path from live issue comment through PR, CI, and follow-up review/close behavior |
-| `TC-004` | Agent Execution Adapter Smoke | CLI replay | verify config resolution and provider-enabled session evidence for the first opt-in adapter across `bounded_code_change` and `documentation_update` |
+| `TC-004` | Agent Execution Adapter Smoke | CLI replay | verify config resolution and provider-enabled session evidence for all currently enabled task classes |
+| `TC-005` | Real AI Connectivity Manual Flow | CLI half-live | provide a repeatable operator-facing runbook for validating real provider connectivity from issue-command intent to PR and CI evidence |
 
 ## Cadence And Triggers
 Run the relevant local regression cases when:
@@ -115,3 +116,4 @@ The testing dashboard should summarize near-term attention items, while canonica
 - 2026-04-21: Initial version.
 - 2026-04-23: Added WBS 3.9 agent execution adapter evidence to the local test scope.
 - 2026-04-23: Expanded `TC-004` scope to include provider-enabled `documentation_update` validation in addition to `bounded_code_change`.
+- 2026-04-23: Expanded `TC-004` scope to include provider-enabled `review_follow_up` and `ci_failure_investigation`, and added `TC-005` as the manual real-AI connectivity runbook.
