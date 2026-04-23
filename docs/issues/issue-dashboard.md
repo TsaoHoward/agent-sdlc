@@ -3,7 +3,7 @@
 ## Document Metadata
 - Version: 0.1
 - Status: Active
-- Last Updated: 2026-04-22
+- Last Updated: 2026-04-23
 - Owner: Project Maintainer
 - Source Template: docs/templates/issue-dashboard.template.md
 
@@ -46,6 +46,7 @@ It does not replace forge issues, roadmap/WBS planning structure, the decision b
 | Issue ID | Title | Status | Related Docs / WBS | Next Action | Exit Path |
 |---|---|---|---|---|---|
 | I-001 | Phase 1 Minimum Closed Loop Implementation Packaging | In Progress | `docs/roadmap.md` Phase 1; WBS `3`, `3.1`-`3.9` | Validate the new config-selected agent execution adapter with provider-enabled DeepSeek credentials, apply ADR-0008's config-template policy to future configurable modules, keep the testing workflow and user capability matrix current, preserve the CI-to-host traceability callback path in future changes, and improve operator-facing artifact browsing | Archive after the first slice is underway and the remaining work is split or absorbed into active execution tracking |
+| I-002 | Configuration Template Policy Compliance Gaps | Open | ADR-0008; `docs/policies/configuration-management.md`; WBS `3.1`, `3.3`, `3.5`, `3.9` | Split local Gitea/dev bootstrap into checked-in template plus ignored generated config first, then fold webhook, runner, worker-runtime, and CI callback settings into template-backed configuration surfaces where they are operator-controlled | Close after all current operator-controlled startup settings either follow the template/local-config pattern or have an explicit documented exception |
 
 ## Issue Items
 
@@ -59,6 +60,17 @@ It does not replace forge issues, roadmap/WBS planning structure, the decision b
 - Supporting Notes: `docs/issues/items/I-001-phase1-minimum-closed-loop-implementation.md`
 - Promotion / Escalation Check: Update `docs/decisions/decision-backlog.md` and ADRs only if implementation uncovers a new major boundary, ownership, or governance decision.
 - Notes: This item seeds the issue workflow with the project's current highest-signal active issue after the Phase 0 and Phase 1 design baseline.
+
+### I-002 - Configuration Template Policy Compliance Gaps
+- Status: `Open`
+- Related Docs / WBS: ADR-0008; `docs/policies/configuration-management.md`; `docs/roadmap.md` Phase 1; `docs/wbs.md` WBS `3.1`, `3.3`, `3.5`, `3.9`
+- Why It Matters: ADR-0008 makes checked-in templates plus ignored local config the repository-wide policy for configurable modules. The first compliant module exists, but several current startup surfaces still expose operator-controlled values through tracked realized config, package-script arguments, workflow env, env-only defaults, or code constants.
+- Current State: `config/agent-execution.template.yaml` plus ignored `config/agent-execution.yaml` is compliant. Machine-readable policy under `config/policy/` remains committed source-of-truth policy input and does not need a template/local split unless policy ownership changes. The local Gitea/dev bootstrap still tracks realized settings in `config/dev/gitea-bootstrap.json`, including local ports, callback host, admin credentials, and database password. Control-host webhook listener settings are split across `config/dev/gitea-bootstrap.json`, package scripts, and code defaults. The local Gitea runner, worker runtime, and CI-to-host traceability callback have operator-controlled settings that are currently env-only or embedded as defaults without a dedicated template surface.
+- Next Action: Implement the highest-impact gap first by converting `config/dev/gitea-bootstrap.json` into a checked-in template plus ignored generated local config, with a repo-owned generation helper and loader precedence consistent with ADR-0008.
+- Exit Path: Close this issue after the current configurable startup modules either follow ADR-0008's template/local-config pattern or carry an explicit documented exception.
+- Supporting Notes: `docs/issues/items/I-002-configuration-template-policy-compliance-gaps.md`
+- Promotion / Escalation Check: Update ADR-0008 or create a new ADR only if remediation changes source-of-truth ownership, secret-handling expectations, runtime isolation, CI ownership, or governance rules.
+- Notes: This issue was created from the 2026-04-23 policy compliance audit after `agent-execution` established the first repository-owned template/local-config implementation.
 
 ## Change Log
 - 2026-04-15: Initial version.
@@ -93,3 +105,4 @@ It does not replace forge issues, roadmap/WBS planning structure, the decision b
 - 2026-04-22: Narrowed the remaining WBS `3.9` implementation direction to a config-selected remote/local-capable execution adapter with `DeepSeek API` as the short-term remote default.
 - 2026-04-23: Recorded the first WBS 3.9 implementation slice for the config-selected agent execution adapter and session evidence wiring.
 - 2026-04-23: Recorded ADR-0008 as the repository-wide policy for checked-in config templates and ignored local config.
+- 2026-04-23: Added I-002 to track configuration-template policy compliance gaps across local bootstrap, webhook, runner, worker-runtime, and CI callback startup settings.

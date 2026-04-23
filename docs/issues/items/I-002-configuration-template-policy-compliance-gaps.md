@@ -1,0 +1,53 @@
+# I-002: Configuration Template Policy Compliance Gaps
+
+## Metadata
+- Issue ID: I-002
+- Status: Open
+- Last Updated: 2026-04-23
+- Owner: Project Maintainer
+- Related Docs / WBS: ADR-0008; `docs/policies/configuration-management.md`; `docs/roadmap.md` Phase 1; `docs/wbs.md` WBS `3.1`, `3.3`, `3.5`, `3.9`
+- Source Dashboard: docs/issues/issue-dashboard.md
+- Source Template: docs/templates/issue-note.template.md
+
+## Summary
+Several existing startup and integration modules predate ADR-0008's repository-wide configuration-template policy. The first compliant module is `agent-execution`, but other operator-controlled settings still need to be moved behind checked-in templates plus ignored generated local config, or documented as explicit exceptions.
+
+## Why It Matters
+Configuration drift makes local setup harder to reproduce and review. When ports, callback URLs, provider/runtime selectors, or secret-adjacent defaults live only in tracked realized config, package scripts, workflow env, or code constants, future operators and agents cannot reliably tell which settings are safe to edit, safe to commit, or expected to vary per machine.
+
+## Current State
+The following surfaces were identified in the 2026-04-23 audit:
+
+- `agent-execution` is compliant: `config/agent-execution.template.yaml` is tracked, `config/agent-execution.yaml` is ignored, and `scripts/dev/ensure-agent-execution-config.js` generates the local file.
+- `config/policy/*.yaml` is a documented exception category: these files are committed machine-readable policy source-of-truth, not generated operator-local config.
+- `config/dev/gitea-bootstrap.json` is a tracked realized local-dev config containing local ports, callback host, Gitea admin values, and PostgreSQL credentials. It has no template/local split yet.
+- Task-gateway and review-surface listener settings are duplicated across `config/dev/gitea-bootstrap.json`, npm scripts, and code defaults.
+- The local Gitea Actions runner uses env/code defaults for container name, image, labels, network, and instance URL without a template-backed config.
+- The worker runtime uses env/code defaults for worker image and container-reachable Gitea host without a template-backed config.
+- The CI-to-host traceability callback URL is embedded in `.gitea/workflows/phase1-ci.yml` and defaulted in `scripts/ci/sync-host-traceability.js`.
+
+## Dependencies And Constraints
+- ADR-0008 requires operator-controlled module configuration to have a checked-in template and ignored local config when values can vary by operator, machine, provider, credential, or local runtime.
+- Secret values should not be introduced into checked-in templates. Prefer environment variable names or generated local development defaults when unavoidable for local-only bootstrap.
+- `config/policy/*.yaml` should remain committed policy input unless a future ADR changes policy source-of-truth ownership.
+- Remediation should preserve the current working local Gitea, webhook, runner, CI callback, and worker-runtime behavior.
+
+## Proposed Handling Or Work Packaging
+Handle this in small implementation slices:
+
+- First split `config/dev/gitea-bootstrap.json` into `config/dev/gitea-bootstrap.template.json` plus ignored generated `config/dev/gitea-bootstrap.json`, and add a repo-owned helper to create the local file.
+- Then centralize task-gateway and review-surface listener settings so direct npm entrypoints and managed bootstrap use the same template-backed source where practical.
+- Then decide whether runner and worker-runtime settings should live under the dev bootstrap config or a dedicated runtime template, based on how often operators are expected to change them.
+- Then remove or parameterize the embedded CI host callback URL if it remains operator-controlled in the local workflow path.
+
+## Exit Path
+Close the issue when all current operator-controlled startup settings either follow ADR-0008's template/local-config pattern or carry an explicit documented exception in the relevant policy or architecture document.
+
+## Next Actions
+- Implement the `config/dev/gitea-bootstrap` template/local split.
+- Add or update generation helpers and `.gitignore` entries.
+- Update local bootstrap docs and tests to mention template path, local path, and generation command.
+- Re-run platform validation and a non-destructive bootstrap status check.
+
+## Change Log
+- 2026-04-23: Initial version from the configuration-template policy compliance audit.
