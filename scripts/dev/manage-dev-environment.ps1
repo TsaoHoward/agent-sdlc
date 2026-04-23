@@ -14,13 +14,32 @@ Set-StrictMode -Version Latest
 $ErrorActionPreference = "Stop"
 
 $RepoRoot = (Resolve-Path (Join-Path $PSScriptRoot "..\..")).Path
+$DefaultLocalConfigPath = Join-Path $RepoRoot "config\dev\gitea-bootstrap.json"
+$DefaultTemplateConfigPath = Join-Path $RepoRoot "config\dev\gitea-bootstrap.template.json"
+$ConfigSource = "custom"
 
 if (-not $ConfigPath) {
-    $ConfigPath = Join-Path $RepoRoot "config\dev\gitea-bootstrap.json"
+    if (Test-Path -LiteralPath $DefaultLocalConfigPath) {
+        $ConfigPath = $DefaultLocalConfigPath
+        $ConfigSource = "local"
+    }
+    elseif (Test-Path -LiteralPath $DefaultTemplateConfigPath) {
+        $ConfigPath = $DefaultTemplateConfigPath
+        $ConfigSource = "template"
+    }
+    else {
+        $ConfigPath = $DefaultLocalConfigPath
+    }
+}
+elseif ($ConfigPath -eq $DefaultLocalConfigPath) {
+    $ConfigSource = "local"
+}
+elseif ($ConfigPath -eq $DefaultTemplateConfigPath) {
+    $ConfigSource = "template"
 }
 
 if (-not (Test-Path -LiteralPath $ConfigPath)) {
-    throw "Bootstrap config file was not found at '$ConfigPath'."
+    throw "Bootstrap config file was not found at '$ConfigPath'. Run 'npm run dev:gitea-bootstrap-config' or restore '$DefaultTemplateConfigPath'."
 }
 
 $BootstrapConfig = Get-Content -LiteralPath $ConfigPath -Raw | ConvertFrom-Json
@@ -99,7 +118,20 @@ $GiteaDefaultBranch = if ($BootstrapConfig.gitea.defaultBranch) { [string]$Boots
 $GiteaUserUid = if ($null -ne $BootstrapConfig.gitea.userUid) { [int]$BootstrapConfig.gitea.userUid } else { 1000 }
 $GiteaUserGid = if ($null -ne $BootstrapConfig.gitea.userGid) { [int]$BootstrapConfig.gitea.userGid } else { 1000 }
 $GiteaAdminUsername = [string]$BootstrapConfig.gitea.admin.username
-$GiteaAdminPassword = [string]$BootstrapConfig.gitea.admin.password
+$GiteaAdminPasswordEnvName = if ($BootstrapConfig.gitea.admin.passwordEnv) { [string]$BootstrapConfig.gitea.admin.passwordEnv } else { "AGENT_SDLC_GITEA_PASSWORD" }
+$GiteaAdminPasswordFromNamedEnv = if ($GiteaAdminPasswordEnvName) { [Environment]::GetEnvironmentVariable($GiteaAdminPasswordEnvName) } else { "" }
+$GiteaAdminPassword = if ($env:AGENT_SDLC_GITEA_PASSWORD) {
+    $env:AGENT_SDLC_GITEA_PASSWORD
+}
+elseif ($GiteaAdminPasswordFromNamedEnv) {
+    $GiteaAdminPasswordFromNamedEnv
+}
+elseif ($BootstrapConfig.gitea.admin.password) {
+    [string]$BootstrapConfig.gitea.admin.password
+}
+else {
+    ""
+}
 $GiteaAdminEmail = [string]$BootstrapConfig.gitea.admin.email
 $GiteaAdminMustChangePassword = if ($null -ne $BootstrapConfig.gitea.admin.mustChangePassword) { [bool]$BootstrapConfig.gitea.admin.mustChangePassword } else { $false }
 $GiteaDatabaseMode = if ($GiteaDatabaseMode) { $GiteaDatabaseMode } elseif ($env:AGENT_SDLC_GITEA_DB_MODE) { $env:AGENT_SDLC_GITEA_DB_MODE } else { [string]$BootstrapConfig.gitea.databaseMode }
@@ -146,10 +178,24 @@ $GiteaPostgresUser = if ($env:AGENT_SDLC_GITEA_POSTGRES_USER) {
 } else {
     [string]$BootstrapConfig.postgres.user
 }
+$GiteaPostgresPasswordEnvName = if ($BootstrapConfig.postgres.passwordEnv) { [string]$BootstrapConfig.postgres.passwordEnv } else { "AGENT_SDLC_GITEA_POSTGRES_PASSWORD" }
+$GiteaPostgresPasswordFromNamedEnv = if ($GiteaPostgresPasswordEnvName) { [Environment]::GetEnvironmentVariable($GiteaPostgresPasswordEnvName) } else { "" }
 $GiteaPostgresPassword = if ($env:AGENT_SDLC_GITEA_POSTGRES_PASSWORD) {
     $env:AGENT_SDLC_GITEA_POSTGRES_PASSWORD
-} else {
+} elseif ($GiteaPostgresPasswordFromNamedEnv) {
+    $GiteaPostgresPasswordFromNamedEnv
+} elseif ($BootstrapConfig.postgres.password) {
     [string]$BootstrapConfig.postgres.password
+} else {
+    ""
+}
+
+if ($Command -eq "up" -and -not $GiteaAdminPassword) {
+    throw "Gitea admin password is not configured. Run 'npm run dev:gitea-bootstrap-config' or set '$GiteaAdminPasswordEnvName'."
+}
+
+if ($Command -eq "up" -and $GiteaDatabaseMode -eq "postgres" -and -not $GiteaPostgresPassword) {
+    throw "Gitea PostgreSQL password is not configured. Run 'npm run dev:gitea-bootstrap-config' or set '$GiteaPostgresPasswordEnvName'."
 }
 
 function Ensure-Directory {
@@ -464,6 +510,7 @@ function Initialize-ProjectState {
 
     Save-JsonFile -Path $EffectiveBootstrapSettingsPath -Value @{
         configPath = $ConfigPath
+        configSource = $ConfigSource
         dockerDesktopPath = $DockerDesktopPath
         dockerDesktopStartupTimeoutSeconds = $DockerDesktopStartupTimeoutSeconds
         bindAddress = $PortBindAddress
@@ -897,6 +944,7 @@ function Write-GiteaBootstrapSummary {
         installedNonInteractively = $true
         installLock = $GiteaInstallLock
         configPath = $ConfigPath
+        configSource = $ConfigSource
         generatedSecretsPath = $GiteaSecretsPath
         localRepo = @{
             ensureOnBootstrap = $LocalRepoEnsureOnBootstrap
@@ -1061,7 +1109,7 @@ function Show-EnvironmentStatus {
     }
 
     Write-Host "Project root: $RepoRoot"
-    Write-Host "Bootstrap config: $ConfigPath"
+    Write-Host "Bootstrap config: $ConfigPath ($ConfigSource)"
     Write-Host "Docker Desktop Path: $DockerDesktopPath"
     Write-Host "ENV-001 Forge (Gitea): $giteaStatus on $GiteaRootUrl"
     Write-Host "ENV-001 Port Forwarding: ${PortBindAddress}:${GiteaHttpPort}->3000 and ${PortBindAddress}:${GiteaSshPort}->2222"
@@ -1078,14 +1126,14 @@ function Show-EnvironmentStatus {
     Write-Host "ENV-005 Task Request State: $(Get-DirectoryState -Path $TaskRequestStateDir)"
     Write-Host "ENV-005 Agent Session State: $(Get-DirectoryState -Path $AgentSessionStateDir)"
     Write-Host "ENV-005 Traceability Path: $(Get-DirectoryState -Path $TraceabilityDir)"
-    Write-Host "ENV-006 Secrets: repo-owned config plus generated local Gitea secrets under $GiteaSecretsPath"
+    Write-Host "ENV-006 Secrets: template/local config plus generated local Gitea secrets under $GiteaSecretsPath"
 }
 
 switch ($Command) {
     "init" {
         Initialize-ProjectState
         Write-Host "Initialized project-local state directories under '$ProjectStateRoot'."
-        Write-Host "Bootstrap config is sourced from '$ConfigPath'."
+        Write-Host "Bootstrap config is sourced from '$ConfigPath' ($ConfigSource)."
         break
     }
 

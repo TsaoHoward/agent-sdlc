@@ -123,6 +123,7 @@ Phase 1 environment dependencies do not all need to be bundled inside the reposi
 Current bootstrap commands:
 
 ```powershell
+npm run dev:gitea-bootstrap-config
 powershell -File scripts/dev/manage-dev-environment.ps1 -Command init
 powershell -File scripts/dev/manage-dev-environment.ps1 -Command up
 powershell -File scripts/dev/manage-dev-environment.ps1 -Command up -GiteaDatabaseMode sqlite
@@ -136,7 +137,8 @@ npm run dev:env:status
 npm run dev:env:down
 ```
 
-`dev:env:up` now also starts the default task-intake and review-follow-up webhook listeners from repo-owned config, and the default local Gitea repo bootstrap path now ensures both issue-comment and review-follow-up webhooks are configured against that repo.
+`dev:env:up` now also starts the default task-intake and review-follow-up webhook listeners from template/local config, and the default local Gitea repo bootstrap path now ensures both issue-comment and review-follow-up webhooks are configured against that repo.
+The npm `dev:env:init` and `dev:env:up*` commands ensure the ignored local Gitea bootstrap config before starting; run `npm run dev:gitea-bootstrap-config` once first when using the direct PowerShell `up` command without password environment variables.
 
 Current platform package commands:
 
@@ -146,6 +148,7 @@ npm run validate:platform
 npm run typecheck
 npm run task-gateway:webhook
 npm run review-surface:webhook
+npm run dev:gitea-bootstrap-config
 npm run dev:agent-execution-config
 npm run dev:gitea-repo -- ensure-local-repo --owner howard --repo agent-sdlc --seed-from .
 npm run dev:gitea-runner -- ensure-runner
@@ -156,6 +159,6 @@ docker build -f docker/worker-runtime/Dockerfile -t agent-sdlc-worker-runtime:te
 When `--seed-from .` is used, the local Gitea repo is seeded from the source repo's current `HEAD` into remote `main` so the local forge sees the same tracked workflow and platform files as the active workspace.
 If a local regression ever prevents auto-created Actions runs for fresh PR events, the tracked workflow also supports `workflow_dispatch` so maintainers can manually dispatch `phase1-ci` against the proposal branch during troubleshooting.
 
-The default local ports come from `config/dev/gitea-bootstrap.json` and are intentionally forwarded to higher, non-common host ports.
+The default local ports come from the tracked `config/dev/gitea-bootstrap.template.json`. Operators can generate an ignored local override at `config/dev/gitea-bootstrap.json` with `npm run dev:gitea-bootstrap-config`; loaders prefer that local file when present and otherwise fall back to the template.
 
 See `docs/environment-bootstrap.md` for the current bootstrap posture and what each command covers, then use `docs/testing/README.md` and `docs/testing/local-test-procedures.md` for the repeatable operator test flow.

@@ -193,7 +193,7 @@
 - Dependencies: 2
 - Critical-Path-Candidate: Yes
 - Status: In Progress
-- Notes: Project-local environment bootstrap now includes repo-owned config, explicit high-port forwarding, non-interactive local Gitea initialization, and admin-password refresh behavior that preserves the tracked forced-password-change setting so the first implementation slice can start without unstable manual forge setup. The current implementation slice now also includes repo-local task-gateway, agent-control, proposal-surface, and local-Gitea-repo helper CLIs that write file-backed task/session state and create the first traceable Gitea PR proposal. ADR-0006 now sets the platform-stack convergence path to TypeScript/Node.js plus npm, with repo-owned Dockerfiles as the packaging baseline before later compose consolidation.
+- Notes: Project-local environment bootstrap now includes a repo-owned template plus ignored local config path, explicit high-port forwarding, non-interactive local Gitea initialization, and admin-password refresh behavior that preserves the configured forced-password-change setting so the first implementation slice can start without unstable manual forge setup. The current implementation slice now also includes repo-local task-gateway, agent-control, proposal-surface, and local-Gitea-repo helper CLIs that write file-backed task/session state and create the first traceable Gitea PR proposal. ADR-0006 now sets the platform-stack convergence path to TypeScript/Node.js plus npm, with repo-owned Dockerfiles as the packaging baseline before later compose consolidation.
 
 ### WBS 3.1 — Trigger Adapter Implementation
 - Parent: 3
@@ -451,3 +451,4 @@
 - 2026-04-22: Narrowed WBS 3.9 toward a config-selected remote/local-capable execution adapter with `DeepSeek API` as the short-term remote default.
 - 2026-04-23: Moved WBS 3.9 to in progress after adding the first config-selected agent execution adapter slice and session evidence wiring.
 - 2026-04-23: Added ADR-0008-backed configuration template governance to WBS 1.4.
+- 2026-04-23: Updated WBS 3 after moving local Gitea/dev bootstrap settings to the ADR-0008 template/local-config pattern.

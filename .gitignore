@@ -4,5 +4,6 @@
 .agent-sdlc/runtime/
 .agent-sdlc/traceability/
 config/agent-execution.yaml
+config/dev/gitea-bootstrap.json
 node_modules/
 dist/

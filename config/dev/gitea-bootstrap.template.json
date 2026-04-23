@@ -27,7 +27,8 @@
     "userGid": 1000,
     "admin": {
       "username": "agent-admin",
-      "password": "agent-dev-password",
+      "passwordEnv": "AGENT_SDLC_GITEA_PASSWORD",
+      "password": "",
       "email": "agent-admin@example.local",
       "mustChangePassword": false
     }
@@ -68,6 +69,7 @@
     "image": "postgres:16",
     "database": "gitea",
     "user": "gitea",
-    "password": "gitea-dev-password"
+    "passwordEnv": "AGENT_SDLC_GITEA_POSTGRES_PASSWORD",
+    "password": ""
   }
 }

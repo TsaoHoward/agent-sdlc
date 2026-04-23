@@ -8,7 +8,7 @@ It complements `docs/environment-requirements.md` by describing how maintainers 
 ## Current Bootstrap Posture
 - prefer repository-local commands as the operator-facing startup surface
 - allow backing services to remain external or tool-managed when that keeps Phase 1 replaceable and light
-- keep concrete local startup settings in a repo-owned config file rather than only in ad hoc local commands
+- keep concrete local startup settings in a repo-owned template plus ignored local config rather than only in ad hoc local commands
 - use explicit host-port forwarding on non-common ports so local startup stays conflict-resistant and easier to translate into `docker compose` or Kubernetes manifests later
 - keep bootstrap entrypoints stable even if the underlying implementation later moves to `docker compose` or another one-command launcher
 - defer a full single-file orchestration package until the active service mix is stable enough to justify it
@@ -17,7 +17,7 @@ It complements `docs/environment-requirements.md` by describing how maintainers 
 ## Current Bootstrap Surfaces
 | Environment ID | Current Bootstrap Path | Current Posture |
 |---|---|---|
-| ENV-001 | `scripts/dev/manage-dev-environment.ps1 -Command up`; `npm run dev:env:up`; `npm run dev:gitea-repo -- ensure-local-repo ...` | Starts a local Gitea development stack from repo-owned config and now has a repo-local helper to provision the default local owner/repository path for proposal-flow testing. The default local path uses PostgreSQL-backed Gitea, explicit high-port forwarding, non-interactive installation with an admin user bootstrap, a repo-owned webhook allowed-host list for host callbacks, and repo-hook configuration for both issue-comment intake and review-follow-up sync. |
+| ENV-001 | `scripts/dev/manage-dev-environment.ps1 -Command up`; `npm run dev:env:up`; `npm run dev:gitea-repo -- ensure-local-repo ...` | Starts a local Gitea development stack from repo-owned template/local config and now has a repo-local helper to provision the default local owner/repository path for proposal-flow testing. The default local path uses PostgreSQL-backed Gitea, explicit high-port forwarding, non-interactive installation with an admin user bootstrap, a repo-owned webhook allowed-host list for host callbacks, and repo-hook configuration for both issue-comment intake and review-follow-up sync. |
 | ENV-002 | `npm install`; `npm run validate:platform`; `npm run task-gateway:webhook`; `node scripts/agent-control.js ...`; `node scripts/proposal-surface.js ...`; `node scripts/review-surface.js ...`; `npm run review-surface:webhook`; `scripts/dev/manage-dev-environment.ps1 -Command up -SkipGitea` | Prepares the npm-managed control-plane baseline and exposes repo-local webhook, session-start, proposal-surface, and review-surface CLIs. The current slice supports actual Gitea issue-comment webhook delivery, source-event retention, normalized task-request persistence, direct handoff into the worker runtime scaffold, PR creation against the local Gitea forge, explicit review-outcome synchronization back into durable traceability records, and bootstrap-managed task/review webhook listeners for the default local repo posture. |
 | ENV-003 | `docker build -f docker/worker-runtime/Dockerfile ...`; `node scripts/agent-control.js ...` | Builds and exercises the first repo-owned worker-runtime image scaffold on top of the host-local Docker-compatible runner. The current runtime handoff launches a per-session container, prepares a fresh workspace checkout from the forge target repository and branch, and exports runtime launch artifacts under `.agent-sdlc/runtime/`. |
 | ENV-004 | `npm run dev:gitea-runner -- ensure-runner`; `.gitea/workflows/phase1-ci.yml` | Boots a local Gitea Actions runner and executes the first PR-triggered CI workflow. The current skeleton collects verification metadata into `.agent-sdlc/ci/verification-metadata.json`, emits it in job logs and step summaries, attaches CI run references and final verification status to the traceability artifact, refreshes the PR traceability block for reviewers, and uploads those artifacts as persisted workflow outputs even when the local forge root URL is localhost-backed. The tracked workflow also supports `workflow_dispatch` as an operator fallback for targeted reruns or local debugging. |
@@ -28,6 +28,7 @@ It complements `docs/environment-requirements.md` by describing how maintainers 
 Run these commands from the repository root in PowerShell:
 
 ```powershell
+npm run dev:gitea-bootstrap-config
 powershell -File scripts/dev/manage-dev-environment.ps1 -Command init
 powershell -File scripts/dev/manage-dev-environment.ps1 -Command up
 powershell -File scripts/dev/manage-dev-environment.ps1 -Command up -GiteaDatabaseMode sqlite
@@ -45,6 +46,7 @@ npm run validate:platform
 npm run typecheck
 npm run task-gateway:webhook
 npm run review-surface:webhook
+npm run dev:gitea-bootstrap-config
 npm run dev:gitea-repo -- ensure-local-repo --owner howard --repo agent-sdlc --seed-from .
 npm run dev:gitea-runner -- ensure-runner
 node scripts/task-gateway.js normalize-gitea-issue-comment --event docs/examples/gitea-issue-comment-event.example.json
@@ -58,9 +60,10 @@ docker build -f docker/worker-runtime/Dockerfile -t agent-sdlc-worker-runtime:te
 ```
 
 Command behavior:
+- `npm run dev:gitea-bootstrap-config` generates ignored local config at `config/dev/gitea-bootstrap.json` from the tracked `config/dev/gitea-bootstrap.template.json`
 - `init` creates the local `.agent-sdlc/` state and development-environment directories used by the first implementation slice
-- `up` runs `init`, then starts the local PostgreSQL-backed Gitea development stack, applies the tracked bootstrap settings, and completes the initial install path non-interactively if Docker is available
-- `up` now also starts the managed task-gateway and review-follow-up webhook listeners from repo-owned config, then ensures the default local Gitea repo plus its webhook set when local forge bootstrap is enabled
+- `up` runs `init`, then starts the local PostgreSQL-backed Gitea development stack, applies the local bootstrap config when present or the tracked template otherwise, and completes the initial install path non-interactively if Docker is available
+- `up` now also starts the managed task-gateway and review-follow-up webhook listeners from the template/local bootstrap config, then ensures the default local Gitea repo plus its webhook set when local forge bootstrap is enabled
 - `up -GiteaDatabaseMode sqlite` starts the lighter single-container Gitea fallback instead of the PostgreSQL-backed stack
 - `up -SkipGitea` prepares the project-local state surfaces and managed control-host webhook listeners without requiring the local forge container to be available yet
 - `status` reports the current project-local bootstrap state without changing it
@@ -91,14 +94,15 @@ Local CI fallback:
 
 ## Repo-Owned Bootstrap Inputs
 The current local forge bootstrap and platform packaging baseline are configured by:
-- `config/dev/gitea-bootstrap.json`
+- `config/dev/gitea-bootstrap.template.json`
+- `config/dev/gitea-bootstrap.json` when generated locally; this file is ignored by Git
 - `package.json`
 - `package-lock.json`
 - `tsconfig.json`
 - `docker/worker-runtime/Dockerfile`
 - `.dockerignore`
 
-The local forge bootstrap config currently owns:
+The local forge bootstrap template/local config currently owns:
 - the Docker Desktop path used for auto-start attempts
 - the explicit forwarded host ports and bind address
 - the default Gitea database mode
@@ -107,6 +111,11 @@ The local forge bootstrap config currently owns:
 - the local bootstrap admin user values for the dev stack
 - the default local owner/repo bootstrap target
 - the callback host plus route/port settings for the task-intake and review-follow-up webhook paths
+
+Config resolution follows ADR-0008:
+- local config: `config/dev/gitea-bootstrap.json`
+- template config: `config/dev/gitea-bootstrap.template.json`
+- generator: `npm run dev:gitea-bootstrap-config`
 
 The package and runtime files currently own:
 - the selected npm-managed platform package baseline
@@ -176,7 +185,7 @@ Starting the containers is no longer the only bootstrap step, but several workfl
 - the first PostgreSQL bring-up can take noticeably longer than a normal restart because the database has to initialize before Gitea can connect
 - under the localhost-rooted local forge topology, the runner helper now shifts runner and job containers onto host networking and injects an `agent-sdlc-gitea` host alias so checkout and artifact upload both succeed; during validation, local Gitea still returned an empty artifact listing response even though uploaded chunks were persisted on disk
 - local Gitea host callbacks require a non-default webhook allowlist because `host.docker.internal` resolves to a private address from inside the forge container; the bootstrap now sets `webhook.ALLOWED_HOST_LIST=external,private` so the default issue-comment and review listeners are reachable
-- if an older local data set was created before this bootstrap synced the admin `mustChangePassword` flag during password refresh, run `powershell -File scripts/dev/manage-dev-environment.ps1 -Command up` once to reconcile the existing admin account with the tracked bootstrap setting
+- if an older local data set was created before this bootstrap synced the admin `mustChangePassword` flag during password refresh, run `powershell -File scripts/dev/manage-dev-environment.ps1 -Command up` once to reconcile the existing admin account with the template/local bootstrap setting
 
 ## Non-Goals
 - fully provisioning every environment dependency from scratch

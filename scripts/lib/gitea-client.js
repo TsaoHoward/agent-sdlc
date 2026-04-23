@@ -11,17 +11,51 @@ function normalizeBaseUrl(baseUrl) {
   return parsed.toString();
 }
 
-function loadLocalGiteaSettings(repoRoot) {
-  const configPath = path.join(repoRoot, "config", "dev", "gitea-bootstrap.json");
-  const config = JSON.parse(fs.readFileSync(configPath, "utf8"));
+function resolveGiteaBootstrapConfig(repoRoot) {
+  const localConfigPath = path.join(repoRoot, "config", "dev", "gitea-bootstrap.json");
+  const templateConfigPath = path.join(repoRoot, "config", "dev", "gitea-bootstrap.template.json");
+  const configPath = fs.existsSync(localConfigPath) ? localConfigPath : templateConfigPath;
+
+  if (!fs.existsSync(configPath)) {
+    throw new Error(
+      "Gitea bootstrap config was not found. Run 'npm run dev:gitea-bootstrap-config' or restore config/dev/gitea-bootstrap.template.json.",
+    );
+  }
 
   return {
     configPath,
+    configSource: configPath === localConfigPath ? "local" : "template",
+    localConfigPath,
+    templateConfigPath,
+  };
+}
+
+function readGiteaBootstrapConfig(repoRoot) {
+  const resolvedConfig = resolveGiteaBootstrapConfig(repoRoot);
+  const config = JSON.parse(fs.readFileSync(resolvedConfig.configPath, "utf8"));
+
+  return {
+    ...resolvedConfig,
+    config,
+  };
+}
+
+function loadLocalGiteaSettings(repoRoot) {
+  const { configPath, configSource, config } = readGiteaBootstrapConfig(repoRoot);
+  const adminPasswordEnvName =
+    (config.gitea.admin && config.gitea.admin.passwordEnv) || "AGENT_SDLC_GITEA_PASSWORD";
+
+  return {
+    configPath,
+    configSource,
     baseUrl: normalizeBaseUrl(
       process.env.AGENT_SDLC_GITEA_BASE_URL || config.gitea.rootUrl || "http://localhost:43000/",
     ),
     username: process.env.AGENT_SDLC_GITEA_USERNAME || config.gitea.admin.username,
-    password: process.env.AGENT_SDLC_GITEA_PASSWORD || config.gitea.admin.password,
+    password:
+      process.env.AGENT_SDLC_GITEA_PASSWORD ||
+      process.env[adminPasswordEnvName] ||
+      config.gitea.admin.password,
     token: process.env.AGENT_SDLC_GITEA_TOKEN || null,
   };
 }
@@ -301,7 +335,9 @@ module.exports = {
   listRepositoryHooks,
   loadLocalGiteaSettings,
   parseGiteaRepositoryRef,
+  readGiteaBootstrapConfig,
   requestJson,
+  resolveGiteaBootstrapConfig,
   updatePullRequest,
   updateRepositoryHook,
 };

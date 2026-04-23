@@ -1,4 +1,3 @@
-const fs = require("fs");
 const { spawnSync } = require("child_process");
 const path = require("path");
 
@@ -10,6 +9,7 @@ const {
   getUser,
   listRepositoryHooks,
   loadLocalGiteaSettings,
+  readGiteaBootstrapConfig,
   updateRepositoryHook,
 } = require("../lib/gitea-client");
 const { getRepoRoot } = require("../lib/project-state");
@@ -82,11 +82,6 @@ function runProcess(fileName, args, cwd = undefined) {
   }
 
   return (result.stdout || "").trim();
-}
-
-function readBootstrapConfig(repoRoot) {
-  const configPath = path.join(repoRoot, "config", "dev", "gitea-bootstrap.json");
-  return JSON.parse(fs.readFileSync(configPath, "utf8"));
 }
 
 function normalizeRoute(route) {
@@ -319,7 +314,7 @@ async function main() {
   try {
     const repoRoot = getRepoRoot();
     const options = parseArguments(process.argv);
-    const bootstrapConfig = readBootstrapConfig(repoRoot);
+    const { config: bootstrapConfig } = readGiteaBootstrapConfig(repoRoot);
     const settings = loadLocalGiteaSettings(repoRoot);
     const repositoryRef = `gitea:${new URL(settings.baseUrl).host}/${options.owner}/${options.repo}`;
     const repositoryUrls = buildRepositoryUrls(settings, options.owner, options.repo, repositoryRef);

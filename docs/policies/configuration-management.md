@@ -27,11 +27,13 @@ Module loaders should use this order unless a documented exception exists:
 When configuration affects lifecycle behavior or evidence, records should include which source was used.
 
 ## 4. Secret Handling
-Templates and local config should not contain raw secret values.
+Templates must not contain raw secret values. Local config should avoid raw secret values when practical.
 
 Preferred approach:
 - config names an environment variable or secret reference
 - the actual secret value is supplied outside the checked-in file
+
+Generated local-only development credentials may exist in ignored local config when they are needed to keep the local bootstrap repeatable, but they must not be committed.
 
 If a future module needs a different secret handling model, update the relevant policy and create an ADR when source-of-truth ownership or security posture changes.
 
@@ -55,6 +57,12 @@ The first module following this pattern is agent execution:
 - loader: `scripts/lib/agent-execution.js`
 
 The local file is ignored by Git and can be regenerated from the template.
+
+The local Gitea/dev bootstrap config also follows this pattern:
+- template: `config/dev/gitea-bootstrap.template.json`
+- local config: `config/dev/gitea-bootstrap.json`
+- generator: `npm run dev:gitea-bootstrap-config`
+- loader surfaces: `scripts/dev/manage-dev-environment.ps1` and `scripts/lib/gitea-client.js`
 
 ## 7. Change Control
 Changes to template shape or safe defaults are usually implementation or planning changes.
