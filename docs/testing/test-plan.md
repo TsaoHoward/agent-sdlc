@@ -33,7 +33,7 @@ This plan currently covers local validation of the Phase 1 closed loop for:
 - issue-comment intake
 - task normalization and session start
 - runtime workspace preparation
-- config-selected agent execution adapter evidence
+- config-template-selected agent execution adapter evidence
 - branch and PR proposal creation
 - CI verification linkage
 - review-follow-up and PR close/reopen synchronization

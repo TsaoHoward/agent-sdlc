@@ -166,4 +166,4 @@ If implementation uncovers a major unresolved decision, the issue should stay ac
 - 2026-04-22: Added `docs/user-capability-matrix.md` as the durable current-state handoff for supported `@agent` entrypoints, task tokens, manual operator surfaces, and lifecycle coverage.
 - 2026-04-22: Added the explicit packaging follow-up to land one real provider-backed agent execution slice in Phase 1, with `bounded_code_change` as the preferred first target.
 - 2026-04-22: Narrowed the first real execution slice toward a config-selected remote/local-capable adapter with `DeepSeek API` as the short-term remote default.
-- 2026-04-23: Recorded the first implementation slice for `config/agent-execution.yaml`, `scripts/lib/agent-execution.js`, and session-record execution evidence.
+- 2026-04-23: Recorded the first implementation slice for `config/agent-execution.template.yaml`, local generated `config/agent-execution.yaml`, `scripts/lib/agent-execution.js`, and session-record execution evidence.

@@ -75,7 +75,7 @@ It does not replace CI run history, forge issue or PR history, roadmap/WBS plann
 - Mode: `CLI replay`
 - Related Docs / WBS: `docs/testing/items/TC-004-agent-execution-adapter-smoke.md`; WBS `3.9`
 - Why It Matters: This is the first validation surface for the new config-selected agent execution adapter before it is trusted as part of the live issue-to-PR path.
-- Current State: The disabled-by-default adapter path has been smoke-tested without API credentials and writes `agent-execution.json` evidence with provider/config metadata. Provider-enabled DeepSeek validation still needs real credentials.
+- Current State: The disabled-by-default adapter path has been smoke-tested without API credentials and writes `agent-execution.json` evidence with provider/config metadata. The tracked config is now a template, while generated local config is ignored by Git. Provider-enabled DeepSeek validation still needs real credentials.
 - Next Action: Run the canonical case first in disabled mode, then repeat with `DEEPSEEK_API_KEY` and explicit enablement when the operator wants to validate real provider-backed edits.
 - Exit Path: Move out after provider-enabled validation is either passed or split into a narrower active item.
 - Canonical Case: `docs/testing/items/TC-004-agent-execution-adapter-smoke.md`

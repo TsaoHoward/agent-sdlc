@@ -427,7 +427,8 @@ This example is intentionally illustrative. It records the desired control shape
 
 ## Implementation Defaults Selected On 2026-04-23
 The first implementation slice settled these detail defaults without changing the selected architecture:
-- checked-in config path: `config/agent-execution.yaml`
+- checked-in config template path: `config/agent-execution.template.yaml`
+- generated local config path: `config/agent-execution.yaml`, ignored by Git
 - default backend: `deepseek`
 - default mode: `remote`
 - default base URL: `https://api.deepseek.com`
@@ -437,6 +438,7 @@ The first implementation slice settled these detail defaults without changing th
 - first evidence artifact: `agent-execution.json` in the session artifact directory, referenced from the session record
 
 This keeps the provider and model choice visible while avoiding a hard dependency on API credentials for the already-working local closed-loop scaffold.
+The local config can be generated from the template with `npm run dev:agent-execution-config`.
 
 ## Implications For WBS 3.9
 The first implementation slice should now be understood as:

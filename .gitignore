@@ -3,5 +3,6 @@
 .agent-sdlc/state/
 .agent-sdlc/runtime/
 .agent-sdlc/traceability/
+config/agent-execution.yaml
 node_modules/
 dist/

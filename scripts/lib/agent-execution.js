@@ -43,10 +43,13 @@ function parseBooleanEnv(value, fallback) {
 }
 
 function readAgentExecutionConfig(repoRoot) {
-  const configPath = path.join(repoRoot, "config", "agent-execution.yaml");
+  const localConfigPath = path.join(repoRoot, "config", "agent-execution.yaml");
+  const templateConfigPath = path.join(repoRoot, "config", "agent-execution.template.yaml");
+  const configPath = fs.existsSync(localConfigPath) ? localConfigPath : templateConfigPath;
   if (!fs.existsSync(configPath)) {
     return {
       configPath,
+      configSource: "default",
       config: { ...DEFAULT_CONFIG },
     };
   }
@@ -54,6 +57,7 @@ function readAgentExecutionConfig(repoRoot) {
   const parsed = readYamlFile(configPath);
   return {
     configPath,
+    configSource: configPath === localConfigPath ? "local" : "template",
     config: {
       ...DEFAULT_CONFIG,
       ...(parsed.agentExecution || {}),
@@ -62,9 +66,10 @@ function readAgentExecutionConfig(repoRoot) {
 }
 
 function resolveAgentExecutionConfig(repoRoot) {
-  const { configPath, config } = readAgentExecutionConfig(repoRoot);
+  const { configPath, configSource, config } = readAgentExecutionConfig(repoRoot);
   return {
     configPath,
+    configSource,
     config: {
       ...config,
       enabled: parseBooleanEnv(process.env.AGENT_SDLC_AGENT_EXECUTION_ENABLED, config.enabled),
@@ -323,7 +328,7 @@ function runValidationCommands({ workspaceDir, commands, allowedCommands, maxCom
   });
 }
 
-function buildSkippedResult({ repoRoot, artifactDir, configPath, config, reason }) {
+function buildSkippedResult({ repoRoot, artifactDir, configPath, configSource, config, reason }) {
   const now = utcNow();
   const result = {
     status: "skipped",
@@ -335,6 +340,7 @@ function buildSkippedResult({ repoRoot, artifactDir, configPath, config, reason 
       model: config.model,
     },
     config_ref: toRepoRelativePath(repoRoot, configPath),
+    config_source: configSource,
     started_at: now,
     finished_at: now,
     changed_files: [],
@@ -350,7 +356,7 @@ function buildSkippedResult({ repoRoot, artifactDir, configPath, config, reason 
 
 async function executeAgentSlice({ repoRoot, taskRequest, sessionRecord, workspaceDir, artifactDir }) {
   const startedAt = utcNow();
-  const { configPath, config } = resolveAgentExecutionConfig(repoRoot);
+  const { configPath, configSource, config } = resolveAgentExecutionConfig(repoRoot);
   const allowedTaskClasses = config.allowedTaskClasses || [];
 
   if (!allowedTaskClasses.includes(taskRequest.task_class)) {
@@ -358,6 +364,7 @@ async function executeAgentSlice({ repoRoot, taskRequest, sessionRecord, workspa
       repoRoot,
       artifactDir,
       configPath,
+      configSource,
       config,
       reason: "task_class_not_enabled_for_agent_execution",
     });
@@ -368,6 +375,7 @@ async function executeAgentSlice({ repoRoot, taskRequest, sessionRecord, workspa
       repoRoot,
       artifactDir,
       configPath,
+      configSource,
       config,
       reason: "disabled_by_config",
     });
@@ -422,6 +430,7 @@ async function executeAgentSlice({ repoRoot, taskRequest, sessionRecord, workspa
     },
     usage: providerResult.usage,
     config_ref: toRepoRelativePath(repoRoot, configPath),
+    config_source: configSource,
     started_at: startedAt,
     finished_at: utcNow(),
     changed_files: changedFiles,
