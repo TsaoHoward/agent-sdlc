@@ -1,0 +1,69 @@
+# TC-004: Agent Execution Adapter Smoke
+
+## Metadata
+- Test ID: TC-004
+- Status: Ready
+- Last Updated: 2026-04-23
+- Owner: Project Maintainer
+- Mode: CLI replay
+- Related Docs / WBS: `docs/decisions/D-012-phase1-minimal-real-agent-execution-shape.md`; WBS `3.9`
+- Source Dashboard: docs/testing/test-dashboard.md
+- Source Template: docs/templates/test-case.template.md
+
+## Objective
+Verify that the first config-selected agent execution adapter resolves configuration, writes durable execution evidence, and can later be enabled for a real DeepSeek-backed `bounded_code_change` run.
+
+## Scope
+This case covers:
+- `config/agent-execution.yaml` config resolution
+- disabled-by-default execution evidence
+- DeepSeek provider metadata in `agent-execution.json`
+- later provider-enabled validation when credentials are available
+
+It does not replace the full proposal, CI, or GUI live cases.
+
+## Preconditions
+- the workspace has `npm install` completed
+- the repo root is the active working directory
+- provider-enabled validation requires `DEEPSEEK_API_KEY`
+
+## Test Data
+- config file: `config/agent-execution.yaml`
+- API key environment variable: `DEEPSEEK_API_KEY`
+- enablement environment variable: `AGENT_SDLC_AGENT_EXECUTION_ENABLED=true`
+- default model: `deepseek-chat`
+
+## Steps
+1. Run platform syntax validation:
+
+```powershell
+npm run validate:platform
+```
+
+2. Run the disabled-by-default adapter evidence smoke:
+
+```powershell
+$tmp = Join-Path $env:TEMP ("agent-sdlc-agent-exec-smoke-" + [guid]::NewGuid().ToString("N"))
+New-Item -ItemType Directory -Force -Path (Join-Path $tmp "workspace"), (Join-Path $tmp "artifacts") | Out-Null
+node -e "const { executeAgentSlice } = require('./scripts/lib/agent-execution'); (async () => { const result = await executeAgentSlice({ repoRoot: process.cwd(), taskRequest: { task_request_id: 'trq-smoke', task_class: 'bounded_code_change', summary: 'adapter smoke', execution_profile_id: 'bounded-change', runtime_capability_set_id: 'bounded-change' }, sessionRecord: { agent_session_id: 'ags-smoke' }, workspaceDir: process.argv[1], artifactDir: process.argv[2] }); console.log(JSON.stringify(result, null, 2)); })().catch((error) => { console.error(error); process.exit(1); });" (Join-Path $tmp "workspace") (Join-Path $tmp "artifacts")
+```
+
+3. Confirm the output reports `status: skipped`, `reason: disabled_by_config`, provider `backend: deepseek`, and model `deepseek-chat`.
+4. For provider-enabled validation, set `DEEPSEEK_API_KEY`, enable execution, and run through a bounded task/session path.
+
+## Expected Results
+- syntax validation passes
+- disabled mode writes `agent-execution.json`
+- the evidence includes config, provider, model, status, timestamps, changed files, and validation command fields
+- when enabled with credentials, provider failures fail closed before proposal creation rather than silently producing an unverified proposal
+
+## Evidence To Capture
+- `npm run validate:platform` output
+- `agent-execution.json`
+- provider-enabled session record when real credentials are used
+
+## Cleanup
+Temporary smoke directories under `$env:TEMP` can be removed after inspection.
+
+## Change Log
+- 2026-04-23: Initial version.

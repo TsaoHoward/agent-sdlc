@@ -31,6 +31,13 @@ function parseScalar(value) {
   return value;
 }
 
+function isQuotedScalarText(value) {
+  return (
+    (value.startsWith('"') && value.endsWith('"')) ||
+    (value.startsWith("'") && value.endsWith("'"))
+  );
+}
+
 function splitKeyValue(text, lineNumber) {
   const separatorIndex = text.indexOf(":");
   if (separatorIndex === -1) {
@@ -177,7 +184,7 @@ function parseYaml(text) {
         continue;
       }
 
-      if (itemText.includes(":")) {
+      if (itemText.includes(":") && !isQuotedScalarText(itemText)) {
         const { key, valueText } = splitKeyValue(itemText, lineNumber);
         const objectItem = {};
 

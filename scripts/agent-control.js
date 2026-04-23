@@ -9,6 +9,7 @@ const {
   toRepoRelativePath,
   writeJson,
 } = require("./lib/project-state");
+const { executeAgentSlice } = require("./lib/agent-execution");
 const { launchWorkerRuntime, DEFAULT_WORKER_IMAGE } = require("./lib/runtime-launcher");
 
 function printUsage() {
@@ -143,7 +144,7 @@ function createProposal(repoRoot, sessionRecordPath) {
   };
 }
 
-function main() {
+async function main() {
   try {
     const repoRoot = getRepoRoot();
     const statePaths = ensureProjectState(repoRoot);
@@ -191,6 +192,58 @@ function main() {
       sessionRecord.runtime_completed_at = runtimeLaunch.completedAt;
       sessionRecord.updated_at = utcNow();
       sessionRecordPath = persistSessionRecord(statePaths, sessionRecord);
+
+      try {
+        const agentExecution = await executeAgentSlice({
+          repoRoot,
+          taskRequest,
+          sessionRecord,
+          workspaceDir: runtimeLaunch.workspaceDir,
+          artifactDir: runtimeLaunch.artifactDir,
+        });
+        sessionRecord.agent_execution = {
+          status: agentExecution.status,
+          reason: agentExecution.reason || null,
+          summary: agentExecution.summary || null,
+          provider: agentExecution.provider,
+          changed_files: agentExecution.changed_files || [],
+          validation_commands: agentExecution.validation_commands || [],
+          artifact_ref: agentExecution.artifact_ref,
+          started_at: agentExecution.started_at,
+          finished_at: agentExecution.finished_at,
+        };
+        sessionRecord.artifact_refs = [
+          ...new Set([...sessionRecord.artifact_refs, agentExecution.artifact_ref]),
+        ];
+        sessionRecord.runtime_handoff_status =
+          agentExecution.status === "completed"
+            ? "workspace-prepared-and-agent-executed"
+            : sessionRecord.runtime_handoff_status;
+        sessionRecord.updated_at = utcNow();
+        sessionRecordPath = persistSessionRecord(statePaths, sessionRecord);
+      } catch (agentExecutionError) {
+        sessionRecord.session_state = "failed";
+        sessionRecord.failure_code = "agent_execution_failed";
+        sessionRecord.runtime_handoff_status = "agent-execution-failed";
+        sessionRecord.runtime_handoff_reason = agentExecutionError.message;
+        sessionRecord.updated_at = utcNow();
+        sessionRecordPath = persistSessionRecord(statePaths, sessionRecord);
+
+        console.log(
+          JSON.stringify(
+            {
+              agent_session_id: agentSessionId,
+              status: sessionRecord.session_state,
+              runtime_handoff_status: sessionRecord.runtime_handoff_status,
+              session_record_path: toRepoRelativePath(repoRoot, sessionRecordPath),
+              message: agentExecutionError.message,
+            },
+            null,
+            2,
+          ),
+        );
+        process.exit(1);
+      }
     } catch (runtimeError) {
       const artifactOutput = runtimeError.artifactOutput || {};
       sessionRecord.session_state = "failed";
@@ -260,6 +313,14 @@ function main() {
       session_record_path: toRepoRelativePath(repoRoot, sessionRecordPath),
       workspace_ref: sessionRecord.workspace_ref,
       artifact_dir_ref: sessionRecord.artifact_dir_ref,
+      agent_execution: sessionRecord.agent_execution
+        ? {
+            status: sessionRecord.agent_execution.status,
+            reason: sessionRecord.agent_execution.reason,
+            changed_files: sessionRecord.agent_execution.changed_files,
+            artifact_ref: sessionRecord.agent_execution.artifact_ref,
+          }
+        : null,
     };
 
     if (proposalResult) {

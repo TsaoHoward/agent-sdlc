@@ -40,10 +40,11 @@ For a fresh local validation pass:
 1. bring up the local environment from `docs/testing/local-test-procedures.md`
 2. run `TC-001` to confirm intake and session-start boundaries
 3. run `TC-002` to confirm proposal, traceability, and review-sync surfaces
-4. run `TC-003` when you need the full operator-facing GUI path
-5. write any new gap back into `docs/testing/test-dashboard.md`, then update issue or decision docs if the result changes project-level understanding
+4. run `TC-004` when agent execution adapter behavior changes or provider-enabled validation is in scope
+5. run `TC-003` when you need the full operator-facing GUI path
+6. write any new gap back into `docs/testing/test-dashboard.md`, then update issue or decision docs if the result changes project-level understanding
 
-The latest reproducible live issue-comment reference is the 2026-04-21 run on `howard/agent-sdlc#11`, which created task request `trq-bd85673302e7`, session `ags-335855297620`, root traceability `.agent-sdlc/traceability/trq-bd85673302e7.json`, and proposal `PR #12` automatically after the strengthened listener path was deployed. The latest CLI half-live verification after commit `292f535` then created synthetic task request `trq-route1-hostsync-final-20260421225724`, session `ags-9c860e1f0026`, and proposal `PR #23`, which produced one successful `pull_request` run (`#41`) and automatically converged the PR body, host root traceability file, and session-local workspace copy. No active near-term testing gap currently remains in the CLI proposal/traceability path; the main remaining follow-up is the separate operator-facing artifact-browsing improvement tracked in the issue workflow.
+The latest reproducible live issue-comment reference is the 2026-04-21 run on `howard/agent-sdlc#11`, which created task request `trq-bd85673302e7`, session `ags-335855297620`, root traceability `.agent-sdlc/traceability/trq-bd85673302e7.json`, and proposal `PR #12` automatically after the strengthened listener path was deployed. The latest CLI half-live verification after commit `292f535` then created synthetic task request `trq-route1-hostsync-final-20260421225724`, session `ags-9c860e1f0026`, and proposal `PR #23`, which produced one successful `pull_request` run (`#41`) and automatically converged the PR body, host root traceability file, and session-local workspace copy. The first agent execution adapter smoke now also verifies the disabled-by-default evidence path without API credentials. No active near-term testing gap currently remains in the CLI proposal/traceability path; the main remaining follow-up is provider-enabled DeepSeek validation plus the separate operator-facing artifact-browsing improvement tracked in the issue workflow.
 
 ## Stable Local Test Data
 | Item | Value |
@@ -68,3 +69,4 @@ See `docs/policies/testing-management.md` for the full governance rule set.
 
 ## Change Log
 - 2026-04-21: Initial version.
+- 2026-04-23: Added `TC-004` to the recommended execution order for the first agent execution adapter slice.

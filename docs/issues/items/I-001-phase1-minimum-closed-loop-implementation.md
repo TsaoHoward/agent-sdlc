@@ -122,6 +122,7 @@ If implementation uncovers a major unresolved decision, the issue should stay ac
 ## Next Actions
 - rerun and maintain the canonical CLI and GUI procedures under `docs/testing/` when intake, runtime, proposal, CI, review, or bootstrap behavior changes
 - add and validate one minimal real provider-backed agent execution path for a supported task class, with `bounded_code_change` as the preferred first target and `DeepSeek API` as the short-term remote default behind a config-selected adapter
+- validate the newly added opt-in DeepSeek adapter path with real credentials after the default disabled-path evidence smoke has passed
 - keep `docs/user-capability-matrix.md` aligned with the actual supported `@agent` locations, task tokens, and manual operator surfaces as the implementation evolves
 - keep the strengthened live issue-comment path in place now that it auto-creates the proposal and root traceability file
 - keep the CI-to-host traceability callback path stable so `.agent-sdlc/traceability/<task_request_id>.json` continues to converge automatically after CI success
@@ -165,3 +166,4 @@ If implementation uncovers a major unresolved decision, the issue should stay ac
 - 2026-04-22: Added `docs/user-capability-matrix.md` as the durable current-state handoff for supported `@agent` entrypoints, task tokens, manual operator surfaces, and lifecycle coverage.
 - 2026-04-22: Added the explicit packaging follow-up to land one real provider-backed agent execution slice in Phase 1, with `bounded_code_change` as the preferred first target.
 - 2026-04-22: Narrowed the first real execution slice toward a config-selected remote/local-capable adapter with `DeepSeek API` as the short-term remote default.
+- 2026-04-23: Recorded the first implementation slice for `config/agent-execution.yaml`, `scripts/lib/agent-execution.js`, and session-record execution evidence.

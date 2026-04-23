@@ -64,6 +64,8 @@ These defaults assume the tracked local bootstrap config is active and no enviro
 | Review-follow-up health URL | `http://127.0.0.1:4011/hooks/gitea/pull-request-review` | `GET` returns `405`, which still proves the listener is up |
 | Review callback host | `host.docker.internal` | used by local Gitea callbacks |
 | Runner container | `agent-sdlc-gitea-runner` | local Actions runner |
+| Agent execution config | `config/agent-execution.yaml` | disabled by default; backend defaults to `deepseek` |
+| DeepSeek API key env | `DEEPSEEK_API_KEY` | required only when provider execution is explicitly enabled |
 
 If the `howard` account does not exist or cannot log in, rerun:
 
@@ -207,6 +209,40 @@ What to observe:
 - the PR body includes task request, session, source, execution profile, CI, and review status fields
 - if no human review exists yet, the review block remains in an awaiting state rather than failing silently
 
+## CLI Procedure D - Agent Execution Adapter Smoke
+Canonical case: `TC-004`
+
+The current adapter is disabled by default so existing local closed-loop tests do not require provider credentials.
+
+1. Run the platform validation:
+
+```powershell
+npm run validate:platform
+```
+
+2. Run the disabled-by-default evidence smoke from `TC-004`:
+
+```powershell
+$tmp = Join-Path $env:TEMP ("agent-sdlc-agent-exec-smoke-" + [guid]::NewGuid().ToString("N"))
+New-Item -ItemType Directory -Force -Path (Join-Path $tmp "workspace"), (Join-Path $tmp "artifacts") | Out-Null
+node -e "const { executeAgentSlice } = require('./scripts/lib/agent-execution'); (async () => { const result = await executeAgentSlice({ repoRoot: process.cwd(), taskRequest: { task_request_id: 'trq-smoke', task_class: 'bounded_code_change', summary: 'adapter smoke', execution_profile_id: 'bounded-change', runtime_capability_set_id: 'bounded-change' }, sessionRecord: { agent_session_id: 'ags-smoke' }, workspaceDir: process.argv[1], artifactDir: process.argv[2] }); console.log(JSON.stringify(result, null, 2)); })().catch((error) => { console.error(error); process.exit(1); });" (Join-Path $tmp "workspace") (Join-Path $tmp "artifacts")
+```
+
+Expected behavior:
+- output reports `status: skipped`
+- `reason` is `disabled_by_config`
+- provider metadata shows `deepseek` / `remote` / `deepseek-chat`
+- an `agent-execution.json` evidence artifact is written under the temporary artifact directory
+
+Provider-enabled validation requires:
+
+```powershell
+$env:DEEPSEEK_API_KEY = "<operator-provided-key>"
+$env:AGENT_SDLC_AGENT_EXECUTION_ENABLED = "true"
+```
+
+Only enable this mode when the operator intends to spend API credits and validate real provider-backed edits.
+
 ## GUI Procedure C - Full Live Issue-Comment To PR Follow-Up
 Canonical case: `TC-003`
 
@@ -332,3 +368,4 @@ PRs and issues created for local smoke tests may be left as evidence during the 
 - 2026-04-21: Reframed the GUI procedure after a fresh issue-comment validation showed that the current default path stops at `workspace-prepared` and still requires a manual `proposal-surface` step to create the PR.
 - 2026-04-21: Updated the GUI procedure after the strengthened listener path restored automatic proposal creation from live issue comments and narrowed the remaining gap to host-side canonical traceability refresh after CI.
 - 2026-04-22: Updated the procedure after seeded local PR `#23` confirmed automatic host-side traceability convergence through the CI callback path.
+- 2026-04-23: Added optional `TC-004` procedure for the first config-selected agent execution adapter.

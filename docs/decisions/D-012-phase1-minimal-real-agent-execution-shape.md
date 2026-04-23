@@ -425,6 +425,19 @@ agentExecution:
 
 This example is intentionally illustrative. It records the desired control shape, not a finalized schema.
 
+## Implementation Defaults Selected On 2026-04-23
+The first implementation slice settled these detail defaults without changing the selected architecture:
+- checked-in config path: `config/agent-execution.yaml`
+- default backend: `deepseek`
+- default mode: `remote`
+- default base URL: `https://api.deepseek.com`
+- default model identifier: `deepseek-chat`
+- API key environment variable: `DEEPSEEK_API_KEY`
+- default activation posture: disabled unless explicitly enabled through config or `AGENT_SDLC_AGENT_EXECUTION_ENABLED`
+- first evidence artifact: `agent-execution.json` in the session artifact directory, referenced from the session record
+
+This keeps the provider and model choice visible while avoiding a hard dependency on API credentials for the already-working local closed-loop scaffold.
+
 ## Implications For WBS 3.9
 The first implementation slice should now be understood as:
 - one repo-owned execution adapter contract
@@ -445,7 +458,6 @@ An ADR is still required before implementation only if the project later decides
 
 ## Remaining Detail Questions
 The major direction is now selected, but these detail choices remain for implementation:
-- the exact DeepSeek model identifier for the first `bounded_code_change` slice
-- the final checked-in config file path and schema for backend selection
-- the exact execution evidence fields written into session and traceability records
-- whether the first execution loop supports one-shot generate-edit-validate or a small bounded iteration count
+- provider-enabled validation with a real `DEEPSEEK_API_KEY`
+- whether the first execution loop should stay one-shot generate-edit-validate or allow a small bounded iteration count
+- the first local-backend adapter target and whether it should use Ollama's native API or an OpenAI-compatible endpoint

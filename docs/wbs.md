@@ -282,8 +282,8 @@
 - Deliverable: one validated provider-backed execution path, expected to start with `bounded_code_change`, plus the supporting documentation and evidence needed to operate it repeatably
 - Dependencies: 3.2, 3.3, 3.4, 3.5, 3.6, 3.7, 3.8
 - Critical-Path-Candidate: Yes
-- Status: Not Started
-- Notes: This item intentionally deepens one task class before broadening intake surfaces or task-token coverage. The goal is to keep the Phase 1 slice narrow while making `agent-run change proposal` mean real bounded agent work inside the isolated runtime. The currently selected direction is a repo-owned execution adapter that supports both remote and local backends through configuration, with `DeepSeek API` as the short-term remote default and a later local-backend path preserved behind the same API-oriented execution boundary. Provider choice, tool surface, and context assembly should remain replaceable and may require follow-up ADR work only if the integration shape exposes a new architecture or governance boundary.
+- Status: In Progress
+- Notes: This item intentionally deepens one task class before broadening intake surfaces or task-token coverage. The goal is to keep the Phase 1 slice narrow while making `agent-run change proposal` mean real bounded agent work inside the isolated runtime. The currently selected direction is a repo-owned execution adapter that supports both remote and local backends through configuration, with `DeepSeek API` as the short-term remote default and a later local-backend path preserved behind the same API-oriented execution boundary. The first implementation slice now adds `config/agent-execution.yaml`, a repo-owned `scripts/lib/agent-execution.js` adapter, and session-record evidence wiring from `agent-control`; provider execution is opt-in while the existing scaffold path remains stable without API credentials. Provider choice, tool surface, and context assembly should remain replaceable and may require follow-up ADR work only if the integration shape exposes a new architecture or governance boundary.
 
 ### WBS 4 — Controlled Expansion
 - Parent:
@@ -449,3 +449,4 @@
 - 2026-04-22: Added WBS 3.8 for the durable user capability matrix that ties live `@agent` entrypoints to the current Phase 1 lifecycle.
 - 2026-04-22: Added WBS 3.9 to make the first real provider-backed agent execution path an explicit Phase 1 work item instead of an implicit expectation.
 - 2026-04-22: Narrowed WBS 3.9 toward a config-selected remote/local-capable execution adapter with `DeepSeek API` as the short-term remote default.
+- 2026-04-23: Moved WBS 3.9 to in progress after adding the first config-selected agent execution adapter slice and session evidence wiring.
