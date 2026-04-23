@@ -59,7 +59,7 @@ The latest reproducible live issue-comment reference is the 2026-04-21 run on `h
 | Review-follow-up listener | `http://127.0.0.1:4011/hooks/gitea/pull-request-review` |
 | Runner container | `agent-sdlc-gitea-runner` |
 
-The password values above are generated into ignored local Gitea bootstrap config by `npm run dev:gitea-bootstrap-config`; the tracked template keeps the config shape and env-var names without storing those actual local password values.
+The password values above are generated into ignored local Gitea bootstrap config by `npm run dev:gitea-bootstrap-config`; the tracked template keeps the config shape and env-var names without storing those actual local password values. Runner and worker-runtime defaults also come from that template/local bootstrap config.
 
 ## Write-In And Move-Out Rule
 - write active or newly discovered testing work into `docs/testing/test-dashboard.md`

@@ -6,10 +6,25 @@ const {
   buildRepositoryUrls,
   loadLocalGiteaSettings,
   parseGiteaRepositoryRef,
+  readGiteaBootstrapConfig,
 } = require("./gitea-client");
 const { toRepoRelativePath, writeJson } = require("./project-state");
 
-const DEFAULT_WORKER_IMAGE = process.env.AGENT_SDLC_WORKER_IMAGE || "agent-sdlc-worker-runtime:test";
+const DEFAULT_WORKER_IMAGE = "agent-sdlc-worker-runtime:test";
+const DEFAULT_WORKER_GITEA_HOST = "host.docker.internal";
+
+function loadWorkerRuntimeSettings(repoRoot) {
+  const { config } = readGiteaBootstrapConfig(repoRoot);
+  const configuredRuntime = config.workerRuntime || {};
+
+  return {
+    image: process.env.AGENT_SDLC_WORKER_IMAGE || configuredRuntime.image || DEFAULT_WORKER_IMAGE,
+    loopbackGiteaHost:
+      process.env.AGENT_SDLC_WORKER_GITEA_HOST ||
+      configuredRuntime.loopbackGiteaHost ||
+      DEFAULT_WORKER_GITEA_HOST,
+  };
+}
 
 function sanitizeContainerName(value) {
   return String(value)
@@ -44,17 +59,17 @@ function isLoopbackHostname(hostname) {
   return normalized === "localhost" || normalized === "127.0.0.1" || normalized === "::1";
 }
 
-function normalizeContainerReachableGitUrl(gitUrl) {
+function normalizeContainerReachableGitUrl(gitUrl, workerRuntimeSettings) {
   const parsed = new URL(gitUrl);
   if (!isLoopbackHostname(parsed.hostname)) {
     return parsed.toString();
   }
 
-  parsed.hostname = process.env.AGENT_SDLC_WORKER_GITEA_HOST || "host.docker.internal";
+  parsed.hostname = workerRuntimeSettings.loopbackGiteaHost;
   return parsed.toString();
 }
 
-function buildRuntimeSourceConfig(repoRoot, taskRequest) {
+function buildRuntimeSourceConfig(repoRoot, taskRequest, workerRuntimeSettings) {
   if (!taskRequest.repository_ref) {
     return {
       cloneMode: "local-source",
@@ -85,7 +100,7 @@ function buildRuntimeSourceConfig(repoRoot, taskRequest) {
 
     return {
       cloneMode: "forge-repository",
-      sourceGitUrl: normalizeContainerReachableGitUrl(repositoryUrls.gitUrl),
+      sourceGitUrl: normalizeContainerReachableGitUrl(repositoryUrls.gitUrl, workerRuntimeSettings),
       sourceGitAuthHeader,
       repositoryRef: taskRequest.repository_ref,
     };
@@ -185,7 +200,7 @@ function launchWorkerRuntime({
   statePaths,
   sessionRecord,
   taskRequest,
-  workerImage = DEFAULT_WORKER_IMAGE,
+  workerImage = null,
 }) {
   const workspaceDir = path.join(statePaths.runtimeWorkspaceRoot, sessionRecord.agent_session_id);
   const artifactDir = path.join(statePaths.runtimeArtifactRoot, sessionRecord.agent_session_id);
@@ -194,13 +209,15 @@ function launchWorkerRuntime({
 
   const launchedAt = utcNow();
   const containerName = sanitizeContainerName(`agent-sdlc-${sessionRecord.agent_session_id}`);
-  const runtimeSource = buildRuntimeSourceConfig(repoRoot, taskRequest);
+  const workerRuntimeSettings = loadWorkerRuntimeSettings(repoRoot);
+  const resolvedWorkerImage = workerImage || workerRuntimeSettings.image;
+  const runtimeSource = buildRuntimeSourceConfig(repoRoot, taskRequest, workerRuntimeSettings);
   const dockerArgs = buildDockerArguments({
     repoRoot,
     workspaceDir,
     artifactDir,
     containerName,
-    image: workerImage,
+    image: resolvedWorkerImage,
     sessionRecord,
     taskRequest,
     runtimeSource,
@@ -218,7 +235,7 @@ function launchWorkerRuntime({
 
   const launchResult = {
     runner: "docker",
-    image: workerImage,
+    image: resolvedWorkerImage,
     container_name: containerName,
     launched_at: launchedAt,
     completed_at: completedAt,
@@ -248,7 +265,7 @@ function launchWorkerRuntime({
   }
 
   return {
-    workerImage,
+    workerImage: resolvedWorkerImage,
     containerName,
     launchedAt,
     completedAt,

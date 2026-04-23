@@ -3,21 +3,19 @@ const path = require("path");
 const { spawnSync } = require("child_process");
 
 const { getRepoRoot } = require("../lib/project-state");
-const { loadLocalGiteaSettings, requestJson } = require("../lib/gitea-client");
+const { loadLocalGiteaSettings, readGiteaBootstrapConfig, requestJson } = require("../lib/gitea-client");
 
-const DEFAULT_RUNNER_CONTAINER = process.env.AGENT_SDLC_GITEA_RUNNER_CONTAINER || "agent-sdlc-gitea-runner";
-const DEFAULT_RUNNER_IMAGE = process.env.AGENT_SDLC_GITEA_RUNNER_IMAGE || "docker.io/gitea/act_runner:latest";
-const DEFAULT_RUNNER_NAME = process.env.AGENT_SDLC_GITEA_RUNNER_NAME || "agent-sdlc-local-runner";
-const DEFAULT_RUNNER_LABELS =
-  process.env.AGENT_SDLC_GITEA_RUNNER_LABELS ||
-  "ubuntu-22.04:docker://node:22-bookworm-slim,ubuntu-latest:docker://node:22-bookworm-slim";
-const DEFAULT_GITEA_CONTAINER = process.env.AGENT_SDLC_GITEA_CONTAINER || "agent-sdlc-gitea";
-const DEFAULT_GITEA_NETWORK = process.env.AGENT_SDLC_GITEA_RUNNER_NETWORK || "agent-sdlc-gitea-network";
-const DEFAULT_RUNNER_CONTAINER_NETWORK =
-  process.env.AGENT_SDLC_GITEA_RUNNER_CONTAINER_NETWORK || null;
-const DEFAULT_JOB_CONTAINER_NETWORK = process.env.AGENT_SDLC_GITEA_RUNNER_JOB_NETWORK || null;
-const DEFAULT_DOCKER_INTERNAL_INSTANCE_URL =
-  process.env.AGENT_SDLC_GITEA_RUNNER_INSTANCE_URL || "http://agent-sdlc-gitea:3000/";
+const DEFAULT_RUNNER_SETTINGS = {
+  giteaContainer: "agent-sdlc-gitea",
+  container: "agent-sdlc-gitea-runner",
+  image: "docker.io/gitea/act_runner:latest",
+  name: "agent-sdlc-local-runner",
+  labels: "ubuntu-22.04:docker://node:22-bookworm-slim,ubuntu-latest:docker://node:22-bookworm-slim",
+  network: "agent-sdlc-gitea-network",
+  containerNetwork: null,
+  jobNetwork: null,
+  dockerInternalInstanceUrl: "http://agent-sdlc-gitea:3000/",
+};
 
 function printUsage() {
   console.error(
@@ -44,6 +42,63 @@ function parseArguments(argv) {
 
   return {
     command,
+  };
+}
+
+function firstNonEmpty(...values) {
+  return values.find((value) => value !== undefined && value !== null && value !== "");
+}
+
+function loadRunnerSettings(repoRoot) {
+  const { config } = readGiteaBootstrapConfig(repoRoot);
+  const configuredRunner = config.giteaActionsRunner || {};
+
+  return {
+    giteaContainer: firstNonEmpty(
+      process.env.AGENT_SDLC_GITEA_CONTAINER,
+      configuredRunner.giteaContainer,
+      DEFAULT_RUNNER_SETTINGS.giteaContainer,
+    ),
+    container: firstNonEmpty(
+      process.env.AGENT_SDLC_GITEA_RUNNER_CONTAINER,
+      configuredRunner.container,
+      DEFAULT_RUNNER_SETTINGS.container,
+    ),
+    image: firstNonEmpty(
+      process.env.AGENT_SDLC_GITEA_RUNNER_IMAGE,
+      configuredRunner.image,
+      DEFAULT_RUNNER_SETTINGS.image,
+    ),
+    name: firstNonEmpty(
+      process.env.AGENT_SDLC_GITEA_RUNNER_NAME,
+      configuredRunner.name,
+      DEFAULT_RUNNER_SETTINGS.name,
+    ),
+    labels: firstNonEmpty(
+      process.env.AGENT_SDLC_GITEA_RUNNER_LABELS,
+      configuredRunner.labels,
+      DEFAULT_RUNNER_SETTINGS.labels,
+    ),
+    network: firstNonEmpty(
+      process.env.AGENT_SDLC_GITEA_RUNNER_NETWORK,
+      configuredRunner.network,
+      DEFAULT_RUNNER_SETTINGS.network,
+    ),
+    containerNetwork: firstNonEmpty(
+      process.env.AGENT_SDLC_GITEA_RUNNER_CONTAINER_NETWORK,
+      configuredRunner.containerNetwork,
+      DEFAULT_RUNNER_SETTINGS.containerNetwork,
+    ),
+    jobNetwork: firstNonEmpty(
+      process.env.AGENT_SDLC_GITEA_RUNNER_JOB_NETWORK,
+      configuredRunner.jobNetwork,
+      DEFAULT_RUNNER_SETTINGS.jobNetwork,
+    ),
+    dockerInternalInstanceUrl: firstNonEmpty(
+      process.env.AGENT_SDLC_GITEA_RUNNER_INSTANCE_URL,
+      configuredRunner.dockerInternalInstanceUrl,
+      DEFAULT_RUNNER_SETTINGS.dockerInternalInstanceUrl,
+    ),
   };
 }
 
@@ -97,9 +152,9 @@ function isLoopbackHostname(hostname) {
   return normalized === "localhost" || normalized === "127.0.0.1" || normalized === "::1";
 }
 
-function resolveJobContainerNetwork(settings) {
-  if (DEFAULT_JOB_CONTAINER_NETWORK) {
-    return DEFAULT_JOB_CONTAINER_NETWORK;
+function resolveJobContainerNetwork(settings, runnerSettings) {
+  if (runnerSettings.jobNetwork) {
+    return runnerSettings.jobNetwork;
   }
 
   const hostname = new URL(settings.baseUrl).hostname;
@@ -107,12 +162,12 @@ function resolveJobContainerNetwork(settings) {
     return "host";
   }
 
-  return dockerNetworkExists(DEFAULT_GITEA_NETWORK) ? DEFAULT_GITEA_NETWORK : "";
+  return dockerNetworkExists(runnerSettings.network) ? runnerSettings.network : "";
 }
 
-function resolveRunnerContainerNetwork(settings) {
-  if (DEFAULT_RUNNER_CONTAINER_NETWORK) {
-    return DEFAULT_RUNNER_CONTAINER_NETWORK;
+function resolveRunnerContainerNetwork(settings, runnerSettings) {
+  if (runnerSettings.containerNetwork) {
+    return runnerSettings.containerNetwork;
   }
 
   const hostname = new URL(settings.baseUrl).hostname;
@@ -120,10 +175,10 @@ function resolveRunnerContainerNetwork(settings) {
     return "host";
   }
 
-  return dockerNetworkExists(DEFAULT_GITEA_NETWORK) ? DEFAULT_GITEA_NETWORK : "";
+  return dockerNetworkExists(runnerSettings.network) ? runnerSettings.network : "";
 }
 
-function resolveRunnerInstanceUrl(settings, runnerContainerNetwork) {
+function resolveRunnerInstanceUrl(settings, runnerContainerNetwork, runnerSettings) {
   if (process.env.AGENT_SDLC_GITEA_RUNNER_INSTANCE_URL) {
     return process.env.AGENT_SDLC_GITEA_RUNNER_INSTANCE_URL;
   }
@@ -132,7 +187,7 @@ function resolveRunnerInstanceUrl(settings, runnerContainerNetwork) {
     return settings.baseUrl;
   }
 
-  return dockerNetworkExists(DEFAULT_GITEA_NETWORK) ? DEFAULT_DOCKER_INTERNAL_INSTANCE_URL : settings.baseUrl;
+  return dockerNetworkExists(runnerSettings.network) ? runnerSettings.dockerInternalInstanceUrl : settings.baseUrl;
 }
 
 function getContainerNetworkMap(containerName) {
@@ -166,12 +221,12 @@ function getContainerIp(containerName, preferredNetworkName = null) {
   return firstNetwork ? firstNetwork.IPAddress : null;
 }
 
-function resolveJobContainerOptions(settings) {
-  if (resolveJobContainerNetwork(settings) !== "host") {
+function resolveJobContainerOptions(settings, runnerSettings) {
+  if (resolveJobContainerNetwork(settings, runnerSettings) !== "host") {
     return "";
   }
 
-  const giteaContainerIp = getContainerIp(DEFAULT_GITEA_CONTAINER, DEFAULT_GITEA_NETWORK);
+  const giteaContainerIp = getContainerIp(runnerSettings.giteaContainer, runnerSettings.network);
   if (!giteaContainerIp) {
     return "";
   }
@@ -179,9 +234,9 @@ function resolveJobContainerOptions(settings) {
   return `--add-host=agent-sdlc-gitea:${giteaContainerIp}`;
 }
 
-function writeRunnerConfig(configPaths, settings) {
-  const containerNetwork = resolveJobContainerNetwork(settings);
-  const containerOptions = resolveJobContainerOptions(settings);
+function writeRunnerConfig(configPaths, settings, runnerSettings) {
+  const containerNetwork = resolveJobContainerNetwork(settings, runnerSettings);
+  const containerOptions = resolveJobContainerOptions(settings, runnerSettings);
   const lines = [
     "log:",
     "  level: info",
@@ -273,10 +328,10 @@ function dockerNetworkExists(networkName) {
   return result.status === 0;
 }
 
-function generateRegistrationToken() {
+function generateRegistrationToken(runnerSettings) {
   const result = runProcess("docker", [
     "exec",
-    "agent-sdlc-gitea",
+    runnerSettings.giteaContainer,
     "gitea",
     "--config",
     "/etc/gitea/app.ini",
@@ -288,6 +343,7 @@ function generateRegistrationToken() {
 }
 
 function buildEnsureRunnerResult(
+  runnerSettings,
   containerStatus,
   runnerState = null,
   jobContainerNetwork = null,
@@ -296,10 +352,10 @@ function buildEnsureRunnerResult(
 ) {
   return {
     status: "ready",
-    container_name: DEFAULT_RUNNER_CONTAINER,
+    container_name: runnerSettings.container,
     container_status: containerStatus,
-    runner_name: DEFAULT_RUNNER_NAME,
-    runner_labels: DEFAULT_RUNNER_LABELS,
+    runner_name: runnerSettings.name,
+    runner_labels: runnerSettings.labels,
     job_container_network: jobContainerNetwork,
     runner_container_network: runnerContainerNetwork,
     instance_url: instanceUrl,
@@ -311,30 +367,31 @@ function isRunnerOnline(runnerState) {
   return !!runnerState && String(runnerState.status || "").toLowerCase() === "online";
 }
 
-async function findRunner(settings) {
+async function findRunner(settings, runnerSettings) {
   const runners = await requestJson(settings, {
     method: "GET",
     pathname: "api/v1/admin/actions/runners",
   });
 
   const entries = (runners && runners.runners) || runners || [];
-  return entries.find((runner) => runner.name === DEFAULT_RUNNER_NAME) || null;
+  return entries.find((runner) => runner.name === runnerSettings.name) || null;
 }
 
 async function ensureRunner(repoRoot) {
   const configPaths = getRunnerConfigPaths(repoRoot);
   const settings = loadLocalGiteaSettings(repoRoot);
+  const runnerSettings = loadRunnerSettings(repoRoot);
   ensureDirectory(configPaths.dataDir);
-  const runnerConfigState = writeRunnerConfig(configPaths, settings);
-  const runnerContainerNetwork = resolveRunnerContainerNetwork(settings);
-  const instanceUrl = resolveRunnerInstanceUrl(settings, runnerContainerNetwork);
+  const runnerConfigState = writeRunnerConfig(configPaths, settings, runnerSettings);
+  const runnerContainerNetwork = resolveRunnerContainerNetwork(settings, runnerSettings);
+  const instanceUrl = resolveRunnerInstanceUrl(settings, runnerContainerNetwork, runnerSettings);
   const runnerRegistrationState = syncRunnerRegistrationState(configPaths, instanceUrl);
 
-  const existingStatus = getContainerStatus(DEFAULT_RUNNER_CONTAINER);
+  const existingStatus = getContainerStatus(runnerSettings.container);
   if (existingStatus === "running") {
-    const currentNetworkMode = getContainerNetworkMode(DEFAULT_RUNNER_CONTAINER);
-    const currentInstanceUrl = getContainerEnvValue(DEFAULT_RUNNER_CONTAINER, "GITEA_INSTANCE_URL");
-    const currentRunnerState = await findRunner(settings);
+    const currentNetworkMode = getContainerNetworkMode(runnerSettings.container);
+    const currentInstanceUrl = getContainerEnvValue(runnerSettings.container, "GITEA_INSTANCE_URL");
+    const currentRunnerState = await findRunner(settings, runnerSettings);
     if (
       !runnerConfigState.changed &&
       !runnerRegistrationState.changed &&
@@ -343,6 +400,7 @@ async function ensureRunner(repoRoot) {
       isRunnerOnline(currentRunnerState)
     ) {
       return buildEnsureRunnerResult(
+        runnerSettings,
         existingStatus,
         currentRunnerState,
         runnerConfigState.containerNetwork,
@@ -351,20 +409,20 @@ async function ensureRunner(repoRoot) {
       );
     }
 
-    runProcess("docker", ["rm", "-f", DEFAULT_RUNNER_CONTAINER], { allowFailure: true });
+    runProcess("docker", ["rm", "-f", runnerSettings.container], { allowFailure: true });
   }
 
   if (existingStatus) {
-    runProcess("docker", ["rm", "-f", DEFAULT_RUNNER_CONTAINER], { allowFailure: true });
+    runProcess("docker", ["rm", "-f", runnerSettings.container], { allowFailure: true });
   }
 
-  const registrationToken = generateRegistrationToken();
+  const registrationToken = generateRegistrationToken(runnerSettings);
   const dockerSocketPath = "//var/run/docker.sock";
   const runnerArgs = [
     "run",
     "-d",
     "--name",
-    DEFAULT_RUNNER_CONTAINER,
+    runnerSettings.container,
     "--restart",
     "unless-stopped",
   ];
@@ -385,17 +443,17 @@ async function ensureRunner(repoRoot) {
     "-e",
     `GITEA_RUNNER_REGISTRATION_TOKEN=${registrationToken}`,
     "-e",
-    `GITEA_RUNNER_NAME=${DEFAULT_RUNNER_NAME}`,
+    `GITEA_RUNNER_NAME=${runnerSettings.name}`,
     "-e",
-    `GITEA_RUNNER_LABELS=${DEFAULT_RUNNER_LABELS}`,
-    DEFAULT_RUNNER_IMAGE,
+    `GITEA_RUNNER_LABELS=${runnerSettings.labels}`,
+    runnerSettings.image,
   );
   runProcess("docker", runnerArgs);
 
   let runnerState = null;
   const deadline = Date.now() + 30000;
   while (Date.now() < deadline) {
-    runnerState = await findRunner(settings);
+    runnerState = await findRunner(settings, runnerSettings);
     if (isRunnerOnline(runnerState)) {
       break;
     }
@@ -405,7 +463,8 @@ async function ensureRunner(repoRoot) {
   }
 
   return buildEnsureRunnerResult(
-    getContainerStatus(DEFAULT_RUNNER_CONTAINER),
+    runnerSettings,
+    getContainerStatus(runnerSettings.container),
     runnerState,
     runnerConfigState.containerNetwork,
     runnerContainerNetwork,
@@ -415,12 +474,14 @@ async function ensureRunner(repoRoot) {
 
 async function showStatus(repoRoot) {
   const settings = loadLocalGiteaSettings(repoRoot);
-  const runnerContainerNetwork = resolveRunnerContainerNetwork(settings);
-  const instanceUrl = resolveRunnerInstanceUrl(settings, runnerContainerNetwork);
+  const runnerSettings = loadRunnerSettings(repoRoot);
+  const runnerContainerNetwork = resolveRunnerContainerNetwork(settings, runnerSettings);
+  const instanceUrl = resolveRunnerInstanceUrl(settings, runnerContainerNetwork, runnerSettings);
   return buildEnsureRunnerResult(
-    getContainerStatus(DEFAULT_RUNNER_CONTAINER) || "not-started",
-    await findRunner(settings),
-    resolveJobContainerNetwork(settings),
+    runnerSettings,
+    getContainerStatus(runnerSettings.container) || "not-started",
+    await findRunner(settings, runnerSettings),
+    resolveJobContainerNetwork(settings, runnerSettings),
     runnerContainerNetwork,
     instanceUrl,
   );
@@ -428,14 +489,15 @@ async function showStatus(repoRoot) {
 
 async function stopRunner(repoRoot) {
   const settings = loadLocalGiteaSettings(repoRoot);
-  const runnerState = await findRunner(settings);
-  if (getContainerStatus(DEFAULT_RUNNER_CONTAINER)) {
-    runProcess("docker", ["rm", "-f", DEFAULT_RUNNER_CONTAINER], { allowFailure: true });
+  const runnerSettings = loadRunnerSettings(repoRoot);
+  const runnerState = await findRunner(settings, runnerSettings);
+  if (getContainerStatus(runnerSettings.container)) {
+    runProcess("docker", ["rm", "-f", runnerSettings.container], { allowFailure: true });
   }
 
   return {
     status: "stopped",
-    container_name: DEFAULT_RUNNER_CONTAINER,
+    container_name: runnerSettings.container,
     runner: runnerState,
   };
 }

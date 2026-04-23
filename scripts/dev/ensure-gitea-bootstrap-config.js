@@ -33,6 +33,49 @@ function parseArguments(argv) {
   return options;
 }
 
+function cloneJson(value) {
+  return JSON.parse(JSON.stringify(value));
+}
+
+function mergeMissingDefaults(target, defaults) {
+  const merged = cloneJson(target);
+
+  for (const [key, defaultValue] of Object.entries(defaults || {})) {
+    const currentValue = merged[key];
+    const defaultIsObject =
+      defaultValue &&
+      typeof defaultValue === "object" &&
+      !Array.isArray(defaultValue);
+    const currentIsObject =
+      currentValue &&
+      typeof currentValue === "object" &&
+      !Array.isArray(currentValue);
+
+    if (currentValue === undefined) {
+      merged[key] = cloneJson(defaultValue);
+      continue;
+    }
+
+    if (defaultIsObject && currentIsObject) {
+      merged[key] = mergeMissingDefaults(currentValue, defaultValue);
+    }
+  }
+
+  return merged;
+}
+
+function materializeLocalDefaults(templateConfig) {
+  const localConfig = cloneJson(templateConfig);
+  localConfig.gitea = localConfig.gitea || {};
+  localConfig.gitea.admin = localConfig.gitea.admin || {};
+  localConfig.postgres = localConfig.postgres || {};
+  localConfig.gitea.admin.password =
+    process.env.AGENT_SDLC_GITEA_PASSWORD || localConfig.gitea.admin.password || "agent-dev-password";
+  localConfig.postgres.password =
+    process.env.AGENT_SDLC_GITEA_POSTGRES_PASSWORD || localConfig.postgres.password || "gitea-dev-password";
+  return localConfig;
+}
+
 function ensureLocalGiteaBootstrapConfig({ repoRoot, force = false }) {
   const templatePath = path.join(repoRoot, "config", "dev", "gitea-bootstrap.template.json");
   const localConfigPath = path.join(repoRoot, "config", "dev", "gitea-bootstrap.json");
@@ -41,7 +84,27 @@ function ensureLocalGiteaBootstrapConfig({ repoRoot, force = false }) {
     throw new Error(`Missing template config: ${toRepoRelativePath(repoRoot, templatePath)}`);
   }
 
+  const templateConfig = JSON.parse(fs.readFileSync(templatePath, "utf8"));
+  const materializedTemplate = materializeLocalDefaults(templateConfig);
+
   if (fs.existsSync(localConfigPath) && !force) {
+    const currentConfig = JSON.parse(fs.readFileSync(localConfigPath, "utf8"));
+    const mergedConfig = mergeMissingDefaults(currentConfig, materializedTemplate);
+    const currentText = `${JSON.stringify(currentConfig, null, 2)}\n`;
+    const mergedText = `${JSON.stringify(mergedConfig, null, 2)}\n`;
+
+    if (currentText !== mergedText) {
+      fs.writeFileSync(localConfigPath, mergedText, "utf8");
+      return {
+        status: "updated",
+        created: false,
+        overwritten: false,
+        config_path: toRepoRelativePath(repoRoot, localConfigPath),
+        template_path: toRepoRelativePath(repoRoot, templatePath),
+        gitignored: true,
+      };
+    }
+
     return {
       status: "exists",
       created: false,
@@ -52,17 +115,8 @@ function ensureLocalGiteaBootstrapConfig({ repoRoot, force = false }) {
     };
   }
 
-  const localConfig = JSON.parse(fs.readFileSync(templatePath, "utf8"));
-  localConfig.gitea = localConfig.gitea || {};
-  localConfig.gitea.admin = localConfig.gitea.admin || {};
-  localConfig.postgres = localConfig.postgres || {};
-  localConfig.gitea.admin.password =
-    process.env.AGENT_SDLC_GITEA_PASSWORD || localConfig.gitea.admin.password || "agent-dev-password";
-  localConfig.postgres.password =
-    process.env.AGENT_SDLC_GITEA_POSTGRES_PASSWORD || localConfig.postgres.password || "gitea-dev-password";
-
   fs.mkdirSync(path.dirname(localConfigPath), { recursive: true });
-  fs.writeFileSync(localConfigPath, `${JSON.stringify(localConfig, null, 2)}\n`, "utf8");
+  fs.writeFileSync(localConfigPath, `${JSON.stringify(materializedTemplate, null, 2)}\n`, "utf8");
 
   return {
     status: force ? "overwritten" : "created",

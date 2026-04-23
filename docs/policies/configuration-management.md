@@ -64,7 +64,12 @@ The local Gitea/dev bootstrap config also follows this pattern:
 - generator: `npm run dev:gitea-bootstrap-config`
 - loader surfaces: `scripts/dev/manage-dev-environment.ps1` and `scripts/lib/gitea-client.js`
 
-## 7. Change Control
+## 7. Current Explicit Exceptions
+`config/policy/*.yaml` files are committed machine-readable policy source-of-truth, not operator-local config.
+
+`.gitea/workflows/phase1-ci.yml` is a committed workflow source-of-truth. Its local CI-to-host callback URL is currently a workflow-owned local default rather than an ignored local config value because the workflow must run from the checked-out proposal branch inside the CI runner. Revisit this exception when workflow generation, repository variables, or another runner-supported configuration injection path becomes part of the implementation.
+
+## 8. Change Control
 Changes to template shape or safe defaults are usually implementation or planning changes.
 
 Create or update an ADR before changing this policy if the change affects:

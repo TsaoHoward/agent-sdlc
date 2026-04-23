@@ -113,11 +113,16 @@ The local forge bootstrap template/local config currently owns:
 - the local bootstrap admin user values for the dev stack
 - the default local owner/repo bootstrap target
 - the callback host plus route/port settings for the task-intake and review-follow-up webhook paths
+- the local Gitea Actions runner container, image, labels, network, and instance URL defaults
+- the worker-runtime image and loopback Gitea host used by runtime workspace preparation
 
 Config resolution follows ADR-0008:
 - local config: `config/dev/gitea-bootstrap.json`
 - template config: `config/dev/gitea-bootstrap.template.json`
 - generator: `npm run dev:gitea-bootstrap-config`
+
+Current explicit exception:
+- `.gitea/workflows/phase1-ci.yml` owns the local CI-to-host traceability callback URL as a committed workflow default because the workflow runs from the checked-out proposal branch inside the CI runner.
 
 The package and runtime files currently own:
 - the selected npm-managed platform package baseline
@@ -143,6 +148,7 @@ The current bootstrap script supports these optional environment variables:
 - `AGENT_SDLC_GITEA_POSTGRES_USER`
 - `AGENT_SDLC_GITEA_POSTGRES_PASSWORD`
 - `AGENT_SDLC_WORKER_IMAGE`
+- `AGENT_SDLC_WORKER_GITEA_HOST`
 - `AGENT_SDLC_GITEA_BASE_URL`
 - `AGENT_SDLC_GITEA_USERNAME`
 - `AGENT_SDLC_GITEA_PASSWORD`
@@ -153,6 +159,8 @@ The current bootstrap script supports these optional environment variables:
 - `AGENT_SDLC_GITEA_RUNNER_NAME`
 - `AGENT_SDLC_GITEA_RUNNER_LABELS`
 - `AGENT_SDLC_GITEA_RUNNER_NETWORK`
+- `AGENT_SDLC_GITEA_RUNNER_CONTAINER_NETWORK`
+- `AGENT_SDLC_GITEA_RUNNER_JOB_NETWORK`
 - `AGENT_SDLC_GITEA_RUNNER_INSTANCE_URL`
 
 ## Why PostgreSQL Is The Default Local Path
