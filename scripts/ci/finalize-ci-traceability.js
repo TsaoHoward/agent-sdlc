@@ -270,13 +270,12 @@ async function main() {
     verificationMetadata.review_surface_synced_at = finalizedAt;
     delete verificationMetadata.review_surface_sync_error;
   } catch (error) {
-    traceability.review.proposal_body_sync_status = "failed";
+    traceability.review.proposal_body_sync_status = "deferred-to-host-sync";
     traceability.review.proposal_body_sync_error = describeError(error);
-    verificationMetadata.review_surface_sync_status = "failed";
+    verificationMetadata.review_surface_sync_status = "deferred-to-host-sync";
     verificationMetadata.review_surface_sync_error = describeError(error);
     writeJson(traceabilityPath, traceability);
     writeJson(verificationMetadataPath, verificationMetadata);
-    throw error;
   }
 
   writeJson(traceabilityPath, traceability);

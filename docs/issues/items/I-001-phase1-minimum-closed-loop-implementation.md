@@ -79,6 +79,14 @@ The repository is intentionally still in an early-phase, structure-first posture
   - the latest duplicate-CI analysis identified route 1 as the preferred cleanup path for new PR creation: stop amending and force-pushing the proposal branch a second time after PR creation, and let CI recover proposal context from the workflow event or branch lookup when the committed branch artifact still carries the pre-PR seed state
   - that route-1 cleanup is now implemented: `proposal-surface create-gitea-pr` updates the host/session traceability copies plus the local workspace copy after PR creation without rewriting the remote proposal branch, the CI traceability scripts now resolve missing `proposal_ref` details from the workflow event payload or a branch-to-PR lookup, and a fresh post-fix live validation after seeding commit `e97f0ba` into local forge `main` created PR `#18` with one successful `pull_request` run (`#37`) instead of an immediate second `pull_request_sync` run
   - a 2026-04-22 follow-up closed that remaining host-side traceability gap: `review-surface` now supports proposal-traceability sync for canonical and session-local copies, CI now posts a host callback after finalize through the local `host.docker.internal` callback path, and a fresh seeded validation on PR `#23` completed one successful `pull_request` run (`#41`) with automatic convergence across the PR body, `.agent-sdlc/traceability/trq-route1-hostsync-final-20260421225724.json`, and the session-local workspace copy
+- A 2026-04-23 provider-enabled validation pass then proved the first DeepSeek-backed execution slice through the session/proposal path:
+  - local ignored `config/agent-execution.yaml` supplied `agentExecution.enabled: true` and `agentExecution.apiKey`
+  - task request `trq-4faac7e2a74b` started session `ags-cd9d3e289f02`
+  - DeepSeek generated `docs/examples/provider-live-smoke.md` in the session workspace and requested `npm run validate:platform`, which passed
+  - `agent-control --auto-create-proposal` created local Gitea PR `#24`
+  - local Actions run `#42` proved that repository validation passed but exposed a CI traceability regression: workflow checkout did not have ignored local Gitea credentials, so direct PR body PATCH returned 401 after validation had already succeeded
+  - the fix keeps project config as source of truth by allowing CI finalize to record deferred PR body sync instead of failing validation, while host-side `review-surface` sync refreshes the PR body using the control host's ignored project config
+  - revalidation run `#45` then completed successfully on PR `#24` with the reviewer-facing PR body automatically converged to `CI: success` / `ready for human review`
 
 ## Dependencies And Constraints
 - Work should stay aligned to Phase 1 and WBS 3 rather than pulling Phase 2 observability or multi-source scope forward.
@@ -122,8 +130,8 @@ If implementation uncovers a major unresolved decision, the issue should stay ac
 
 ## Next Actions
 - rerun and maintain the canonical CLI and GUI procedures under `docs/testing/` when intake, runtime, proposal, CI, review, or bootstrap behavior changes
-- add and validate one minimal real provider-backed agent execution path for a supported task class, with `bounded_code_change` as the preferred first target and `DeepSeek API` as the short-term remote default behind a config-selected adapter
-- validate the newly added opt-in DeepSeek adapter path with real credentials after the default disabled-path evidence smoke has passed
+- continue hardening the minimal provider-backed agent execution path from the validated `bounded_code_change` DeepSeek session/proposal smoke
+- keep the newly validated opt-in DeepSeek adapter path bounded and repeatable when real credentials are enabled in ignored project config
 - keep `docs/user-capability-matrix.md` aligned with the actual supported `@agent` locations, task tokens, and manual operator surfaces as the implementation evolves
 - keep the strengthened live issue-comment path in place now that it auto-creates the proposal and root traceability file
 - keep the CI-to-host traceability callback path stable so `.agent-sdlc/traceability/<task_request_id>.json` continues to converge automatically after CI success
@@ -169,3 +177,4 @@ If implementation uncovers a major unresolved decision, the issue should stay ac
 - 2026-04-22: Narrowed the first real execution slice toward a config-selected remote/local-capable adapter with `DeepSeek API` as the short-term remote default.
 - 2026-04-23: Recorded the first implementation slice for `config/agent-execution.template.yaml`, local generated `config/agent-execution.yaml`, `scripts/lib/agent-execution.js`, and session-record execution evidence.
 - 2026-04-23: Recorded the repository-wide configuration template policy from ADR-0008.
+- 2026-04-23: Recorded provider-enabled DeepSeek validation through session `ags-cd9d3e289f02` and local PR `#24`, plus the CI traceability adjustment that defers PR body refresh to host-side sync when CI checkout lacks ignored local Gitea credentials.

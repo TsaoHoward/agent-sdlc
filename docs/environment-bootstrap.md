@@ -122,7 +122,7 @@ Config resolution follows ADR-0008:
 - generator: `npm run dev:gitea-bootstrap-config`
 
 Current explicit exception:
-- `.gitea/workflows/phase1-ci.yml` owns the local CI-to-host traceability callback URL as a committed workflow default because the workflow runs from the checked-out proposal branch inside the CI runner.
+- `.gitea/workflows/phase1-ci.yml` owns the local CI-to-host traceability callback URL as a committed workflow default because the workflow runs from the checked-out proposal branch inside the CI runner. CI does not require ignored local Gitea credentials for PR body refresh; if direct CI-side refresh is unavailable, the host-side review-surface callback uses project-local config to converge reviewer-facing traceability.
 
 The package and runtime files currently own:
 - the selected npm-managed platform package baseline

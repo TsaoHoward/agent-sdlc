@@ -460,6 +460,15 @@ An ADR is still required before implementation only if the project later decides
 
 ## Remaining Detail Questions
 The major direction is now selected, but these detail choices remain for implementation:
-- provider-enabled validation with a real `agentExecution.apiKey` in ignored local config
 - whether the first execution loop should stay one-shot generate-edit-validate or allow a small bounded iteration count
 - the first local-backend adapter target and whether it should use Ollama's native API or an OpenAI-compatible endpoint
+
+## Provider-Enabled Validation On 2026-04-23
+The first DeepSeek-backed validation pass stayed within the selected architecture boundaries:
+- ignored project config supplied `agentExecution.enabled: true` and `agentExecution.apiKey`
+- task request `trq-4faac7e2a74b` started session `ags-cd9d3e289f02`
+- the runtime workspace executed the configured DeepSeek adapter and changed `docs/examples/provider-live-smoke.md`
+- `agent-execution.json` recorded provider metadata, usage, changed files, and a passing provider-requested `npm run validate:platform`
+- proposal creation surfaced local Gitea PR `#24`
+
+The run exposed one implementation gap rather than a new architecture decision: CI checkout did not have ignored local Gitea credentials, so direct PR body PATCH from CI returned 401 after validation had already passed. The selected fix keeps project config as the source of truth by allowing CI finalize to defer reviewer-facing PR body refresh to the host-side review-surface callback instead of injecting local credentials into CI.

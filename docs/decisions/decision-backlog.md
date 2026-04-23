@@ -3,7 +3,7 @@
 ## Document Metadata
 - Version: 0.5
 - Status: Active
-- Last Updated: 2026-04-22
+- Last Updated: 2026-04-23
 - Owner: Project Maintainer
 - Source Template: docs/templates/decision-backlog.template.md
 
@@ -35,15 +35,15 @@ It is not an ADR. It tracks active, narrowed, recently selected, and deferred ma
 ## Dashboard
 | Decision ID | Title | Status | Related Docs / WBS | Next Action |
 |---|---|---|---|---|
-| D-012 | Phase 1 Minimal Real Agent Execution Shape | Decided | `docs/roadmap.md` Phase 1; `docs/wbs.md` WBS `3.9` | Implement the first config-selected execution adapter with `DeepSeek API` as the short-term remote default while preserving a later local-backend path |
+| D-012 | Phase 1 Minimal Real Agent Execution Shape | Decided | `docs/roadmap.md` Phase 1; `docs/wbs.md` WBS `3.9` | Continue WBS `3.9` hardening from the validated DeepSeek path; move out at the next decision-maintenance pass if no new boundary decision appears |
 
 ## Decision Items
 ### D-012 - Phase 1 Minimal Real Agent Execution Shape
 - Status: `Decided`
 - Related Docs / WBS: `docs/roadmap.md` Phase 1; `docs/wbs.md` WBS `3.9`; `docs/architecture/agent-control-integration-plan.md`; `docs/architecture/runtime-isolation.md`
 - Why It Matters: Phase 1 now explicitly requires one real provider-backed agent execution slice, but the repo should still avoid turning one model/provider/tool surface into a hidden architecture decision.
-- Current State: The current Phase 1 loop reaches live intake, session startup, isolated runtime preparation, proposal PR creation, CI verification, and durable traceability. Task tokens currently influence classification and policy, but execution behavior remains scaffold-first rather than provider-backed real agent work. The selected direction is now documented in `docs/decisions/D-012-phase1-minimal-real-agent-execution-shape.md`: keep orchestration repo-owned, support both remote and local backends through a configuration-selected API adapter, and use `DeepSeek API` as the short-term remote default for the first WBS `3.9` slice.
-- Next Action: Validate the provider-enabled DeepSeek path with real credentials, keep the first execution loop bounded, and only promote to an ADR if implementation changes architecture boundaries, source-of-truth ownership, runtime isolation, or cross-cutting governance assumptions.
+- Current State: The current Phase 1 loop reaches live intake, session startup, isolated runtime preparation, proposal PR creation, CI verification, and durable traceability. Task tokens currently influence classification and policy, and the selected D-012 direction is now implemented far enough to validate a provider-backed path: keep orchestration repo-owned, support both remote and local backends through a configuration-selected API adapter, and use `DeepSeek API` as the short-term remote default for the first WBS `3.9` slice. The 2026-04-23 provider-enabled smoke created task request `trq-4faac7e2a74b`, session `ags-cd9d3e289f02`, local PR `#24`, and DeepSeek-generated documentation with passing provider-requested validation.
+- Next Action: Continue WBS `3.9` hardening from the validated DeepSeek path, keep the first execution loop bounded, and only promote to an ADR if implementation changes architecture boundaries, source-of-truth ownership, runtime isolation, or cross-cutting governance assumptions.
 - Exit Path: Move this item out once WBS `3.9` is either narrowed into implementation-ready defaults in existing docs or promoted to an ADR because the decision changes cross-cutting architecture/governance assumptions.
 
 ## Change Log
@@ -63,3 +63,4 @@ It is not an ADR. It tracks active, narrowed, recently selected, and deferred ma
 - 2026-04-23: Renumbered the active execution-shape decision from D-009 to D-012 to avoid conflicting with archived D-009.
 - 2026-04-23: Recorded the first implementation defaults for config path, DeepSeek model, project-local API key field, and execution evidence artifact.
 - 2026-04-23: Promoted repository-wide configuration template and local-config handling directly to ADR-0008 and policy docs.
+- 2026-04-23: Recorded provider-enabled DeepSeek validation through local PR `#24`; no new architecture-boundary decision was discovered.

@@ -24,7 +24,7 @@ The following surfaces were identified in the 2026-04-23 audit:
 - Task-gateway and review-surface npm listener startup now reads from the Gitea bootstrap template/local config; explicit host/port/route CLI flags remain available for manual override.
 - Local Gitea Actions runner defaults for container name, image, labels, network, and instance URL now resolve from the Gitea bootstrap template/local config, with environment overrides still available.
 - Worker-runtime defaults for image and container-reachable Gitea host now resolve from the Gitea bootstrap template/local config, with environment overrides still available.
-- The CI-to-host traceability callback URL is embedded in `.gitea/workflows/phase1-ci.yml` and is now documented as a committed workflow-local configuration exception.
+- The CI-to-host traceability callback URL is embedded in `.gitea/workflows/phase1-ci.yml` and is now documented as a committed workflow-local configuration exception. CI PR body refresh can defer to host-side review-surface sync when the workflow checkout lacks ignored local Gitea credentials, so local secrets stay in project-local config on the control host rather than being reintroduced into CI environment overrides.
 
 ## Dependencies And Constraints
 - ADR-0008 requires operator-controlled module configuration to have a checked-in template and ignored local config when values can vary by operator, machine, provider, credential, or local runtime.
@@ -39,6 +39,7 @@ Handle this in small implementation slices:
 - Completed: centralized task-gateway and review-surface npm listener startup so package entrypoints and managed bootstrap use the same template-backed source for normal local operation.
 - Completed: moved local runner and worker-runtime startup defaults under the Gitea bootstrap template/local config while preserving environment overrides.
 - Completed: documented the embedded CI host callback URL as a committed workflow-local configuration exception because the workflow runs from the checked-out proposal branch inside the CI runner.
+- Completed: adjusted CI traceability so missing ignored local Gitea credentials in workflow checkout do not turn a passed verifier run into a failed job; host-side review-surface sync owns the credentialed PR body refresh.
 
 ## Exit Path
 This issue can move out of the active dashboard at the next issue-maintenance pass because all current gaps either follow ADR-0008's template/local-config pattern or carry an explicit documented exception.
@@ -52,3 +53,4 @@ This issue can move out of the active dashboard at the next issue-maintenance pa
 - 2026-04-23: Moved npm task-gateway and review-surface webhook startup to template/local bootstrap settings; kept the issue open for runner, worker-runtime, and CI callback settings.
 - 2026-04-23: Moved local runner and worker-runtime startup defaults to template/local bootstrap settings; kept the issue open for the CI-to-host callback URL.
 - 2026-04-23: Marked the issue done after documenting the CI-to-host callback URL as a committed workflow-local configuration exception.
+- 2026-04-23: Recorded the follow-up CI traceability behavior that keeps ignored local Gitea credentials out of workflow checkout while preserving host-side PR body refresh.

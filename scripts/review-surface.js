@@ -953,6 +953,28 @@ async function syncProposalTraceability(repoRoot, statePaths, syncContext, snaps
   traceability.review.host_traceability_sync_at = syncedAt;
   writeTraceabilityCopies(traceabilityTargets.syncPaths, traceability);
 
+  try {
+    const updatedPullRequest = await syncProposalBody(
+      settings,
+      repositoryRef,
+      proposalInfo,
+      traceability,
+    );
+    traceability.proposal_url = updatedPullRequest.html_url || updatedPullRequest.url || traceability.proposal_url || null;
+    traceability.proposal_state =
+      updatedPullRequest.merged ? "merged" : updatedPullRequest.state || traceability.proposal_state || "open";
+    traceability.review.proposal_body_sync_status = "synced";
+    traceability.review.proposal_body_synced_at = syncedAt;
+    delete traceability.review.proposal_body_sync_error;
+  } catch (error) {
+    traceability.review.proposal_body_sync_status = "failed";
+    traceability.review.proposal_body_sync_error = error.message;
+    writeTraceabilityCopies(traceabilityTargets.syncPaths, traceability);
+    throw error;
+  }
+
+  writeTraceabilityCopies(traceabilityTargets.syncPaths, traceability);
+
   return {
     status: "proposal-traceability-synced",
     task_request_id: traceability.task_request_id,
