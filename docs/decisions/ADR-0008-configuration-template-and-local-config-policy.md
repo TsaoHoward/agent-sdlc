@@ -4,7 +4,7 @@
 - Date: 2026-04-23
 
 ## Context
-The Phase 1 agent execution adapter introduced the first provider-facing module configuration that operators may need to customize locally, especially for activation posture, backend selection, model choice, and credential environment variable names.
+The Phase 1 agent execution adapter introduced the first provider-facing module configuration that operators may need to customize locally, especially for activation posture, backend selection, model choice, and provider credentials.
 
 That exposed a broader repository concern:
 - checked-in configuration should remain reviewable and reproducible
@@ -24,6 +24,7 @@ The repository will use a uniform configuration-template policy:
 5. Local config files must not be the only durable source of configuration shape or defaults.
 6. Checked-in templates should contain safe defaults and no secrets.
 7. Docs and tests should refer to both the template path and the generated local path when a module follows this pattern.
+8. For project-owned module settings, runtime code should treat the resolved project config file as the source of truth and should not let ambient environment variables silently override those settings unless an explicit exception exists.
 
 ## Decision Details
 
@@ -41,17 +42,14 @@ Local realized config is the operator-editable surface for:
 - enabling or disabling optional integrations
 - selecting local backends or endpoints
 - choosing model, service, or runtime options
-- naming environment variables used for secrets
-- storing non-secret but machine-specific values
+- storing provider credentials or other machine-specific values when they must remain local and ignored by Git
 
 Local config should be ignored by Git unless an ADR explicitly states that a specific config must be committed.
 
 ### 3. Secrets
-Templates and local config should avoid storing secret values directly.
+Templates should avoid storing secret values directly.
 
-The preferred pattern is:
-- config names the environment variable or secret reference
-- the actual secret value is supplied through environment, local secret manager, or later secret surface
+Ignored local config may store local-only credentials when the project policy requires settings to be maintained in project files rather than ambient environment variables. Those files must remain ignored by Git and must not be copied into tracked docs, templates, prompts, or evidence.
 
 ### 4. Loader Behavior
 Module loaders should document and implement a predictable resolution order.
@@ -75,13 +73,18 @@ A single policy makes configuration behavior easier to review and safer to autom
 - local provider settings are less likely to be committed accidentally
 - code review can focus on template defaults and schema shape
 - tests can validate both fallback and local-config paths
+- provider configuration is less likely to drift because the resolved project config is the single operator-editable source
 
 ### Negative
 - each configurable module needs a small amount of extra scaffolding
 - docs must mention both template and local realized paths
 - loaders must be clear about precedence
+- ignored local config can contain sensitive local credentials, so `.gitignore` coverage and review discipline matter more
 
 ## Follow-Up
 - Keep `docs/policies/configuration-management.md` aligned with this ADR.
 - Update module docs and tests when new configurable modules are added.
 - Treat exceptions as explicit decisions, and promote them to ADRs when they affect source-of-truth ownership, security posture, or governance expectations.
+
+## Change Log
+- 2026-04-23: Clarified that project-owned module settings should be maintained in project config rather than silently overridden by ambient environment variables.

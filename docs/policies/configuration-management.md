@@ -26,14 +26,12 @@ Module loaders should use this order unless a documented exception exists:
 
 When configuration affects lifecycle behavior or evidence, records should include which source was used.
 
+For project-owned module settings, runtime code should treat the resolved project config file as the source of truth. Do not let ambient environment variables silently override those settings unless an explicit policy or ADR exception exists.
+
 ## 4. Secret Handling
-Templates must not contain raw secret values. Local config should avoid raw secret values when practical.
+Templates must not contain raw secret values.
 
-Preferred approach:
-- config names an environment variable or secret reference
-- the actual secret value is supplied outside the checked-in file
-
-Generated local-only development credentials may exist in ignored local config when they are needed to keep the local bootstrap repeatable, but they must not be committed.
+Ignored local config may contain local-only credentials when the module is governed by project-file configuration. Those files must remain ignored by Git and must not be copied into tracked docs, templates, prompts, or evidence.
 
 If a future module needs a different secret handling model, update the relevant policy and create an ADR when source-of-truth ownership or security posture changes.
 
@@ -44,7 +42,7 @@ Add a template when a module has settings such as:
 - service base URLs
 - model or runtime identifiers
 - local ports or callback URLs
-- credential environment variable names
+- credential fields in ignored local config
 - limits, thresholds, allowlists, or capability-like knobs
 
 Small constants that are not operator-controlled do not need a template.
@@ -56,7 +54,7 @@ The first module following this pattern is agent execution:
 - generator: `npm run dev:agent-execution-config`
 - loader: `scripts/lib/agent-execution.js`
 
-The local file is ignored by Git and can be regenerated from the template.
+The local file is ignored by Git and can be regenerated from the template. Provider credentials such as `agentExecution.apiKey` belong in that ignored local file, not in ambient environment variables.
 
 The local Gitea/dev bootstrap config also follows this pattern:
 - template: `config/dev/gitea-bootstrap.template.json`
@@ -80,3 +78,4 @@ Create or update an ADR before changing this policy if the change affects:
 
 ## Change Log
 - 2026-04-23: Initial version.
+- 2026-04-23: Clarified that project-owned module settings should be maintained in project config rather than silently overridden by ambient environment variables.

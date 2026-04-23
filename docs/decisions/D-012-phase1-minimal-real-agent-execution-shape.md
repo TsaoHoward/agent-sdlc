@@ -433,8 +433,8 @@ The first implementation slice settled these detail defaults without changing th
 - default mode: `remote`
 - default base URL: `https://api.deepseek.com`
 - default model identifier: `deepseek-chat`
-- API key environment variable: `DEEPSEEK_API_KEY`
-- default activation posture: disabled unless explicitly enabled through config or `AGENT_SDLC_AGENT_EXECUTION_ENABLED`
+- API key field: `agentExecution.apiKey` in ignored local config
+- default activation posture: disabled unless explicitly enabled through project config
 - first evidence artifact: `agent-execution.json` in the session artifact directory, referenced from the session record
 
 This keeps the provider and model choice visible while avoiding a hard dependency on API credentials for the already-working local closed-loop scaffold.
@@ -460,6 +460,6 @@ An ADR is still required before implementation only if the project later decides
 
 ## Remaining Detail Questions
 The major direction is now selected, but these detail choices remain for implementation:
-- provider-enabled validation with a real `DEEPSEEK_API_KEY`
+- provider-enabled validation with a real `agentExecution.apiKey` in ignored local config
 - whether the first execution loop should stay one-shot generate-edit-validate or allow a small bounded iteration count
 - the first local-backend adapter target and whether it should use Ollama's native API or an OpenAI-compatible endpoint

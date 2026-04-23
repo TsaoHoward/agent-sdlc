@@ -42,7 +42,7 @@ It does not replace CI run history, forge issue or PR history, roadmap/WBS plann
 |---|---|---|---|---|---|---|
 | TC-001 | CLI Replay Intake And Session Smoke | Ready | CLI replay | `docs/roadmap.md` Phase 1; WBS `3.1`, `3.2`, `3.3` | Re-run when intake or session-start behavior changes and keep the case note current if task/session fields or evidence paths move | Move out after the current validation window once the case no longer needs active dashboard attention; keep the canonical case note as the long-lived procedure |
 | TC-002 | CLI Proposal And Traceability Smoke | Passed | CLI half-live | `docs/roadmap.md` Phase 1; WBS `3.4`, `3.5`, `3.6` | Re-run when proposal, CI, or traceability wiring changes so the host callback and convergence path stay covered | Move out at the next maintenance pass if no new proposal/traceability regression appears |
-| TC-004 | Agent Execution Adapter Smoke | Ready | CLI replay | `docs/roadmap.md` Phase 1; WBS `3.9` | Validate the disabled-by-default evidence path now, then re-run with `DEEPSEEK_API_KEY` and `AGENT_SDLC_AGENT_EXECUTION_ENABLED=true` when provider-enabled validation is in scope | Move out after provider-enabled validation is either passed or split into a narrower active item |
+| TC-004 | Agent Execution Adapter Smoke | Ready | CLI replay | `docs/roadmap.md` Phase 1; WBS `3.9` | Validate the disabled-by-default evidence path now, then re-run with `agentExecution.enabled: true` and `agentExecution.apiKey` in ignored local config when provider-enabled validation is in scope | Move out after provider-enabled validation is either passed or split into a narrower active item |
 
 ## Test Items
 
@@ -76,7 +76,7 @@ It does not replace CI run history, forge issue or PR history, roadmap/WBS plann
 - Related Docs / WBS: `docs/testing/items/TC-004-agent-execution-adapter-smoke.md`; WBS `3.9`
 - Why It Matters: This is the first validation surface for the new config-selected agent execution adapter before it is trusted as part of the live issue-to-PR path.
 - Current State: The disabled-by-default adapter path has been smoke-tested without API credentials and writes `agent-execution.json` evidence with provider/config metadata. The tracked config is now a template, while generated local config is ignored by Git. Provider-enabled DeepSeek validation still needs real credentials.
-- Next Action: Run the canonical case first in disabled mode, then repeat with `DEEPSEEK_API_KEY` and explicit enablement when the operator wants to validate real provider-backed edits.
+- Next Action: Run the canonical case first in disabled mode, then repeat with `agentExecution.enabled: true` and `agentExecution.apiKey` in ignored local config when the operator wants to validate real provider-backed edits.
 - Exit Path: Move out after provider-enabled validation is either passed or split into a narrower active item.
 - Canonical Case: `docs/testing/items/TC-004-agent-execution-adapter-smoke.md`
 - Escalation Check: Update the decision backlog or ADRs only if provider validation shows the adapter must move orchestration, runtime, traceability, or policy ownership out of the current repo-owned boundaries.

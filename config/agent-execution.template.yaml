@@ -5,7 +5,7 @@ agentExecution:
   mode: remote
   baseUrl: https://api.deepseek.com
   model: deepseek-chat
-  apiKeyEnv: DEEPSEEK_API_KEY
+  apiKey: ""
   allowedTaskClasses:
     - bounded_code_change
   maxChangedFiles: 3

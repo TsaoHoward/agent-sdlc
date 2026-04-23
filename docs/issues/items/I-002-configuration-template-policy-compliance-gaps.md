@@ -28,7 +28,7 @@ The following surfaces were identified in the 2026-04-23 audit:
 
 ## Dependencies And Constraints
 - ADR-0008 requires operator-controlled module configuration to have a checked-in template and ignored local config when values can vary by operator, machine, provider, credential, or local runtime.
-- Secret values should not be introduced into checked-in templates. Prefer environment variable names or generated local development defaults when unavoidable for local-only bootstrap.
+- Secret values should not be introduced into checked-in templates. Ignored local config may carry local-only credentials when project-file configuration is the selected source of truth.
 - `config/policy/*.yaml` should remain committed policy input unless a future ADR changes policy source-of-truth ownership.
 - Remediation should preserve the current working local Gitea, webhook, runner, CI callback, and worker-runtime behavior.
 

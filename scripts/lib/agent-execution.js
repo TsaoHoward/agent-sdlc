@@ -11,7 +11,7 @@ const DEFAULT_CONFIG = {
   mode: "remote",
   baseUrl: "https://api.deepseek.com",
   model: "deepseek-chat",
-  apiKeyEnv: "DEEPSEEK_API_KEY",
+  apiKey: "",
   allowedTaskClasses: ["bounded_code_change"],
   maxChangedFiles: 3,
   maxPromptBytes: 24000,
@@ -23,23 +23,6 @@ const DEFAULT_CONFIG = {
 
 function utcNow() {
   return new Date().toISOString();
-}
-
-function parseBooleanEnv(value, fallback) {
-  if (value === undefined || value === null || value === "") {
-    return fallback;
-  }
-
-  const normalized = String(value).trim().toLowerCase();
-  if (["1", "true", "yes", "on"].includes(normalized)) {
-    return true;
-  }
-
-  if (["0", "false", "no", "off"].includes(normalized)) {
-    return false;
-  }
-
-  return fallback;
 }
 
 function readAgentExecutionConfig(repoRoot) {
@@ -70,15 +53,7 @@ function resolveAgentExecutionConfig(repoRoot) {
   return {
     configPath,
     configSource,
-    config: {
-      ...config,
-      enabled: parseBooleanEnv(process.env.AGENT_SDLC_AGENT_EXECUTION_ENABLED, config.enabled),
-      backend: process.env.AGENT_SDLC_AGENT_EXECUTION_BACKEND || config.backend,
-      mode: process.env.AGENT_SDLC_AGENT_EXECUTION_MODE || config.mode,
-      baseUrl: process.env.AGENT_SDLC_AGENT_EXECUTION_BASE_URL || config.baseUrl,
-      model: process.env.AGENT_SDLC_AGENT_EXECUTION_MODEL || config.model,
-      apiKeyEnv: process.env.AGENT_SDLC_AGENT_EXECUTION_API_KEY_ENV || config.apiKeyEnv,
-    },
+    config,
   };
 }
 
@@ -385,9 +360,9 @@ async function executeAgentSlice({ repoRoot, taskRequest, sessionRecord, workspa
     throw new Error(`Unsupported agent execution backend or mode: ${config.backend}/${config.mode}`);
   }
 
-  const apiKey = process.env[config.apiKeyEnv];
+  const apiKey = config.apiKey;
   if (!apiKey) {
-    throw new Error(`Agent execution is enabled but ${config.apiKeyEnv} is not set.`);
+    throw new Error("Agent execution is enabled but agentExecution.apiKey is not set in project config.");
   }
 
   const fileList = listWorkspaceFiles(workspaceDir, config.maxFileListEntries);
