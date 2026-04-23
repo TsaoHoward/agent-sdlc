@@ -2,7 +2,7 @@
 
 ## Metadata
 - Test ID: TC-005
-- Status: In Progress
+- Status: Passed
 - Last Updated: 2026-04-23
 - Owner: Project Maintainer
 - Mode: CLI half-live
@@ -26,11 +26,11 @@ It does not replace long-term automation.
 - Date: 2026-04-23
 - Config source: ignored `config/agent-execution.yaml`
 - Provider: `deepseek` / `remote` / `deepseek-chat`
-- `@agent run code`: `trq-4faac7e2a74b` -> `ags-cd9d3e289f02` -> `PR #24` -> run `#45`
-- `@agent run docs`: `trq-2de69af748b1` -> `ags-0e18b7db5b88` -> `PR #25` -> latest local run failed in `#46` after stale-branch finalize 401
-- `@agent run review`: `trq-2644a836e239` -> `ags-94e3f03d2f6b` -> `PR #26` -> latest local run failed in `#47` after stale-branch finalize 401
-- `@agent run ci`: `trq-859264e0df7f` -> `ags-c742088383aa` -> `PR #27` -> latest local run failed in `#48` after stale-branch finalize 401
-- Correction summary: local runs `#46`-`#49` showed the same stale-seeded-branch `Finalize CI Traceability` failure mode; forge `main` reseed plus proposal preflight has landed and multi-token manual-flow convergence is pending revalidation
+- `@agent run code`: `trq-c9b2fa3064fb` -> `ags-33be3cb8741c` -> `PR #1` -> run `#51` (success)
+- `@agent run docs`: `trq-8dc2bbe48812` -> `ags-b8311df3ef0c` -> `PR #30` -> run `#52` (success)
+- `@agent run review`: `trq-fd8ca8f8d18f` -> `ags-9f4217fcbdc7` -> `PR #31` -> run `#53` (success)
+- `@agent run ci`: `trq-7765e00f85d4` -> `ags-327998def612` -> `PR #32` -> run `#54` (success)
+- Convergence summary: all four traceability files now show `ci.ci_status=success`, `review.status=ready-for-human-review`, and `review.proposal_body_sync_status=synced`
 
 ## Preconditions
 - local environment and runner are up
@@ -93,3 +93,4 @@ Close or keep smoke-test PRs based on the current validation window and issue-da
 ## Change Log
 - 2026-04-23: Initial version.
 - 2026-04-23: Reopened after correcting local CI evidence for PRs `#25`-`#29`; stale forge-seeded proposal branches caused `Finalize CI Traceability` 401 failures in runs `#46`-`#49`, so post-fix multi-token manual-flow revalidation is required.
+- 2026-04-23: Marked passed after fresh post-fix multi-token revalidation succeeded for `code/docs/review/ci` with CI runs `#51`-`#54`.

@@ -124,4 +124,4 @@ When a change is substantial enough to alter the supported workflow shape, also 
 - 2026-04-23: Updated `bounded_code_change` coverage after landing the first opt-in config-selected agent execution adapter slice.
 - 2026-04-23: Updated `bounded_code_change` coverage after provider-enabled DeepSeek validation produced a session-backed local proposal.
 - 2026-04-23: Updated `documentation_update`, `review_follow_up`, and `ci_failure_investigation` coverage after provider-enabled DeepSeek validation produced sessions and local PRs `#25`-`#27`.
-- 2026-04-23: Corrected local CI evidence for PRs `#25`-`#29` after identifying stale forge-seeded proposal branches as the `Finalize CI Traceability` 401 failure root cause in runs `#46`-`#49`; coverage remains implemented scaffold with post-fix CI revalidation tracked in testing docs.
+- 2026-04-23: Corrected stale forge-seeded CI failures (`#46`-`#49`) and completed fresh multi-token revalidation with successful runs `#51`-`#54`.

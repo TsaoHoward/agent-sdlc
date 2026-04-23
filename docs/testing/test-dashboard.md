@@ -42,8 +42,8 @@ It does not replace CI run history, forge issue or PR history, roadmap/WBS plann
 |---|---|---|---|---|---|---|
 | TC-001 | CLI Replay Intake And Session Smoke | Ready | CLI replay | `docs/roadmap.md` Phase 1; WBS `3.1`, `3.2`, `3.3` | Re-run when intake or session-start behavior changes and keep the case note current if task/session fields or evidence paths move | Move out after the current validation window once the case no longer needs active dashboard attention; keep the canonical case note as the long-lived procedure |
 | TC-002 | CLI Proposal And Traceability Smoke | Passed | CLI half-live | `docs/roadmap.md` Phase 1; WBS `3.4`, `3.5`, `3.6` | Re-run when proposal, CI, or traceability wiring changes so the host callback and convergence path stay covered | Move out at the next maintenance pass if no new proposal/traceability regression appears |
-| TC-004 | Agent Execution Adapter Smoke | In Progress | CLI replay | `docs/roadmap.md` Phase 1; WBS `3.9` | Re-run after forge reseed and proposal preflight changes so provider-enabled CI linkage evidence is revalidated on fresh proposals | Move out at the next maintenance pass if no new provider-enabled regression appears |
-| TC-005 | Real AI Connectivity Manual Flow | In Progress | CLI half-live | `docs/roadmap.md` Phase 1; WBS `3.7`, `3.9` | Re-run manual-flow evidence on fresh proposals after forge reseed and proposal preflight rollout | Move out at the next maintenance pass if no new operator-facing manual-flow gap appears |
+| TC-004 | Agent Execution Adapter Smoke | Passed | CLI replay | `docs/roadmap.md` Phase 1; WBS `3.9` | Re-run when adapter parsing, provider config, allowed task classes, or path guardrails change | Move out at the next maintenance pass if no new provider-enabled regression appears |
+| TC-005 | Real AI Connectivity Manual Flow | Passed | CLI half-live | `docs/roadmap.md` Phase 1; WBS `3.7`, `3.9` | Re-run when operator runbook steps, provider config, or token coverage changes | Move out at the next maintenance pass if no new operator-facing manual-flow gap appears |
 
 ## Test Items
 
@@ -72,11 +72,11 @@ It does not replace CI run history, forge issue or PR history, roadmap/WBS plann
 - Notes: This case keeps the forge real while still letting the operator advance the lifecycle one command at a time.
 
 ### TC-004 - Agent Execution Adapter Smoke
-- Status: `In Progress`
+- Status: `Passed`
 - Mode: `CLI replay`
 - Related Docs / WBS: `docs/testing/items/TC-004-agent-execution-adapter-smoke.md`; WBS `3.9`
 - Why It Matters: This is the first validation surface for the new config-selected agent execution adapter before it is trusted as part of the live issue-to-PR path.
-- Current State: The disabled-by-default adapter path has been smoke-tested without API credentials, and provider-enabled DeepSeek validation has passed for `bounded_code_change` (`trq-4faac7e2a74b` -> `PR #24` -> run `#45`). A same-day correction found PRs `#25`-`#27` were created from stale forge `main` content and their local runs (`#46`-`#49`) failed at `Finalize CI Traceability` with `401 PATCH /pulls/*`; local forge `main` has been reseeded and proposal preflight now blocks stale-seed proposal creation. For investigation-class behavior, adapter guardrails now restrict edits to `docs/testing/` and `docs/examples/` to keep the output evidence-oriented.
+- Current State: The disabled-by-default adapter path has been smoke-tested without API credentials, and provider-enabled DeepSeek validation is now revalidated across all enabled task classes with fresh post-fix evidence: `bounded_code_change` (`trq-c9b2fa3064fb` -> `PR #1` -> run `#51`), `documentation_update` (`trq-8dc2bbe48812` -> `PR #30` -> run `#52`), `review_follow_up` (`trq-fd8ca8f8d18f` -> `PR #31` -> run `#53`), and `ci_failure_investigation` (`trq-7765e00f85d4` -> `PR #32` -> run `#54`). Proposal preflight now blocks stale forge-seed proposal creation, and agent execution parsing now tolerates non-clean provider JSON wrappers so sessions do not fail on otherwise valid payloads.
 - Next Action: Re-run when agent execution adapter behavior, provider config, allowed task classes, session evidence fields, or CI-to-host traceability sync changes.
 - Exit Path: Move out at the next maintenance pass if no new provider-enabled regression appears.
 - Canonical Case: `docs/testing/items/TC-004-agent-execution-adapter-smoke.md`
@@ -84,11 +84,11 @@ It does not replace CI run history, forge issue or PR history, roadmap/WBS plann
 - Notes: This case intentionally separates config/evidence validation from full live GUI validation so WBS `3.9` can harden without destabilizing the already-working closed loop.
 
 ### TC-005 - Real AI Connectivity Manual Flow
-- Status: `In Progress`
+- Status: `Passed`
 - Mode: `CLI half-live`
 - Related Docs / WBS: `docs/testing/items/TC-005-real-ai-connectivity-manual-flow.md`; WBS `3.7`, `3.9`
 - Why It Matters: Operators need one practical runbook that proves real provider connectivity with project config, real API key wiring, task/session evidence, proposal creation, and CI convergence.
-- Current State: The first manual-flow runbook pass remains validated for `@agent run code` on `PR #24` (`run #45`). A same-day correction found that `docs`, `review`, and `ci` follow-up proposals were generated from stale forge `main` content and failed in runs `#46`-`#49`; reseed plus proposal preflight has landed and the multi-token manual-flow evidence is now queued for revalidation.
+- Current State: The manual-flow runbook is now revalidated across all currently enabled tokens on fresh proposals after reseed/preflight rollout: `@agent run code` (`trq-c9b2fa3064fb` -> `PR #1` -> run `#51`), `@agent run docs` (`trq-8dc2bbe48812` -> `PR #30` -> run `#52`), `@agent run review` (`trq-fd8ca8f8d18f` -> `PR #31` -> run `#53`), and `@agent run ci` (`trq-7765e00f85d4` -> `PR #32` -> run `#54`). All four traceability files converge to `ci_status: success`, `review.status: ready-for-human-review`, and `proposal_body_sync_status: synced`.
 - Next Action: Keep the runbook synchronized with current command surfaces, config fields, and latest reproducible evidence IDs.
 - Exit Path: Move out at the next maintenance pass if no operator-facing real-AI connectivity follow-up remains.
 - Canonical Case: `docs/testing/items/TC-005-real-ai-connectivity-manual-flow.md`
@@ -108,3 +108,4 @@ It does not replace CI run history, forge issue or PR history, roadmap/WBS plann
 - 2026-04-23: Expanded `TC-004` validation coverage to `review_follow_up` (`PR #26`, run `#47`) and `ci_failure_investigation` (`PR #27`, run `#48`) with investigation-path edit guardrails.
 - 2026-04-23: Added `TC-005` and marked the first manual real-AI connectivity flow passed.
 - 2026-04-23: Reopened `TC-004` and `TC-005` after correcting local CI evidence: runs `#46`-`#49` failed from stale forge-seeded proposal branches, and fresh post-fix revalidation is now required.
+- 2026-04-23: Marked `TC-004` and `TC-005` passed again after fresh post-fix provider runs completed for all enabled tokens with successful local CI runs `#51`-`#54` and converged traceability.

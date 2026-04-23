@@ -95,6 +95,11 @@ The repository is intentionally still in an early-phase, structure-first posture
   - the root cause was stale local forge `main` content (`316f89a`) that proposal branches inherited for PRs `#25`-`#29`
   - local forge `main` was reseeded from current workspace `HEAD`
   - `proposal-surface create-gitea-pr` now performs a preflight check and fails fast with a reseed command when local forge `main` lags workspace `HEAD`
+- A same-day post-fix revalidation then reconfirmed the provider-enabled path:
+  - fresh runs covered all enabled tokens with task requests `trq-c9b2fa3064fb`, `trq-8dc2bbe48812`, `trq-fd8ca8f8d18f`, and `trq-7765e00f85d4`
+  - sessions `ags-33be3cb8741c`, `ags-b8311df3ef0c`, `ags-9f4217fcbdc7`, and `ags-327998def612` produced proposals `PR #1`, `#30`, `#31`, and `#32`
+  - local Actions runs `#51`-`#54` all completed successfully, with traceability converging to `ci_status: success`, `ready-for-human-review`, and `proposal_body_sync_status: synced`
+  - provider response handling now extracts the first valid JSON object from mixed output to reduce session failures from provider formatting noise
 
 ## Dependencies And Constraints
 - Work should stay aligned to Phase 1 and WBS 3 rather than pulling Phase 2 observability or multi-source scope forward.
@@ -188,3 +193,4 @@ If implementation uncovers a major unresolved decision, the issue should stay ac
 - 2026-04-23: Recorded provider-enabled DeepSeek validation through session `ags-cd9d3e289f02` and local PR `#24`, plus the CI traceability adjustment that defers PR body refresh to host-side sync when CI checkout lacks ignored local Gitea credentials.
 - 2026-04-23: Expanded provider-enabled DeepSeek coverage to `documentation_update`, `review_follow_up`, and `ci_failure_investigation` through local PRs `#25`-`#27`.
 - 2026-04-23: Corrected local CI evidence for PRs `#25`-`#29` after identifying stale forge seeding as the `Finalize CI Traceability` 401 root cause in runs `#46`-`#49`, then reseeded forge `main` and added proposal preflight guardrails.
+- 2026-04-23: Recorded fresh post-fix provider revalidation across all enabled tokens with successful CI runs `#51`-`#54`, and captured provider JSON extraction hardening for mixed-output responses.

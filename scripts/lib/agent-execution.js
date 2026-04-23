@@ -244,21 +244,96 @@ function buildExecutionPrompt({ taskRequest, sessionRecord, fileList, contextFil
   return truncateText(JSON.stringify(payload, null, 2), config.maxPromptBytes);
 }
 
+function tryParseJsonObject(value) {
+  const attempts = [String(value || ""), String(value || "").replace(/,\s*([}\]])/gu, "$1")];
+  let lastError = null;
+
+  for (const attempt of attempts) {
+    try {
+      return JSON.parse(attempt);
+    } catch (error) {
+      lastError = error;
+    }
+  }
+
+  throw lastError || new Error("Failed to parse JSON object.");
+}
+
+function collectBalancedJsonObjects(text) {
+  const source = String(text || "");
+  const results = [];
+  let depth = 0;
+  let startIndex = -1;
+  let inString = false;
+  let escaping = false;
+
+  for (let index = 0; index < source.length; index += 1) {
+    const char = source[index];
+
+    if (inString) {
+      if (escaping) {
+        escaping = false;
+      } else if (char === "\\") {
+        escaping = true;
+      } else if (char === "\"") {
+        inString = false;
+      }
+      continue;
+    }
+
+    if (char === "\"") {
+      inString = true;
+      continue;
+    }
+
+    if (char === "{") {
+      if (depth === 0) {
+        startIndex = index;
+      }
+      depth += 1;
+      continue;
+    }
+
+    if (char === "}" && depth > 0) {
+      depth -= 1;
+      if (depth === 0 && startIndex !== -1) {
+        results.push(source.slice(startIndex, index + 1));
+        startIndex = -1;
+      }
+    }
+  }
+
+  return results;
+}
+
 function extractJsonObject(text) {
   const trimmed = String(text || "").trim();
-  if (trimmed.startsWith("{") && trimmed.endsWith("}")) {
-    return JSON.parse(trimmed);
+  const candidates = [];
+
+  if (trimmed) {
+    candidates.push(trimmed);
   }
 
   const fencedMatch = trimmed.match(/```(?:json)?\s*([\s\S]*?)```/iu);
   if (fencedMatch) {
-    return JSON.parse(fencedMatch[1].trim());
+    candidates.push(fencedMatch[1].trim());
   }
 
-  const firstBrace = trimmed.indexOf("{");
-  const lastBrace = trimmed.lastIndexOf("}");
-  if (firstBrace !== -1 && lastBrace > firstBrace) {
-    return JSON.parse(trimmed.slice(firstBrace, lastBrace + 1));
+  candidates.push(...collectBalancedJsonObjects(trimmed));
+
+  const visited = new Set();
+  for (const candidate of candidates) {
+    const normalizedCandidate = String(candidate || "").trim();
+    if (!normalizedCandidate || visited.has(normalizedCandidate)) {
+      continue;
+    }
+    visited.add(normalizedCandidate);
+
+    try {
+      return tryParseJsonObject(normalizedCandidate);
+    } catch {
+      // Continue scanning candidate payloads until one parses cleanly.
+    }
   }
 
   throw new Error("Provider response did not contain a JSON object.");

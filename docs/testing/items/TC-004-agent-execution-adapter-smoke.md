@@ -2,7 +2,7 @@
 
 ## Metadata
 - Test ID: TC-004
-- Status: In Progress
+- Status: Passed
 - Last Updated: 2026-04-23
 - Owner: Project Maintainer
 - Mode: CLI replay
@@ -29,18 +29,29 @@ It does not replace the full proposal, CI, or GUI live cases.
 - Date: 2026-04-23
 - Local config source: ignored `config/agent-execution.yaml`
 - Provider: `deepseek` / `remote` / `deepseek-chat`
-- `bounded_code_change` run:
-  - Task request: `trq-4faac7e2a74b`
-  - Session: `ags-cd9d3e289f02`
-  - Local proposal: `gitea:localhost:43000/howard/agent-sdlc#pull/24`
-  - Changed file in session workspace: `docs/examples/provider-live-smoke.md`
-  - Provider-requested validation: `npm run validate:platform` passed
-  - CI/traceability note: local Actions run `#42` completed repository validation successfully but initially failed on direct PR body PATCH because the workflow checkout did not have ignored local Gitea credentials; the CI finalize path now defers that PR body refresh to host-side review-surface sync, and revalidation run `#45` completed successfully with the PR traceability block automatically refreshed to `CI: success` / `ready for human review`
-- `documentation_update`, `review_follow_up`, and `ci_failure_investigation` follow-up runs were generated as local PRs `#25`, `#26`, and `#27`, but a same-day correction found those branches inherited stale forge `main` content and their local CI runs (`#46`-`#49`) failed at `Finalize CI Traceability` with `401 PATCH /pulls/*` from an older script revision.
-- Post-correction status:
-  - local forge `main` has been reseeded from current workspace `HEAD`
+- `bounded_code_change` revalidation:
+  - Task request: `trq-c9b2fa3064fb`
+  - Session: `ags-33be3cb8741c`
+  - Local proposal: `gitea:localhost:43000/howard/agent-sdlc#pull/1` (existing proposal branch updated)
+  - CI run: `#51` (success)
+- `documentation_update` revalidation:
+  - Task request: `trq-8dc2bbe48812`
+  - Session: `ags-b8311df3ef0c`
+  - Local proposal: `gitea:localhost:43000/howard/agent-sdlc#pull/30`
+  - CI run: `#52` (success)
+- `review_follow_up` revalidation:
+  - Task request: `trq-fd8ca8f8d18f`
+  - Session: `ags-9f4217fcbdc7`
+  - Local proposal: `gitea:localhost:43000/howard/agent-sdlc#pull/31`
+  - CI run: `#53` (success)
+- `ci_failure_investigation` revalidation:
+  - Task request: `trq-7765e00f85d4`
+  - Session: `ags-327998def612`
+  - Local proposal: `gitea:localhost:43000/howard/agent-sdlc#pull/32`
+  - CI run: `#54` (success)
+- Stability notes:
   - proposal creation now fails fast with a reseed instruction when local forge `main` lags workspace `HEAD`
-  - the three non-`code` provider-enabled classes are pending fresh post-fix CI revalidation
+  - provider response parsing now extracts the first valid JSON object from mixed output so sessions fail less often on formatting noise
 
 ## Preconditions
 - the workspace has `npm install` completed
@@ -102,3 +113,4 @@ Temporary smoke directories under `$env:TEMP` can be removed after inspection.
 - 2026-04-23: Marked provider-enabled validation passed after session `ags-cd9d3e289f02` created local proposal `PR #24` with DeepSeek-generated documentation and passed provider-requested validation.
 - 2026-04-23: Expanded latest known result to include provider-enabled proposals for `documentation_update`, `review_follow_up`, and `ci_failure_investigation` through PRs `#25`-`#27`.
 - 2026-04-23: Corrected CI evidence for PRs `#25`-`#29` after identifying stale forge seeding as the `Finalize CI Traceability` 401 root cause in runs `#46`-`#49`; reopened for fresh post-fix validation.
+- 2026-04-23: Marked passed again after fresh post-fix provider revalidation across all enabled task classes with successful runs `#51`-`#54`.

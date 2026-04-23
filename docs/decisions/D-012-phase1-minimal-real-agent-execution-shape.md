@@ -486,3 +486,8 @@ The same boundary model then expanded to `review_follow_up` and `ci_failure_inve
 - `ci_failure_investigation`: task request `trq-859264e0df7f`, session `ags-c742088383aa`, local PR `#27`
 - the investigation path now enforces docs-scoped edits to keep investigation output evidence-oriented
 - correction: recent local runs `#46`-`#49` failed at `Finalize CI Traceability` with `401 PATCH /pulls/*` from stale forge-seeded branch content, and the mitigation keeps architecture boundaries unchanged by reseeding local forge `main` and adding proposal preflight checks before branch push
+
+A same-day post-fix pass reconfirmed the selected direction without boundary drift:
+- fresh multi-token provider runs created `PR #1`, `#30`, `#31`, and `#32`
+- local CI runs `#51`-`#54` all succeeded and traceability converged to `ready-for-human-review`
+- provider output handling is now hardened to extract the first valid JSON object from mixed output wrappers, reducing execution failure noise while preserving the same repo-owned control boundary
