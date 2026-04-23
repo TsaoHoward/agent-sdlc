@@ -35,15 +35,15 @@ It is not an ADR. It tracks active, narrowed, recently selected, and deferred ma
 ## Dashboard
 | Decision ID | Title | Status | Related Docs / WBS | Next Action |
 |---|---|---|---|---|
-| D-009 | Phase 1 Minimal Real Agent Execution Shape | Open | `docs/roadmap.md` Phase 1; `docs/wbs.md` WBS `3.9` | Narrow the first provider/tooling/context shape for one supported task class without collapsing task gateway, agent control, runtime, and CI boundaries |
+| D-012 | Phase 1 Minimal Real Agent Execution Shape | Decided | `docs/roadmap.md` Phase 1; `docs/wbs.md` WBS `3.9` | Implement the first config-selected execution adapter with `DeepSeek API` as the short-term remote default while preserving a later local-backend path |
 
 ## Decision Items
-### D-009 - Phase 1 Minimal Real Agent Execution Shape
-- Status: `Open`
+### D-012 - Phase 1 Minimal Real Agent Execution Shape
+- Status: `Decided`
 - Related Docs / WBS: `docs/roadmap.md` Phase 1; `docs/wbs.md` WBS `3.9`; `docs/architecture/agent-control-integration-plan.md`; `docs/architecture/runtime-isolation.md`
 - Why It Matters: Phase 1 now explicitly requires one real provider-backed agent execution slice, but the repo should still avoid turning one model/provider/tool surface into a hidden architecture decision.
-- Current State: The current Phase 1 loop reaches live intake, session startup, isolated runtime preparation, proposal PR creation, CI verification, and durable traceability. Task tokens currently influence classification and policy, but execution behavior remains scaffold-first rather than provider-backed real agent work.
-- Next Action: Decide the first supported task class, provider boundary, bounded tool surface, and evidence expectations for the first real execution slice. Promote to an ADR only if the chosen shape changes architecture boundaries, source-of-truth ownership, runtime isolation, or cross-cutting governance assumptions.
+- Current State: The current Phase 1 loop reaches live intake, session startup, isolated runtime preparation, proposal PR creation, CI verification, and durable traceability. Task tokens currently influence classification and policy, but execution behavior remains scaffold-first rather than provider-backed real agent work. The selected direction is now documented in `docs/decisions/D-012-phase1-minimal-real-agent-execution-shape.md`: keep orchestration repo-owned, support both remote and local backends through a configuration-selected API adapter, and use `DeepSeek API` as the short-term remote default for the first WBS `3.9` slice.
+- Next Action: Implement the first config-selected execution adapter, settle the initial DeepSeek model identifier plus evidence fields, and only promote to an ADR if implementation changes architecture boundaries, source-of-truth ownership, runtime isolation, or cross-cutting governance assumptions.
 - Exit Path: Move this item out once WBS `3.9` is either narrowed into implementation-ready defaults in existing docs or promoted to an ADR because the decision changes cross-cutting architecture/governance assumptions.
 
 ## Change Log
@@ -57,4 +57,7 @@ It is not an ADR. It tracks active, narrowed, recently selected, and deferred ma
 - 2026-04-15: Moved the issue-document workflow choice directly to ADR-0005 and kept the active dashboard empty because no unresolved major decision remains.
 - 2026-04-15: Promoted the platform implementation stack and packaging baseline directly to ADR-0006 and kept the active dashboard empty because no unresolved major decision remains.
 - 2026-04-21: Promoted the testing workflow choice directly to ADR-0007 and kept the active dashboard empty because no unresolved major decision remains.
-- 2026-04-22: Added D-009 to track the still-open provider/tooling/context shape for the first real Phase 1 agent execution slice under WBS `3.9`.
+- 2026-04-22: Added D-012 to track the still-open provider/tooling/context shape for the first real Phase 1 agent execution slice under WBS `3.9`.
+- 2026-04-22: Moved D-012 to `In Analysis` and linked the new supporting note that narrows the first-slice recommendation toward repo-owned orchestration plus a provider-backed execution adapter.
+- 2026-04-22: Marked D-012 `Decided` after selecting a config-switched remote/local-capable adapter direction with `DeepSeek API` as the short-term remote default.
+- 2026-04-23: Renumbered the active execution-shape decision from D-009 to D-012 to avoid conflicting with archived D-009.

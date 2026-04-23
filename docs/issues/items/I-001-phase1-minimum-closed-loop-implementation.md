@@ -5,7 +5,7 @@
 - Status: In Progress
 - Last Updated: 2026-04-22
 - Owner: Project Maintainer
-- Related Docs / WBS: `docs/roadmap.md` Phase 1; `docs/wbs.md` WBS `3`, `3.1`, `3.2`, `3.3`, `3.4`, `3.5`, `3.6`, `3.7`
+- Related Docs / WBS: `docs/roadmap.md` Phase 1; `docs/wbs.md` WBS `3`, `3.1`, `3.2`, `3.3`, `3.4`, `3.5`, `3.6`, `3.7`, `3.8`, `3.9`
 - Source Dashboard: docs/issues/issue-dashboard.md
 - Source Template: docs/templates/issue-note.template.md
 
@@ -100,6 +100,8 @@ The repository is intentionally still in an early-phase, structure-first posture
 
 Steps 1 through 5 now have working implementation slices, with WBS 3.1 reaching a real trigger path, WBS 3.2/3.3 handing off into the worker image scaffold, WBS 3.4 creating a real Gitea proposal path, and WBS 3.5 exercising a real PR-triggered workflow on the local Gitea Actions path. The next packaging boundary is therefore narrower:
 - land one minimal real provider-backed agent execution slice for a supported task class before broadening intake surfaces or token-specific workflows
+- use a repo-owned API-oriented execution adapter that can switch between remote and local backends through configuration rather than hard-coding one provider into workflow orchestration
+- use `DeepSeek API` as the short-term remote default for that first execution slice while preserving a later local-backend path
 - keep the current control-plane growth path inside the npm-managed package baseline
 - keep the local forge seed path aligned to the active workspace `HEAD` so workflow and platform files match the code under test
 - keep runtime workspace preparation sourced from the forge target repository and target branch so proposal heads inherit active workflow files and other forge-truth content
@@ -119,7 +121,7 @@ If implementation uncovers a major unresolved decision, the issue should stay ac
 
 ## Next Actions
 - rerun and maintain the canonical CLI and GUI procedures under `docs/testing/` when intake, runtime, proposal, CI, review, or bootstrap behavior changes
-- add and validate one minimal real provider-backed agent execution path for a supported task class, with `bounded_code_change` as the preferred first target
+- add and validate one minimal real provider-backed agent execution path for a supported task class, with `bounded_code_change` as the preferred first target and `DeepSeek API` as the short-term remote default behind a config-selected adapter
 - keep `docs/user-capability-matrix.md` aligned with the actual supported `@agent` locations, task tokens, and manual operator surfaces as the implementation evolves
 - keep the strengthened live issue-comment path in place now that it auto-creates the proposal and root traceability file
 - keep the CI-to-host traceability callback path stable so `.agent-sdlc/traceability/<task_request_id>.json` continues to converge automatically after CI success
@@ -162,3 +164,4 @@ If implementation uncovers a major unresolved decision, the issue should stay ac
 - 2026-04-22: Closed the remaining host-side canonical traceability refresh gap by adding proposal-traceability sync plus a CI host callback, then validated automatic convergence on seeded local PR `#23` with successful run `#41`.
 - 2026-04-22: Added `docs/user-capability-matrix.md` as the durable current-state handoff for supported `@agent` entrypoints, task tokens, manual operator surfaces, and lifecycle coverage.
 - 2026-04-22: Added the explicit packaging follow-up to land one real provider-backed agent execution slice in Phase 1, with `bounded_code_change` as the preferred first target.
+- 2026-04-22: Narrowed the first real execution slice toward a config-selected remote/local-capable adapter with `DeepSeek API` as the short-term remote default.
