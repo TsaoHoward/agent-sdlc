@@ -3,7 +3,7 @@
 ## Document Metadata
 - Version: 0.1
 - Status: Active
-- Last Updated: 2026-04-23
+- Last Updated: 2026-04-24
 - Owner: Project Maintainer
 - Source Template: docs/templates/test-dashboard.template.md
 
@@ -44,6 +44,7 @@ It does not replace CI run history, forge issue or PR history, roadmap/WBS plann
 | TC-002 | CLI Proposal And Traceability Smoke | Passed | CLI half-live | `docs/roadmap.md` Phase 1; WBS `3.4`, `3.5`, `3.6` | Re-run when proposal, CI, or traceability wiring changes so the host callback and convergence path stay covered | Move out at the next maintenance pass if no new proposal/traceability regression appears |
 | TC-004 | Agent Execution Adapter Smoke | Passed | CLI replay | `docs/roadmap.md` Phase 1; WBS `3.9` | Re-run when adapter parsing, provider config, allowed task classes, or path guardrails change | Move out at the next maintenance pass if no new provider-enabled regression appears |
 | TC-005 | Real AI Connectivity Manual Flow | Passed | CLI half-live | `docs/roadmap.md` Phase 1; WBS `3.7`, `3.9` | Re-run when operator runbook steps, provider config, or token coverage changes | Move out at the next maintenance pass if no new operator-facing manual-flow gap appears |
+| TC-006 | External Target Service-Evaluation Baseline | Passed | External target evaluation | ADR-0009; `docs/roadmap.md` Phase 1; WBS `3.10`, `3.11` | Move out at the next maintenance pass if no immediate follow-up remains beyond additional fixture expansion | Move out after the first external target-repo procedure is live and the current dashboard no longer needs to carry the baseline setup work |
 
 ## Test Items
 
@@ -53,6 +54,7 @@ It does not replace CI run history, forge issue or PR history, roadmap/WBS plann
 - Related Docs / WBS: `docs/testing/items/TC-001-cli-replay-intake-and-session-smoke.md`; WBS `3.1`, `3.2`, `3.3`
 - Why It Matters: This is the fastest deterministic way to inspect task normalization and session-start boundaries without waiting on the live forge path.
 - Current State: The current CLI replay path exists and is used as the first troubleshooting layer when live webhook validation is not necessary.
+- Evidence Class: `platform self-test / platform regression`
 - Next Action: Keep the procedure aligned with the current command surface and evidence paths under `.agent-sdlc/state/` and `.agent-sdlc/runtime/`.
 - Exit Path: Move out after the current validation window when the dashboard no longer needs to carry it directly.
 - Canonical Case: `docs/testing/items/TC-001-cli-replay-intake-and-session-smoke.md`
@@ -65,6 +67,7 @@ It does not replace CI run history, forge issue or PR history, roadmap/WBS plann
 - Related Docs / WBS: `docs/testing/items/TC-002-cli-proposal-and-traceability-smoke.md`; WBS `3.4`, `3.5`, `3.6`
 - Why It Matters: This is the most direct way to validate proposal creation, traceability write-back, and direct review-sync entrypoints against the local forge.
 - Current State: Proposal creation, reviewer-facing PR-body CI updates, and host-side traceability convergence are all working. A fresh seeded validation on synthetic proposal `PR #23` completed one successful `pull_request` run (`#41`) without the earlier duplicate sync-triggered second run, and the PR body, host root traceability file, and session-local workspace copy all converged automatically through the normal CI path.
+- Evidence Class: `platform self-test / platform regression`
 - Next Action: Re-run against future proposal-path changes so duplicate-CI and host-traceability regressions are caught early.
 - Exit Path: Move out at the next maintenance pass if no new proposal, CI, or traceability regression reopens this path.
 - Canonical Case: `docs/testing/items/TC-002-cli-proposal-and-traceability-smoke.md`
@@ -77,6 +80,7 @@ It does not replace CI run history, forge issue or PR history, roadmap/WBS plann
 - Related Docs / WBS: `docs/testing/items/TC-004-agent-execution-adapter-smoke.md`; WBS `3.9`
 - Why It Matters: This is the first validation surface for the new config-selected agent execution adapter before it is trusted as part of the live issue-to-PR path.
 - Current State: The disabled-by-default adapter path has been smoke-tested without API credentials, and provider-enabled DeepSeek validation is now revalidated across all enabled task classes with fresh post-fix evidence: `bounded_code_change` (`trq-c9b2fa3064fb` -> `PR #1` -> run `#51`), `documentation_update` (`trq-8dc2bbe48812` -> `PR #30` -> run `#52`), `review_follow_up` (`trq-fd8ca8f8d18f` -> `PR #31` -> run `#53`), and `ci_failure_investigation` (`trq-7765e00f85d4` -> `PR #32` -> run `#54`). Proposal preflight now blocks stale forge-seed proposal creation, and agent execution parsing now tolerates non-clean provider JSON wrappers so sessions do not fail on otherwise valid payloads.
+- Evidence Class: `platform self-test / platform regression`
 - Next Action: Re-run when agent execution adapter behavior, provider config, allowed task classes, session evidence fields, or CI-to-host traceability sync changes.
 - Exit Path: Move out at the next maintenance pass if no new provider-enabled regression appears.
 - Canonical Case: `docs/testing/items/TC-004-agent-execution-adapter-smoke.md`
@@ -89,11 +93,24 @@ It does not replace CI run history, forge issue or PR history, roadmap/WBS plann
 - Related Docs / WBS: `docs/testing/items/TC-005-real-ai-connectivity-manual-flow.md`; WBS `3.7`, `3.9`
 - Why It Matters: Operators need one practical runbook that proves real provider connectivity with project config, real API key wiring, task/session evidence, proposal creation, and CI convergence.
 - Current State: The manual-flow runbook is now revalidated across all currently enabled tokens on fresh proposals after reseed/preflight rollout: `@agent run code` (`trq-c9b2fa3064fb` -> `PR #1` -> run `#51`), `@agent run docs` (`trq-8dc2bbe48812` -> `PR #30` -> run `#52`), `@agent run review` (`trq-fd8ca8f8d18f` -> `PR #31` -> run `#53`), and `@agent run ci` (`trq-7765e00f85d4` -> `PR #32` -> run `#54`). All four traceability files converge to `ci_status: success`, `review.status: ready-for-human-review`, and `proposal_body_sync_status: synced`.
+- Evidence Class: `platform self-test / platform regression`
 - Next Action: Keep the runbook synchronized with current command surfaces, config fields, and latest reproducible evidence IDs.
 - Exit Path: Move out at the next maintenance pass if no operator-facing real-AI connectivity follow-up remains.
 - Canonical Case: `docs/testing/items/TC-005-real-ai-connectivity-manual-flow.md`
 - Escalation Check: Open or update issue/decision surfaces when manual connectivity steps reveal drift between repo policy, local config, and runtime behavior.
 - Notes: This case complements `TC-004` by emphasizing operator workflow and evidence collection instead of adapter internals only.
+
+### TC-006 - External Target Service-Evaluation Baseline
+- Status: `Passed`
+- Mode: `External target evaluation`
+- Related Docs / WBS: `docs/testing/items/TC-006-external-target-service-evaluation-baseline.md`; WBS `3.10`, `3.11`
+- Why It Matters: The project now has a durable rule that self-targeted platform runs are useful but not sufficient for broader service-quality claims. This case is the first step toward evidence from a non-platform target repo.
+- Current State: The first controlled external-target baseline now exists as `fixtures/targets/target-docs/`, with repo-local provisioning/reset commands and a minimal target-side CI integration kit. A post-fix live docs evaluation now passes on `eval/target-docs`: issue `#3` / comment `#153` -> task `trq-f77d70ed7f92` -> session `ags-7f12724630cc` -> PR `#4` -> run `#56` (`success`). The resulting change stayed bounded to `README.md` and `docs/faq.md`, and host-side traceability converged to `review.status=ready-for-human-review` with `proposal_body_sync_status=synced`.
+- Next Action: Move this bootstrap case out at the next maintenance pass unless a near-term second fixture or external-target regression keeps it active.
+- Exit Path: Move out after the first external target-repo procedure is runnable and the current dashboard no longer needs to carry the bootstrap/setup work directly.
+- Canonical Case: `docs/testing/items/TC-006-external-target-service-evaluation-baseline.md`
+- Escalation Check: Update issue, roadmap, WBS, or ADR surfaces if the first external target-repo path reveals a new environment, source-of-truth, or service-boundary assumption.
+- Notes: This case is intentionally about service-evaluation credibility rather than only about more local smoke coverage. The first fixture stays docs-only on purpose so the repo boundary changes without also widening task risk at the same time. A same-day nested-fixture seeding bug was fixed before the passed evidence set was recorded.
 
 ## Change Log
 - 2026-04-21: Initial version.
@@ -109,3 +126,6 @@ It does not replace CI run history, forge issue or PR history, roadmap/WBS plann
 - 2026-04-23: Added `TC-005` and marked the first manual real-AI connectivity flow passed.
 - 2026-04-23: Reopened `TC-004` and `TC-005` after correcting local CI evidence: runs `#46`-`#49` failed from stale forge-seeded proposal branches, and fresh post-fix revalidation is now required.
 - 2026-04-23: Marked `TC-004` and `TC-005` passed again after fresh post-fix provider runs completed for all enabled tokens with successful local CI runs `#51`-`#54` and converged traceability.
+- 2026-04-24: Added `TC-006` and marked the existing active cases as platform-regression evidence while the first external target-repo service-evaluation baseline is still being introduced.
+- 2026-04-24: Moved `TC-006` to ready after adding the first `target-docs` fixture plus provisioning/reset commands.
+- 2026-04-24: Marked `TC-006` passed after post-fix external-target run `#002` completed successfully on `eval/target-docs` with PR `#4` and CI run `#56`.

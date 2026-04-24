@@ -1,3 +1,5 @@
+const fs = require("fs");
+const os = require("os");
 const { spawnSync } = require("child_process");
 const path = require("path");
 
@@ -82,6 +84,57 @@ function runProcess(fileName, args, cwd = undefined) {
   }
 
   return (result.stdout || "").trim();
+}
+
+function normalizePathForComparison(value) {
+  const resolved = path.resolve(value);
+  return process.platform === "win32" ? resolved.toLowerCase() : resolved;
+}
+
+function resolveGitTopLevel(candidatePath) {
+  const result = spawnSync("git", ["-C", candidatePath, "rev-parse", "--show-toplevel"], {
+    encoding: "utf8",
+  });
+
+  if (result.error || result.status !== 0) {
+    return null;
+  }
+
+  return path.resolve((result.stdout || "").trim());
+}
+
+function createSeedSnapshotRepo(seedFrom) {
+  const tempRoot = fs.mkdtempSync(path.join(os.tmpdir(), "agent-sdlc-seed-"));
+  const snapshotDir = path.join(tempRoot, "snapshot");
+  fs.mkdirSync(snapshotDir, { recursive: true });
+  fs.cpSync(seedFrom, snapshotDir, {
+    recursive: true,
+    force: true,
+    filter: (sourcePath) => path.basename(sourcePath) !== ".git",
+  });
+
+  runProcess("git", ["init", "-b", "main"], snapshotDir);
+  runProcess("git", ["add", "-A"], snapshotDir);
+  runProcess(
+    "git",
+    [
+      "-c",
+      "user.name=Agent SDLC Seed Bot",
+      "-c",
+      "user.email=agent-sdlc@example.local",
+      "commit",
+      "-m",
+      "seed: snapshot external target fixture",
+      "--allow-empty",
+    ],
+    snapshotDir,
+  );
+
+  return {
+    tempRoot,
+    workingDirectory: snapshotDir,
+    seedStrategy: "directory-snapshot",
+  };
 }
 
 function normalizeRoute(route) {
@@ -293,21 +346,42 @@ function pushSeedBranch(seedFrom, remoteUrl, settings) {
   const basicAuthHeader = Buffer.from(`${settings.username}:${settings.password}`, "utf8").toString(
     "base64",
   );
+  const gitTopLevel = resolveGitTopLevel(seedFrom);
+  const seedFromPath = path.resolve(seedFrom);
+  const useSnapshotRepo =
+    !gitTopLevel ||
+    normalizePathForComparison(gitTopLevel) !== normalizePathForComparison(seedFromPath);
+  const seedContext = useSnapshotRepo
+    ? createSeedSnapshotRepo(seedFromPath)
+    : {
+        tempRoot: null,
+        workingDirectory: seedFromPath,
+        seedStrategy: "git-worktree",
+      };
 
-  // Seed the local forge from the source repo's current HEAD so local testing
-  // sees the same tracked workflow and platform files as the active workspace.
-  runProcess(
-    "git",
-    [
-      "-c",
-      `http.extraHeader=AUTHORIZATION: Basic ${basicAuthHeader}`,
-      "push",
-      "--force",
-      remoteUrl,
-      "HEAD:refs/heads/main",
-    ],
-    seedFrom,
-  );
+  try {
+    runProcess(
+      "git",
+      [
+        "-c",
+        `http.extraHeader=AUTHORIZATION: Basic ${basicAuthHeader}`,
+        "push",
+        "--force",
+        remoteUrl,
+        "HEAD:refs/heads/main",
+      ],
+      seedContext.workingDirectory,
+    );
+  } finally {
+    if (seedContext.tempRoot) {
+      fs.rmSync(seedContext.tempRoot, { recursive: true, force: true });
+    }
+  }
+
+  return {
+    seededFrom: seedFromPath,
+    seedStrategy: seedContext.seedStrategy,
+  };
 }
 
 async function main() {
@@ -338,8 +412,9 @@ async function main() {
       repoCreated = true;
     }
 
+    let seedResult = null;
     if (options.seedFrom) {
-      pushSeedBranch(options.seedFrom, repositoryUrls.gitUrl, settings);
+      seedResult = pushSeedBranch(options.seedFrom, repositoryUrls.gitUrl, settings);
       repository = await getRepository(settings, options.owner, options.repo, repositoryRef);
     }
 
@@ -362,7 +437,8 @@ async function main() {
           repository_ref: repositoryRef,
           repository_url: repository && (repository.html_url || repository.clone_url || repositoryUrls.webUrl),
           git_url: repositoryUrls.gitUrl,
-          seeded_from: options.seedFrom ? path.resolve(options.seedFrom) : null,
+          seeded_from: seedResult ? seedResult.seededFrom : null,
+          seed_strategy: seedResult ? seedResult.seedStrategy : null,
           configured_hooks: configuredHooks,
         },
         null,

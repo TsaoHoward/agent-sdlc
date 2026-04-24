@@ -3,7 +3,7 @@
 ## Document Metadata
 - Version: 0.1
 - Status: Active
-- Last Updated: 2026-04-23
+- Last Updated: 2026-04-24
 - Owner: Project Maintainer
 
 ## Purpose
@@ -15,6 +15,7 @@ Use it to:
 - find stable local test data such as URLs, usernames, passwords, and repo names
 - track active near-term testing work separately from long-lived test procedures
 - move completed or no-longer-near-term test items out of the active dashboard without losing useful history
+- distinguish platform self-test evidence from external target service-evaluation evidence
 
 ## Recommended Reading Order
 1. `docs/testing/test-plan.md`
@@ -43,11 +44,18 @@ For a fresh local validation pass:
 4. run `TC-004` when agent execution adapter behavior changes or provider-enabled validation is in scope
 5. run `TC-005` when you need the operator-facing real AI connectivity checklist
 6. run `TC-003` when you need the full operator-facing GUI path
-7. write any new gap back into `docs/testing/test-dashboard.md`, then update issue or decision docs if the result changes project-level understanding
+7. treat those current runs as platform self-test / platform regression when they target `howard/agent-sdlc`
+8. run `TC-006` when you need service-evaluation evidence beyond the platform repo, starting with `npm run eval:target-docs:provision` or `npm run eval:target-docs:reset`
+9. write any new gap back into `docs/testing/test-dashboard.md`, then update issue or decision docs if the result changes project-level understanding
 
 The latest reproducible live issue-comment reference is the 2026-04-21 run on `howard/agent-sdlc#11`, which created task request `trq-bd85673302e7`, session `ags-335855297620`, root traceability `.agent-sdlc/traceability/trq-bd85673302e7.json`, and proposal `PR #12` automatically after the strengthened listener path was deployed. The latest CLI half-live verification after commit `292f535` then created synthetic task request `trq-route1-hostsync-final-20260421225724`, session `ags-9c860e1f0026`, and proposal `PR #23`, which produced one successful `pull_request` run (`#41`) and automatically converged the PR body, host root traceability file, and session-local workspace copy. Provider-enabled agent execution validation has now been revalidated across all currently enabled issue-comment tokens with fresh post-fix evidence: `code` (`trq-c9b2fa3064fb`, `PR #1`, run `#51`), `docs` (`trq-8dc2bbe48812`, `PR #30`, run `#52`), `review` (`trq-fd8ca8f8d18f`, `PR #31`, run `#53`), and `ci` (`trq-7765e00f85d4`, `PR #32`, run `#54`).
 
 Current correction status (2026-04-23): stale-seed CI failures in runs `#46`-`#49` are resolved by reseeding local forge `main` and enforcing proposal stale-seed preflight before branch push.
+
+Current evidence classification (2026-04-24):
+- the seeded local `howard/agent-sdlc` path remains the primary platform self-test / platform regression path
+- broader service-quality claims now require external target-repo evaluation per ADR-0009 and `docs/policies/service-state-and-evaluation.md`
+- the first valid external-target evidence set is now `eval/target-docs` issue `#3` / comment `#153` -> task `trq-f77d70ed7f92` -> session `ags-7f12724630cc` -> PR `#4` -> CI run `#56` (`success`)
 
 ## Stable Local Test Data
 | Item | Value |
@@ -80,3 +88,6 @@ See `docs/policies/testing-management.md` for the full governance rule set.
 - 2026-04-23: Expanded provider-enabled `TC-004` validation to `review_follow_up` and `ci_failure_investigation`, and added `TC-005` as the manual real-AI connectivity runbook entrypoint.
 - 2026-04-23: Corrected CI evidence for runs `#46`-`#49` after identifying stale forge seeding as the common failure root cause; reopened post-fix revalidation for multi-token provider paths.
 - 2026-04-23: Recorded fresh post-fix provider revalidation across all enabled tokens with successful runs `#51`-`#54`, and kept stale-seed preflight as the prevention guardrail.
+- 2026-04-24: Added the platform-regression versus external-target evidence distinction and the planned `TC-006` service-evaluation baseline.
+- 2026-04-24: Recorded the first concrete `target-docs` external-target baseline plus its local provision/reset commands.
+- 2026-04-24: Recorded the first valid external-target evidence set on `eval/target-docs` after fixing nested-fixture seeding.

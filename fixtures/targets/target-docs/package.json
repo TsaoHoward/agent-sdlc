@@ -1,0 +1,14 @@
+{
+  "name": "target-docs",
+  "version": "0.1.0",
+  "private": true,
+  "description": "Controlled external docs target for agent-sdlc service evaluation",
+  "type": "commonjs",
+  "engines": {
+    "node": ">=22"
+  },
+  "scripts": {
+    "validate:platform": "node scripts/validate-docs-target.js",
+    "typecheck": "node scripts/typecheck-target.js"
+  }
+}

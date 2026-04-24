@@ -3,7 +3,7 @@
 ## Document Metadata
 - Version: 0.4
 - Status: Active
-- Last Updated: 2026-04-21
+- Last Updated: 2026-04-24
 - Owner: Project Maintainer
 
 ## Purpose
@@ -29,6 +29,7 @@ This is not a substitute for ADRs. It is only the move-out surface for items tha
 | D-009 | Issue Document Workflow | Promoted To ADR | `ADR-0005` | 2026-04-15 | Added a durable issue dashboard, archive, and supporting-note workflow without replacing forge issue ownership. |
 | D-010 | Platform Implementation Stack And Packaging Baseline | Promoted To ADR | `ADR-0006` | 2026-04-15 | Selected TypeScript/Node.js plus npm as the platform core, kept docs/config multi-format by design, and set Dockerfile plus later compose packaging as the self-hosted path. |
 | D-011 | Testing Workflow As Durable Collaboration Surface | Promoted To ADR | `ADR-0007` | 2026-04-21 | Added a durable local testing plan, framework, dashboard, archive, and canonical case workflow without replacing CI or forge history. |
+| D-013 | Platform / Target Repo Separation And Service-Evaluation Evidence Model | Promoted To ADR | `ADR-0009` | 2026-04-24 | Directly promoted after selecting the rule that self-targeted platform runs remain valid for regression but cannot by themselves justify broader service-quality claims. |
 
 ## Change Log
 - 2026-04-14: Initial version.
@@ -36,3 +37,4 @@ This is not a substitute for ADRs. It is only the move-out surface for items tha
 - 2026-04-15: Archived D-009 after promoting the issue-document workflow choice to ADR-0005.
 - 2026-04-15: Archived D-010 after promoting the platform implementation stack and packaging baseline to ADR-0006.
 - 2026-04-21: Archived D-011 after promoting the testing workflow choice to ADR-0007.
+- 2026-04-24: Archived D-013 after promoting the platform/target repo separation and service-evaluation evidence model to ADR-0009.

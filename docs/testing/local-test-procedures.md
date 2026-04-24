@@ -16,6 +16,11 @@ It gives one place to:
 - observe each stage of the lifecycle
 - use stable local credentials and repo names without rediscovering them
 
+Current evidence classification:
+- unless a procedure explicitly says otherwise, the procedures below target the seeded local `howard/agent-sdlc` repo and therefore count as platform self-test / platform regression
+- for the first non-platform service-evaluation baseline, seed `eval/target-docs` with `npm run eval:target-docs:provision` or `npm run eval:target-docs:reset` and treat that repo as the target under test instead of `howard/agent-sdlc`
+- they remain necessary and valid, but they are not by themselves sufficient as long-term service-quality evidence for non-platform target repos
+
 See also:
 - `docs/testing/README.md`
 - `docs/testing/test-plan.md`
@@ -78,6 +83,8 @@ If the `howard` account does not exist or cannot log in, rerun:
 ```powershell
 npm run dev:gitea-repo -- ensure-local-repo --owner howard --repo agent-sdlc --seed-from .
 ```
+
+This default local repo remains the platform-regression baseline. A separate external target-repo baseline is still required for broader service evaluation under ADR-0009.
 
 ## Environment Bring-Up
 Run these commands from the repository root:
@@ -438,3 +445,4 @@ PRs and issues created for local smoke tests may be left as evidence during the 
 - 2026-04-23: Corrected CI evidence for runs `#46`-`#49` after identifying stale forge seeding as the failure root cause, and documented the new proposal stale-seed preflight behavior.
 - 2026-04-23: Recorded fresh post-fix provider revalidation across all enabled task tokens with successful runs `#51`-`#54`.
 - 2026-04-24: Linked the formal branch/local-forge synchronization policy from the operator runbook.
+- 2026-04-24: Marked the current procedures as platform-regression evidence unless a later external target-repo procedure says otherwise.

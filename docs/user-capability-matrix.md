@@ -3,7 +3,7 @@
 ## Document Metadata
 - Version: 0.1
 - Status: Active
-- Last Updated: 2026-04-23
+- Last Updated: 2026-04-24
 - Owner: Project Maintainer
 
 ## Purpose
@@ -19,18 +19,33 @@ Use it when you need one place to answer:
 - what `@agent run <token>` means right now
 - which parts of the end-to-end lifecycle are automated versus still generic scaffold
 - which manual operator commands exist alongside the live `@agent` path
+- what kind of user this current implementation is actually for right now
 
 ## Linked Planning Context
 - Project vision: `docs/project-overview.md`
 - Active issue packaging: `docs/issues/issue-dashboard.md` item `I-001`
 - Related roadmap phase: `docs/roadmap.md` Phase 1
-- Related WBS items: `docs/wbs.md` WBS `3.1`, `3.2`, `3.3`, `3.4`, `3.5`, `3.6`, `3.7`, `3.8`
+- Related WBS items: `docs/wbs.md` WBS `3.1`, `3.2`, `3.3`, `3.4`, `3.5`, `3.6`, `3.7`, `3.8`, `3.9`, `3.10`, `3.11`
 
 ## Status Legend
 - `Implemented`: a user-facing path exists and the documented lifecycle behavior is working in the current repo-owned flow
 - `Implemented Scaffold`: the path is live and traceable end to end, but task-specific execution behavior is still generic rather than deeply specialized
 - `Manual Operator Only`: the capability exists through repo-owned CLI or bootstrap commands, not through a live `@agent` user entrypoint
 - `Not Supported`: the surface or request form is not currently wired into an executable path
+
+## Current User Relationship
+The current implemented path should be understood primarily as a maintainer or operator-facing `Workbench` / `Internal Eval` surface, not yet as a broad end-user production service.
+
+Why:
+- only one live trigger surface exists today
+- task classes remain intentionally bounded
+- the first provider-backed execution path is still opt-in
+- current local validation still relies heavily on the platform repo as the seeded target, which is useful for platform regression but not sufficient by itself as broader service-quality evidence under ADR-0009
+- the first external-target evidence set now exists on `eval/target-docs`, but that is still an `Internal Eval` proof point rather than enough evidence for `Pilot` or `Production`
+
+## Current Service State
+- Overall current state: `Workbench` with the first real `Internal Eval` external-target evidence now captured
+- Not yet justified from current evidence: `Pilot`, `Production`
 
 ## Project-Vision Link
 The target top-level experience from `docs/project-overview.md` is:
@@ -104,6 +119,8 @@ For the current live Phase 1 `@agent` path, the implemented lifecycle is:
 - The four task tokens currently drive classification, policy, and traceability. The opt-in agent execution adapter now supports all four issue-comment tokens (`bounded_code_change`, `documentation_update`, `review_follow_up`, `ci_failure_investigation`) and has passed provider-enabled local validation for each, but live default behavior remains scaffold-first unless the operator enables agent execution in ignored project config.
 - CI remains an independent verifier and human review remains the merge control point.
 - Operator-facing artifact browsing remains a narrower follow-up outside this matrix's core capability scope.
+- The current local seeded `howard/agent-sdlc` path remains a valid platform-regression route, but broader service-quality claims now require external target-repo evaluation rather than self-targeted platform runs alone.
+- The first external-target evidence set is now `eval/target-docs` issue `#3` / comment `#153` -> task `trq-f77d70ed7f92` -> session `ags-7f12724630cc` -> PR `#4` -> run `#56` (`success`), with bounded edits to `README.md` and `docs/faq.md`.
 
 ## Maintenance Rule
 Update this document when any of the following change:
@@ -125,3 +142,5 @@ When a change is substantial enough to alter the supported workflow shape, also 
 - 2026-04-23: Updated `bounded_code_change` coverage after provider-enabled DeepSeek validation produced a session-backed local proposal.
 - 2026-04-23: Updated `documentation_update`, `review_follow_up`, and `ci_failure_investigation` coverage after provider-enabled DeepSeek validation produced sessions and local PRs `#25`-`#27`.
 - 2026-04-23: Corrected stale forge-seeded CI failures (`#46`-`#49`) and completed fresh multi-token revalidation with successful runs `#51`-`#54`.
+- 2026-04-24: Added the current user/service-state interpretation and clarified that self-targeted platform runs are still platform-regression evidence rather than sufficient broader service proof by themselves.
+- 2026-04-24: Recorded the first valid external-target internal-eval evidence on `eval/target-docs` after fixing nested-fixture seeding.

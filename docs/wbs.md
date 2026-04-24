@@ -3,7 +3,7 @@
 ## Document Metadata
 - Version: 0.1
 - Status: Draft
-- Last Updated: 2026-04-23
+- Last Updated: 2026-04-24
 - Owner: Project Maintainer
 - Source Template: docs/templates/wbs.template.md
 
@@ -42,10 +42,13 @@
 | 3.7 | Testing Workflow Baseline | 3 | Phase 1 | repeatable local test plan, dashboard, and canonical CLI/GUI procedures |
 | 3.8 | User Capability Matrix | 3 | Phase 1 | durable user-facing matrix for supported `@agent` and operator workflows |
 | 3.9 | Minimal Real Agent Execution | 3 | Phase 1 | one provider-backed bounded execution path for a supported task class |
+| 3.10 | External Target Repo Evaluation Baseline | 3 | Phase 1 | distinct target-repo baseline for service evaluation beyond platform self-test |
+| 3.11 | Service-State And Evaluation Workflow | 3 | Phase 1 | durable workbench/internal-eval/pilot/production model with evidence rules |
 | 4 | Controlled Expansion | - | Phase 2 | structured expansion without boundary collapse |
 | 4.1 | Additional Intake Paths | 4 | Phase 2 | more adapters |
 | 4.2 | Policy Pack Expansion | 4 | Phase 2 | richer policy definitions |
 | 4.3 | Observability and Audit | 4 | Phase 2 | lifecycle visibility improvements |
+| 4.4 | Pilot Promotion Gates | 4 | Phase 2 | staged rollout rules for target repos, task classes, and user exposure |
 | 5 | Governance Evolution | - | Phase 3 | stronger governance and replaceability model |
 | 5.1 | Governance Model Refinement | 5 | Phase 3 | expanded governance rules |
 | 5.2 | Component Replaceability Review | 5 | Phase 3 | replaceability assessment/update |
@@ -193,7 +196,7 @@
 - Dependencies: 2
 - Critical-Path-Candidate: Yes
 - Status: In Progress
-- Notes: Project-local environment bootstrap now includes a repo-owned template plus ignored local config path, explicit high-port forwarding, non-interactive local Gitea initialization, and admin-password refresh behavior that preserves the configured forced-password-change setting so the first implementation slice can start without unstable manual forge setup. The current implementation slice now also includes repo-local task-gateway, agent-control, proposal-surface, and local-Gitea-repo helper CLIs that write file-backed task/session state and create the first traceable Gitea PR proposal. ADR-0006 now sets the platform-stack convergence path to TypeScript/Node.js plus npm, with repo-owned Dockerfiles as the packaging baseline before later compose consolidation.
+- Notes: Project-local environment bootstrap now includes a repo-owned template plus ignored local config path, explicit high-port forwarding, non-interactive local Gitea initialization, and admin-password refresh behavior that preserves the configured forced-password-change setting so the first implementation slice can start without unstable manual forge setup. The current implementation slice now also includes repo-local task-gateway, agent-control, proposal-surface, and local-Gitea-repo helper CLIs that write file-backed task/session state and create the first traceable Gitea PR proposal. ADR-0006 now sets the platform-stack convergence path to TypeScript/Node.js plus npm, with repo-owned Dockerfiles as the packaging baseline before later compose consolidation. ADR-0009 now also clarifies that the seeded local `agent-sdlc` repo path is valid platform regression evidence but is not sufficient by itself as long-term service-quality evidence for non-platform target repositories.
 
 ### WBS 3.1 — Trigger Adapter Implementation
 - Parent: 3
@@ -285,6 +288,26 @@
 - Status: In Progress
 - Notes: This item intentionally deepens one task class before broadening intake surfaces or task-token coverage. The goal is to keep the Phase 1 slice narrow while making `agent-run change proposal` mean real bounded agent work inside the isolated runtime. The currently selected direction is a repo-owned execution adapter that supports both remote and local backends through configuration, with `DeepSeek API` as the short-term remote default and a later local-backend path preserved behind the same API-oriented execution boundary. The first implementation slice now adds tracked `config/agent-execution.template.yaml`, ignored local `config/agent-execution.yaml` generation, a repo-owned `scripts/lib/agent-execution.js` adapter, and session-record evidence wiring from `agent-control`; provider execution is opt-in while the existing scaffold path remains stable without API credentials. Provider-enabled validation first passed for `bounded_code_change` with task request `trq-4faac7e2a74b`, session `ags-cd9d3e289f02`, and local PR `#24`, then expanded to `documentation_update`, `review_follow_up`, and `ci_failure_investigation` with task requests `trq-2de69af748b1`, `trq-2644a836e239`, and `trq-859264e0df7f` plus local PRs `#25`, `#26`, and `#27`. A same-day CI stability correction found that those proposals were based on stale local forge `main` content and produced failed runs (`#46`-`#49`) with `Finalize CI Traceability` 401 errors from an older workflow/script revision; the mitigation reseeded local forge `main`, added proposal preflight blocking when forge `main` lags workspace `HEAD`, and completed fresh post-fix revalidation across all enabled tokens with successful runs `#51`-`#54` (`PR #1`, `#30`, `#31`, `#32`). The adapter now also hardens provider response parsing by extracting the first valid JSON object from mixed output so sessions fail less often on provider formatting noise. The `ci_failure_investigation` path now enforces evidence-oriented edit guardrails under `docs/testing/` and `docs/examples/`.
 
+### WBS 3.10 — External Target Repo Evaluation Baseline
+- Parent: 3
+- Related Phase: Phase 1
+- Description: Establish at least one distinct non-platform target repo path so service evaluation does not rely only on self-targeted platform runs.
+- Deliverable: target-repo baseline plus the repo/bootstrap/test wiring needed to evaluate agent behavior outside `agent-sdlc`
+- Dependencies: 3.4, 3.5, 3.7, 3.8, 3.9
+- Critical-Path-Candidate: Yes
+- Status: Done
+- Notes: ADR-0009 requires the project to distinguish platform regression evidence from service-quality evidence. The first concrete slice now exists as `fixtures/targets/target-docs/`, a docs-only external target repo baseline with a minimal target-side CI integration kit and repo-local validation scripts. The platform repo now also exposes `npm run eval:targets`, `npm run eval:target-docs:provision`, and `npm run eval:target-docs:reset` so the fixture can be seeded into local Gitea as `eval/target-docs` without reusing `agent-sdlc` as the target under test. A same-day seeding fix now snapshots nested fixture directories before push, and the first valid bounded evaluation run is captured in `TC-006` through task `trq-f77d70ed7f92`, session `ags-7f12724630cc`, PR `#4`, and successful CI run `#56`.
+
+### WBS 3.11 — Service-State And Evaluation Workflow
+- Parent: 3
+- Related Phase: Phase 1
+- Description: Make workbench/internal-eval state explicit and define the evidence model that separates platform self-test from broader service evaluation.
+- Deliverable: durable service-state policy, evidence rules, and current-state doc alignment
+- Dependencies: 3.7, 3.8, 3.10
+- Critical-Path-Candidate: Yes
+- Status: Done
+- Notes: This item is about governance and current-state clarity, not only about new code. ADR-0009 plus `docs/policies/service-state-and-evaluation.md` now define the evidence rule that self-targeted `agent-sdlc` runs remain valid for bootstrap and regression but cannot by themselves justify pilot or production service claims. The first runnable external-target evidence set now exists, so the policy, testing workflow, and current-state docs are aligned to a real `Workbench` / `Internal Eval` evidence model instead of a purely planned one.
+
 ### WBS 4 — Controlled Expansion
 - Parent:
 - Related Phase: Phase 2
@@ -321,6 +344,16 @@
 - Description: Improve lifecycle visibility, auditability, and failure tracing.
 - Deliverable: audit and observability improvements
 - Dependencies: 3
+- Critical-Path-Candidate: No
+- Status: Not Started
+- Notes:
+
+### WBS 4.4 — Pilot Promotion Gates
+- Parent: 4
+- Related Phase: Phase 2
+- Description: Define and implement staged rollout controls that govern how task classes and target repos move from internal evaluation into pilot use.
+- Deliverable: promotion-gate workflow for selected task classes, target repos, and user exposure
+- Dependencies: 3.10, 3.11, 4.2, 4.3
 - Critical-Path-Candidate: No
 - Status: Not Started
 - Notes:
@@ -391,7 +424,10 @@
 | 3.7 | 3.1, 3.2, 3.4, 3.5, 3.6 | the testing workflow baseline depends on a real closed-loop path worth validating and observing |
 | 3.8 | 1.2, 3.1, 3.2, 3.4, 3.5, 3.6, 3.7 | the capability matrix depends on both the planned user experience and the implemented lifecycle surfaces it describes |
 | 3.9 | 3.2, 3.3, 3.4, 3.5, 3.6, 3.7, 3.8 | the first real agent execution path depends on working session/runtime/proposal/verification handoffs plus current-state workflow and validation surfaces |
+| 3.10 | 3.4, 3.5, 3.7, 3.8, 3.9 | credible service evaluation needs a working proposal/CI/testing baseline plus at least one real execution path before it can move beyond self-targeted platform runs |
+| 3.11 | 3.7, 3.8, 3.10 | service-state and evidence rules depend on both the testing workflow and the introduction of a distinct target-repo evaluation baseline |
 | 4 | 3 | expansion should follow first working loop |
+| 4.4 | 3.10, 3.11, 4.2, 4.3 | staged pilot rollout depends on explicit evidence tiers plus policy and observability support |
 | 5 | 4 | governance evolution should follow practical expansion experience |
 
 ## Critical Path Candidates
@@ -417,6 +453,8 @@
 - 3.7
 - 3.8
 - 3.9
+- 3.10
+- 3.11
 
 ## Open Questions
 - No current WBS-level open questions block WBS 3 start.
@@ -458,3 +496,6 @@
 - 2026-04-23: Expanded WBS 3.9 provider-enabled coverage to `documentation_update`, `review_follow_up`, and `ci_failure_investigation` through local PRs `#25`-`#27`.
 - 2026-04-23: Corrected local CI evidence for PRs `#25`-`#29` after identifying stale forge seeding as the instability root cause, and added proposal preflight protection so stale forge `main` is blocked before new proposal creation.
 - 2026-04-23: Completed fresh post-fix WBS 3.9 multi-token revalidation with successful runs `#51`-`#54`, and hardened provider JSON extraction for mixed-output responses.
+- 2026-04-24: Added WBS 3.10 and 3.11 to separate external target-repo service evaluation from self-targeted platform regression and to make service-state/evidence rules explicit before later pilot claims.
+- 2026-04-24: Moved WBS 3.10 and 3.11 to in progress after adding the first `target-docs` external fixture, provisioning/reset command surface, and runnable `TC-006` baseline definition.
+- 2026-04-24: Marked WBS 3.10 and 3.11 done after fixing nested-fixture seeding and collecting the first valid external-target evidence set on `eval/target-docs`.

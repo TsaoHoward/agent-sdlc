@@ -3,7 +3,7 @@
 ## Document Metadata
 - Version: 0.1
 - Status: Active
-- Last Updated: 2026-04-23
+- Last Updated: 2026-04-24
 - Owner: Project Maintainer
 
 ## Purpose
@@ -37,6 +37,7 @@ This plan currently covers local validation of the Phase 1 closed loop for:
 - branch and PR proposal creation
 - CI verification linkage
 - review-follow-up and PR close/reopen synchronization
+- explicit separation between platform self-test evidence and external target-repo service-evaluation evidence
 
 ## Related Phase And WBS
 - Related Phase: `docs/roadmap.md` Phase 1
@@ -49,6 +50,7 @@ This plan currently covers local validation of the Phase 1 closed loop for:
 | CLI half-live | exercise real local Gitea proposal and traceability surfaces with direct operator commands | `node scripts/proposal-surface.js ...`; `node scripts/review-surface.js ...` | PR body, traceability JSON, local Actions runs |
 | GUI live | exercise the real local operator workflow through Gitea UI | Gitea web UI at `http://localhost:43000/` | issue/comment history, PR UI, Actions UI, review or close/reopen state |
 | CI-linked validation | confirm independent verifier behavior on the PR path | local Gitea Actions runner plus `.gitea/workflows/phase1-ci.yml` | workflow runs, verification metadata, PR traceability updates |
+| External target evaluation | validate service behavior against a non-platform target repo | first controlled external target repo baseline under WBS `3.10` | non-platform PRs, CI results, task-quality rubric evidence |
 
 ## Default Local Test Data
 These defaults assume the tracked local bootstrap template or matching generated local config is being used without environment overrides.
@@ -85,6 +87,7 @@ The current local validation window is considered healthy when:
 - the local CI workflow still produces a visible Actions run for the proposal path
 - at least one live GUI-driven follow-up path can refresh durable traceability without manual replay
 - any new or reopened live-gap item is explicitly tracked in `docs/testing/test-dashboard.md` and, when needed, in `docs/issues/issue-dashboard.md`
+- service-quality claims beyond platform regression are not made solely from self-targeted `agent-sdlc` runs
 
 ## Canonical Regression Pack
 | Test ID | Title | Mode | Objective |
@@ -94,6 +97,7 @@ The current local validation window is considered healthy when:
 | `TC-003` | GUI Full Live Issue-Comment Smoke | GUI live | verify the operator-facing happy path from live issue comment through PR, CI, and follow-up review/close behavior |
 | `TC-004` | Agent Execution Adapter Smoke | CLI replay | verify config resolution and provider-enabled session evidence for all currently enabled task classes |
 | `TC-005` | Real AI Connectivity Manual Flow | CLI half-live | provide a repeatable operator-facing runbook for validating real provider connectivity from issue-command intent to PR and CI evidence |
+| `TC-006` | External Target Service-Evaluation Baseline | External target evaluation | verify that at least one non-platform target repo can carry the bounded workflow and produce service-quality evidence distinct from platform regression |
 
 ## Cadence And Triggers
 Run the relevant local regression cases when:
@@ -112,8 +116,13 @@ The current local test plan expects evidence to remain in:
 
 The testing dashboard should summarize near-term attention items, while canonical case notes hold the repeatable procedures.
 
+Current interpretation rule:
+- runs against the seeded local `howard/agent-sdlc` repo are still valid platform regression evidence
+- promotion to broader service claims requires external target-repo evidence under ADR-0009
+
 ## Change Log
 - 2026-04-21: Initial version.
 - 2026-04-23: Added WBS 3.9 agent execution adapter evidence to the local test scope.
 - 2026-04-23: Expanded `TC-004` scope to include provider-enabled `documentation_update` validation in addition to `bounded_code_change`.
 - 2026-04-23: Expanded `TC-004` scope to include provider-enabled `review_follow_up` and `ci_failure_investigation`, and added `TC-005` as the manual real-AI connectivity runbook.
+- 2026-04-24: Added the external-target evidence distinction and `TC-006` so service-quality claims are not based only on self-targeted platform runs.

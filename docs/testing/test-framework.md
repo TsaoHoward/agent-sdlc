@@ -3,7 +3,7 @@
 ## Document Metadata
 - Version: 0.1
 - Status: Active
-- Last Updated: 2026-04-21
+- Last Updated: 2026-04-24
 - Owner: Project Maintainer
 
 ## Purpose
@@ -49,6 +49,17 @@ Typical entry points:
 - create issue and comment in the local Gitea UI
 - observe PR, Actions, review, close, and reopen behavior in the UI
 
+### Mode D - External Target Evaluation
+Use when:
+- you need evidence about service behavior beyond the platform repo itself
+- you want to observe bounded AI work on a non-platform target repo
+- you need promotion evidence for later pilot claims
+
+Typical entry points:
+- provision or reset a controlled non-platform target repo
+- run a bounded `@agent` path or replay flow against that target repo
+- score the resulting PR, CI result, and edit boundary against a reusable rubric
+
 ## Observation Surfaces By Lifecycle Stage
 | Lifecycle Stage | Primary Observation Surface | Secondary Evidence |
 |---|---|---|
@@ -71,6 +82,13 @@ The active dashboard may reference these cases, but the case notes remain the so
 
 ## Active Dashboard Convention
 `docs/testing/test-dashboard.md` tracks only active or near-term testing work.
+
+## Evidence Classification Rule
+Testing docs should classify evidence as one of:
+- `platform self-test / platform regression`
+- `external target service evaluation`
+
+Runs against the seeded local `agent-sdlc` repo remain valid and useful, but they must not be treated as the only basis for broader pilot or production claims.
 
 Use the dashboard to answer:
 - which regression cases still need attention
@@ -97,3 +115,4 @@ For deeper local debugging, the framework permits these evidence surfaces:
 
 ## Change Log
 - 2026-04-21: Initial version.
+- 2026-04-24: Added Mode D and the evidence-classification rule that separates platform regression from external target service evaluation.

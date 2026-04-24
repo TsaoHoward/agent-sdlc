@@ -3,7 +3,7 @@
 ## Document Metadata
 - Version: 0.5
 - Status: Active
-- Last Updated: 2026-04-23
+- Last Updated: 2026-04-24
 - Owner: Project Maintainer
 - Source Template: docs/templates/decision-backlog.template.md
 
@@ -67,3 +67,4 @@ It is not an ADR. It tracks active, narrowed, recently selected, and deferred ma
 - 2026-04-23: Expanded provider-enabled DeepSeek validation coverage to `documentation_update`, `review_follow_up`, and `ci_failure_investigation` through local PRs `#25`-`#27`; no new architecture-boundary decision was discovered.
 - 2026-04-23: Corrected local CI evidence for runs `#46`-`#49` after identifying stale forge seeding as the failure root cause; landed reseed plus proposal preflight mitigation with no new architecture-boundary decision discovered.
 - 2026-04-23: Recorded fresh post-fix provider revalidation success across all enabled tokens with runs `#51`-`#54`, plus provider JSON extraction hardening, with no new architecture-boundary decision discovered.
+- 2026-04-24: Promoted the platform/target repo separation and service-evaluation evidence model directly to ADR-0009 after selecting the direction to distinguish platform regression from external target-repo service evidence.

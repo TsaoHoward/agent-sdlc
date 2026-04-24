@@ -23,6 +23,8 @@ The repo is no longer planning-only. It now has a working minimum closed-loop sc
 - a repo-owned testing workflow baseline with local CLI and GUI procedures plus an active test dashboard
 
 The goal is still **not** to deliver the full platform immediately. The current focus is to harden the smallest useful issue-driven experience without collapsing architecture boundaries.
+The current local `howard/agent-sdlc` seeded repo path should now be treated as a **platform workbench / internal-eval baseline**, not as sufficient evidence that the service is ready for broader pilot or production use on non-platform repositories.
+The first valid external-target service-evaluation evidence now exists on `eval/target-docs`: issue `#3` / comment `#153` -> task `trq-f77d70ed7f92` -> session `ags-7f12724630cc` -> PR `#4` -> CI run `#56` (`success`).
 
 ## Progress Against Target Experience
 Target experience:
@@ -41,6 +43,8 @@ Current progress:
 ## Current Todo
 - improve operator-facing artifact browsing or listing now that traceability, CI metadata, and review sync are in place
 - keep `docs/user-capability-matrix.md` aligned with the actual supported `@agent` surfaces, task tokens, and lifecycle boundaries
+- expand beyond the first `target-docs` external-target baseline only when a second fixture family (`code` or `ci`) is worth the extra coordination cost
+- keep explicit service-state labeling (`Workbench`, `Internal Eval`, `Pilot`, `Production`) and promotion rules aligned with real evidence
 - decide how much more of the local operator workflow should be consolidated into the default bootstrap before moving on to broader Phase 2 concerns
 - keep the Phase 1 slice narrow and avoid pulling in broader observability, multi-source intake, or deployment concerns too early
 
@@ -77,6 +81,7 @@ Use these files as the primary planning sources of truth:
 - `docs/policies/`: intake, issue-management, and change-control rules
 - `docs/policies/branch-and-local-forge-sync.md`: proposal-branch and local-forge synchronization rule for Phase 1 local validation
 - `docs/policies/configuration-management.md`: repository-wide config template and local-config policy
+- `docs/policies/service-state-and-evaluation.md`: service-state labels plus the rule that platform self-test evidence is distinct from broader external target-repo service evaluation
 - `docs/templates/`: formatting templates for AI-maintained planning docs
 - `prompts/init-project.prompt.md`: initialization prompt for Codex or similar agents
 

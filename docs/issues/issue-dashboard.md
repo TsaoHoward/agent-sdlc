@@ -45,7 +45,8 @@ It does not replace forge issues, roadmap/WBS planning structure, the decision b
 ## Dashboard
 | Issue ID | Title | Status | Related Docs / WBS | Next Action | Exit Path |
 |---|---|---|---|---|---|
-| I-001 | Phase 1 Minimum Closed Loop Implementation Packaging | In Progress | `docs/roadmap.md` Phase 1; WBS `3`, `3.1`-`3.9` | Continue hardening the provider-enabled agent execution path, keep the testing workflow and user capability matrix current, preserve the CI-to-host traceability callback path, enforce the new forge-seed preflight in proposal creation, and improve operator-facing artifact browsing | Archive after the first slice is underway and the remaining work is split or absorbed into active execution tracking |
+| I-001 | Phase 1 Minimum Closed Loop Implementation Packaging | In Progress | `docs/roadmap.md` Phase 1; WBS `3`, `3.1`-`3.11` | Continue hardening the provider-enabled agent execution path, keep the testing workflow and user capability matrix current, preserve the CI-to-host traceability callback path, enforce the new forge-seed preflight in proposal creation, and improve operator-facing artifact browsing while keeping self-targeted local runs framed as platform regression rather than broad service proof | Archive after the first slice is underway and the remaining work is split or absorbed into active execution tracking |
+| I-003 | Platform Self-Test And External Target Service-Evaluation Separation | Done | ADR-0009; `docs/roadmap.md` Phase 1; WBS `3.10`, `3.11` | Move out at the next maintenance pass if no immediate second-fixture follow-up is needed | Move to archive after the first external target-repo path exists and the testing workflow clearly distinguishes platform regression from service evaluation |
 | I-002 | Configuration Template Policy Compliance Gaps | Done | ADR-0008; `docs/policies/configuration-management.md`; WBS `3.1`, `3.3`, `3.5`, `3.9` | Move out of the active dashboard at the next issue-maintenance pass if no new config-template gap appears | Archive after the current completion no longer needs active dashboard visibility |
 
 ## Issue Items
@@ -63,6 +64,17 @@ It does not replace forge issues, roadmap/WBS planning structure, the decision b
 - Supporting Notes: `docs/issues/items/I-001-phase1-minimum-closed-loop-implementation.md`
 - Promotion / Escalation Check: Update `docs/decisions/decision-backlog.md` and ADRs only if implementation uncovers a new major boundary, ownership, or governance decision.
 - Notes: This item seeds the issue workflow with the project's current highest-signal active issue after the Phase 0 and Phase 1 design baseline.
+
+### I-003 - Platform Self-Test And External Target Service-Evaluation Separation
+- Status: `Done`
+- Related Docs / WBS: ADR-0009; `docs/roadmap.md` Phase 1; `docs/wbs.md` WBS `3.10`, `3.11`
+- Why It Matters: The current local closed loop is real and useful, but it still relies heavily on the platform repo as the target under test. Without a durable separation plan, the project risks overstating user readiness from self-targeted evidence.
+- Current State: ADR-0009 now records that the seeded local `howard/agent-sdlc` path remains valid for bootstrap and platform regression, but no longer counts as sufficient evidence for broader service-quality claims by itself. The roadmap and WBS now require an external target-repo evaluation baseline plus explicit service-state labeling before later pilot claims. The first concrete baseline now exists as `fixtures/targets/target-docs/`, and the platform repo exposes `npm run eval:targets`, `npm run eval:target-docs:provision`, and `npm run eval:target-docs:reset` to seed the fixture into local Gitea as `eval/target-docs`. A post-fix live docs evaluation now provides the first valid evidence set: issue `#3` / comment `#153` -> task `trq-f77d70ed7f92` -> session `ags-7f12724630cc` -> PR `#4` -> run `#56` (`success`).
+- Next Action: Move this item out at the next maintenance pass unless an immediate second-fixture follow-up keeps it active.
+- Exit Path: Move this item out once the first external target-repo path exists, testing docs clearly distinguish platform regression from service evaluation, and the remaining follow-up is absorbed into narrower rollout work.
+- Supporting Notes: `docs/issues/items/I-003-platform-self-test-and-external-target-service-evaluation-separation.md`
+- Promotion / Escalation Check: Promote new follow-up only if implementation changes the ownership boundary between the platform repo and target repos or introduces a new architecture-level service boundary beyond ADR-0009.
+- Notes: This item is intentionally about evidence quality and rollout governance, not only about adding more test fixtures.
 
 ### I-002 - Configuration Template Policy Compliance Gaps
 - Status: `Done`
@@ -118,3 +130,6 @@ It does not replace forge issues, roadmap/WBS planning structure, the decision b
 - 2026-04-23: Corrected local CI evidence for PRs `#25`-`#29` after confirming stale forge seeding caused `Finalize CI Traceability` 401 failures in runs `#46`-`#49`; reseeded local forge `main` and added proposal preflight guardrails.
 - 2026-04-23: Recorded fresh post-fix provider revalidation across all enabled tokens with successful local CI runs `#51`-`#54`, and added provider JSON extraction hardening evidence to I-001.
 - 2026-04-24: Added the formal branch/local-forge synchronization policy and linked it back into the active Phase 1 issue context.
+- 2026-04-24: Added I-003 to track the new ADR-0009 requirement to separate platform self-test evidence from external target-repo service-evaluation evidence.
+- 2026-04-24: Moved I-003 to in progress after landing the first `target-docs` external fixture and local provisioning/reset command surface.
+- 2026-04-24: Marked I-003 done after fixing nested-fixture seeding and collecting the first valid external-target evidence set on `eval/target-docs`.

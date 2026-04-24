@@ -3,7 +3,7 @@
 ## Document Metadata
 - Version: 0.1
 - Status: Draft
-- Last Updated: 2026-04-22
+- Last Updated: 2026-04-24
 - Owner: Project Maintainer
 - Source Template: docs/templates/roadmap.template.md
 
@@ -43,6 +43,9 @@ Phase planning is sequenced from those requirements: define the environment base
 - Repo-owned Dockerfiles should define the control-plane and worker packaging baseline before the project consolidates into a repo-owned `docker compose` package.
 - CI remains independent and outside the agent control plane.
 - Human review remains a required merge control point.
+- the platform control repository and external target repositories should be treated as distinct concerns for service-quality evidence once the bootstrap closed loop is proven
+- self-targeted local runs against the platform repo count as platform regression evidence, not as sufficient pilot or production evidence by themselves
+- service-state labeling should distinguish at least `Workbench`, `Internal Eval`, `Pilot`, and `Production`
 
 ### Key Constraints
 - Avoid premature lock-in to a single tool.
@@ -124,6 +127,7 @@ Implement the smallest working path from task trigger to independently verified 
 - one CI verification flow
 - one human review point
 - one durable user capability matrix linked to the implemented workflow
+- one initial distinction between platform self-test and external target-repo service evaluation
 
 ### Deliverables
 - task intake adapter
@@ -136,6 +140,8 @@ Implement the smallest working path from task trigger to independently verified 
 - repeatable local testing workflow with canonical CLI and GUI cases plus a durable testing dashboard
 - user capability matrix and current workflow map linked to the implemented Phase 1 surfaces
 - traceable task lifecycle contract and minimal logging
+- external target-repo evaluation baseline for at least one non-platform repo path
+- service-state and evaluation-evidence policy that distinguishes workbench regression from broader service-quality claims
 
 ### Entry Criteria
 - Phase 0 baseline completed
@@ -149,6 +155,8 @@ Implement the smallest working path from task trigger to independently verified 
 - human review remains the merge gate
 - maintainers can execute documented local CLI and GUI validation procedures and capture the resulting evidence without relying on transient chat context
 - maintainers and users can recover where `@agent` is supported, what each supported task token currently means, and which parts of the lifecycle are automated from a durable repo document
+- maintainers can distinguish platform self-test evidence from service-evaluation evidence in durable docs
+- at least one external target-repo path exists so the project is not relying only on self-targeted platform runs when judging service behavior
 
 ### Dependencies
 - task model definition
@@ -181,6 +189,7 @@ Add breadth without collapsing system boundaries.
 - stronger repository conventions
 - better error handling and retry behavior
 - initial governance tooling
+- staging and pilot promotion gates for selected task classes and target repos
 
 ### Deliverables
 - more adapters
@@ -188,6 +197,7 @@ Add breadth without collapsing system boundaries.
 - lifecycle visibility and audit trail improvements
 - reusable task templates
 - failure classification and handling rules
+- staged rollout rules that control how workflows move from internal evaluation into pilot use
 
 ### Entry Criteria
 - Phase 1 closed loop is stable enough to demonstrate repeated use
@@ -197,6 +207,7 @@ Add breadth without collapsing system boundaries.
 - system supports more than one intake pattern or more than one supported work profile
 - governance and failure handling are explicit
 - replaceability assumptions remain intact
+- pilot-readiness claims rely on explicit promotion evidence rather than on workbench-only smoke success
 
 ### Dependencies
 - stable task request contract
@@ -277,3 +288,4 @@ This phase should only proceed when prior boundaries are understood and defended
 - 2026-04-21: Expanded the Phase 1 deliverables and exit criteria to include a durable local testing workflow with canonical cases and active dashboard tracking.
 - 2026-04-22: Expanded the Phase 1 workflow packaging to include a durable user capability matrix linked to the live `@agent` entrypoints and current lifecycle coverage.
 - 2026-04-22: Clarified that Phase 1 is not complete until one supported task class reaches a minimal real agent execution path inside the bounded runtime.
+- 2026-04-24: Added the Phase 1 requirement to distinguish platform self-test from external target-repo service evaluation, plus the service-state/evidence baseline needed before later pilot claims.
