@@ -25,6 +25,7 @@ The repo is no longer planning-only. It now has a working minimum closed-loop sc
 The goal is still **not** to deliver the full platform immediately. The current focus is to harden the smallest useful issue-driven experience without collapsing architecture boundaries.
 The current local `howard/agent-sdlc` seeded repo path should now be treated as a **platform workbench / internal-eval baseline**, not as sufficient evidence that the service is ready for broader pilot or production use on non-platform repositories.
 The first valid external-target service-evaluation evidence now exists on `eval/target-docs`: issue `#3` / comment `#153` -> task `trq-f77d70ed7f92` -> session `ags-7f12724630cc` -> PR `#4` -> CI run `#56` (`success`).
+The first valid bounded-code external-target evidence now also exists on `eval/target-code-small`: issue `#5` / comment `#162` -> task `trq-7d9a75db740f` -> session `ags-b02a30c22316` -> PR `#6` -> CI run `#59` (`success`), after two earlier failed retries exposed behavior-sensitive code-change failure modes.
 
 ## Progress Against Target Experience
 Target experience:
@@ -43,7 +44,7 @@ Current progress:
 ## Current Todo
 - improve operator-facing artifact browsing or listing now that traceability, CI metadata, and review sync are in place
 - keep `docs/user-capability-matrix.md` aligned with the actual supported `@agent` surfaces, task tokens, and lifecycle boundaries
-- capture the first bounded-code external-target evidence on `target-code-small` now that the second fixture family baseline exists
+- compare the current docs-only and bounded-code external-target evidence and decide whether the next follow-up is prompt hardening, rubric refinement, or a third fixture family
 - keep explicit service-state labeling (`Workbench`, `Internal Eval`, `Pilot`, `Production`) and promotion rules aligned with real evidence
 - decide how much more of the local operator workflow should be consolidated into the default bootstrap before moving on to broader Phase 2 concerns
 - keep the Phase 1 slice narrow and avoid pulling in broader observability, multi-source intake, or deployment concerns too early

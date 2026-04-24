@@ -2,7 +2,7 @@
 
 ## Metadata
 - Test ID: TC-007
-- Status: Ready
+- Status: Passed
 - Last Updated: 2026-04-24
 - Owner: Project Maintainer
 - Mode: External target evaluation
@@ -25,7 +25,36 @@ This case is intended to cover:
 - local provision command: `npm run eval:target-code-small:provision`
 - local reset command: `npm run eval:target-code-small:reset`
 - seeded local forge target: `gitea:localhost:43000/eval/target-code-small`
-- baseline status: fixture and command surface validated, first bounded-code evaluation run still pending
+- baseline status: fixture and command surface validated, with the first valid bounded-code external-target evidence now captured
+
+## Latest Known Result
+- Date: 2026-04-24
+- Fixture: `fixtures/targets/target-code-small/`
+- Local repo: `eval/target-code-small`
+- Trigger issue/comment: issue `#5`, comment `#162`
+- Task/session: `trq-7d9a75db740f` -> `ags-b02a30c22316`
+- Proposal PR: `#6`
+- CI run: `#59` (`success`)
+- Changed files:
+  - `src/task-priority.js`
+- Validation command outcome:
+  - `npm run validate:platform` -> `passed`
+- Final traceability summary:
+  - `ci.ci_status=success`
+  - `review.status=ready-for-human-review`
+  - `review.proposal_body_sync_status=synced`
+
+## Earlier Failed Attempts
+- `external-target-code-20260424-001`
+  - issue `#1`, comment `#156`
+  - task `trq-8f5d49d8a806`
+  - PR `#2`, CI run `#57` (`failure`)
+  - failure mode: AI rewrote `src/task-summary.js` and removed the expected `formatTaskSummary` export shape
+- `external-target-code-20260424-002`
+  - issue `#3`, comment `#159`
+  - task `trq-98dabf270019`
+  - PR `#4`, CI run `#58` (`failure`)
+  - failure mode: AI preserved the export name but broke the required summary behavior by dropping status text from `formatTaskSummary`
 
 ## Preconditions
 - local Gitea environment and runner are up
@@ -80,3 +109,4 @@ This case is intended to cover:
 ## Change Log
 - 2026-04-24: Initial version.
 - 2026-04-24: Updated after validating the `target-code-small` fixture scripts and provision command.
+- 2026-04-24: Marked passed after narrowed retry `external-target-code-20260424-003` completed with task `trq-7d9a75db740f`, session `ags-b02a30c22316`, PR `#6`, and successful CI run `#59`, while preserving the earlier failed retries as useful evaluation evidence.

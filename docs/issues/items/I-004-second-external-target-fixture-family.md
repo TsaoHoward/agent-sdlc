@@ -2,7 +2,7 @@
 
 ## Metadata
 - Issue ID: I-004
-- Status: In Progress
+- Status: Done
 - Last Updated: 2026-04-24
 - Owner: Project Maintainer
 - Related Docs / WBS: `docs/roadmap.md` Phase 1; `docs/wbs.md` WBS `3.10`, `3.11`
@@ -26,6 +26,12 @@ One docs-only target is enough to prove the platform/target-repo separation, but
   - `npm run eval:target-code-small:provision`
   - `npm run eval:target-code-small:reset`
   - seeded local forge target: `gitea:localhost:43000/eval/target-code-small`
+- The first valid bounded-code external-target evidence now exists:
+  - issue `#5`, comment `#162`
+  - task `trq-7d9a75db740f`
+  - session `ags-b02a30c22316`
+  - PR `#6`
+  - CI run `#59` (`success`)
 - This follow-up does not change architecture boundaries or ADR-0009. It extends the evidence surface inside the existing platform-repo versus target-repo separation model.
 
 ## Dependencies And Constraints
@@ -46,10 +52,11 @@ This issue exits the active dashboard when:
 - the remaining work is only the first live evaluation run, which can then move to test-tracking rather than fixture-bootstrap tracking
 
 ## Next Actions
-- provision the second fixture into local Gitea and confirm the new command surface works
-- keep testing docs explicit that the fixture is baseline-ready before it has passed service-evaluation evidence
-- run the first bounded-code evaluation only after the fixture baseline and rubric are stable
+- move this bootstrap issue out at the next maintenance pass unless an immediate comparison follow-up keeps it active
+- keep the passed `TC-007` evidence and the two earlier failed retries visible in testing docs so future prompt or rubric tuning can build on them
+- use a separate issue if the next step becomes cross-fixture comparison or bounded-code prompt hardening rather than fixture bootstrap
 
 ## Change Log
 - 2026-04-24: Initial version.
 - 2026-04-24: Updated after validating the `target-code-small` provision command and seeding `eval/target-code-small` into local Gitea.
+- 2026-04-24: Marked done after `TC-007` captured the first valid bounded-code external-target evidence on `eval/target-code-small`.

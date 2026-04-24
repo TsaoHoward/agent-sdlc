@@ -57,7 +57,7 @@ Current evidence classification (2026-04-24):
 - the seeded local `howard/agent-sdlc` path remains the primary platform self-test / platform regression path
 - broader service-quality claims now require external target-repo evaluation per ADR-0009 and `docs/policies/service-state-and-evaluation.md`
 - the first valid external-target evidence set is now `eval/target-docs` issue `#3` / comment `#153` -> task `trq-f77d70ed7f92` -> session `ags-7f12724630cc` -> PR `#4` -> CI run `#56` (`success`)
-- the second fixture family `eval/target-code-small` is now the next bounded-code service-evaluation baseline, but it does not count as evidence until `TC-007` captures a real run
+- the first valid bounded-code external-target evidence set is now `eval/target-code-small` issue `#5` / comment `#162` -> task `trq-7d9a75db740f` -> session `ags-b02a30c22316` -> PR `#6` -> CI run `#59` (`success`)
 
 ## Stable Local Test Data
 | Item | Value |
@@ -94,3 +94,4 @@ See `docs/policies/testing-management.md` for the full governance rule set.
 - 2026-04-24: Recorded the first concrete `target-docs` external-target baseline plus its local provision/reset commands.
 - 2026-04-24: Recorded the first valid external-target evidence set on `eval/target-docs` after fixing nested-fixture seeding.
 - 2026-04-24: Added `TC-007` and the `target-code-small` fixture family as the next external-target bounded-code evaluation baseline.
+- 2026-04-24: Recorded the first valid bounded-code external-target evidence set on `eval/target-code-small` after two earlier failed retries exposed behavior-sensitive bounded-code failure modes.

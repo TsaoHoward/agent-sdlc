@@ -122,7 +122,7 @@ For the current live Phase 1 `@agent` path, the implemented lifecycle is:
 - Operator-facing artifact browsing remains a narrower follow-up outside this matrix's core capability scope.
 - The current local seeded `howard/agent-sdlc` path remains a valid platform-regression route, but broader service-quality claims now require external target-repo evaluation rather than self-targeted platform runs alone.
 - The first external-target evidence set is now `eval/target-docs` issue `#3` / comment `#153` -> task `trq-f77d70ed7f92` -> session `ags-7f12724630cc` -> PR `#4` -> run `#56` (`success`), with bounded edits to `README.md` and `docs/faq.md`.
-- A second fixture family now exists as `eval/target-code-small`, but it is still baseline-only until `TC-007` captures the first real bounded-code external-target run.
+- The first bounded-code external-target evidence set is now `eval/target-code-small` issue `#5` / comment `#162` -> task `trq-7d9a75db740f` -> session `ags-b02a30c22316` -> PR `#6` -> run `#59` (`success`), with bounded edits to `src/task-priority.js`; `TC-007` also records two earlier failed retries that are useful for understanding current code-task quality limits.
 
 ## Maintenance Rule
 Update this document when any of the following change:
@@ -147,3 +147,4 @@ When a change is substantial enough to alter the supported workflow shape, also 
 - 2026-04-24: Added the current user/service-state interpretation and clarified that self-targeted platform runs are still platform-regression evidence rather than sufficient broader service proof by themselves.
 - 2026-04-24: Recorded the first valid external-target internal-eval evidence on `eval/target-docs` after fixing nested-fixture seeding.
 - 2026-04-24: Added the external-target fixture provisioning operator surface and recorded `eval/target-code-small` as the next bounded-code internal-eval baseline.
+- 2026-04-24: Recorded the first valid bounded-code external-target internal-eval evidence on `eval/target-code-small`, alongside two earlier failed retries that exposed behavior-sensitive bounded-code failure modes.

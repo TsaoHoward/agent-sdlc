@@ -45,7 +45,7 @@ It does not replace CI run history, forge issue or PR history, roadmap/WBS plann
 | TC-004 | Agent Execution Adapter Smoke | Passed | CLI replay | `docs/roadmap.md` Phase 1; WBS `3.9` | Re-run when adapter parsing, provider config, allowed task classes, or path guardrails change | Move out at the next maintenance pass if no new provider-enabled regression appears |
 | TC-005 | Real AI Connectivity Manual Flow | Passed | CLI half-live | `docs/roadmap.md` Phase 1; WBS `3.7`, `3.9` | Re-run when operator runbook steps, provider config, or token coverage changes | Move out at the next maintenance pass if no new operator-facing manual-flow gap appears |
 | TC-006 | External Target Service-Evaluation Baseline | Passed | External target evaluation | ADR-0009; `docs/roadmap.md` Phase 1; WBS `3.10`, `3.11` | Move out at the next maintenance pass if no immediate follow-up remains beyond additional fixture expansion | Move out after the first external target-repo procedure is live and the current dashboard no longer needs to carry the baseline setup work |
-| TC-007 | External Target Bounded-Code Evaluation Baseline | Ready | External target evaluation | `docs/roadmap.md` Phase 1; WBS `3.10`, `3.11` | Provision `target-code-small`, then run the first bounded `@agent run code` evaluation and record the resulting evidence | Move out after the first bounded-code external-target run is captured or explicitly deferred |
+| TC-007 | External Target Bounded-Code Evaluation Baseline | Passed | External target evaluation | `docs/roadmap.md` Phase 1; WBS `3.10`, `3.11` | Move out at the next maintenance pass unless immediate follow-up is needed on bounded-code prompt quality | Move out after the first bounded-code external-target run is captured and written back into the canonical case note |
 
 ## Test Items
 
@@ -114,17 +114,17 @@ It does not replace CI run history, forge issue or PR history, roadmap/WBS plann
 - Notes: This case is intentionally about service-evaluation credibility rather than only about more local smoke coverage. The first fixture stays docs-only on purpose so the repo boundary changes without also widening task risk at the same time. A same-day nested-fixture seeding bug was fixed before the passed evidence set was recorded.
 
 ### TC-007 - External Target Bounded-Code Evaluation Baseline
-- Status: `Ready`
+- Status: `Passed`
 - Mode: `External target evaluation`
 - Related Docs / WBS: `docs/testing/items/TC-007-external-target-bounded-code-evaluation-baseline.md`; WBS `3.10`, `3.11`
 - Why It Matters: The current external-target evidence proves docs-only behavior on a non-platform repo, but it does not yet say how the bounded-code path behaves outside `agent-sdlc`.
-- Current State: The second fixture family is now `target-code-small`, a tiny Node.js repo that reuses the same target-side CI and traceability kit while narrowing edits to a small code surface. The fixture scripts pass locally, and `npm run eval:target-code-small:provision` has already seeded `eval/target-code-small`; the first real bounded-code evaluation is the remaining evidence step.
+- Current State: The second fixture family is now `target-code-small`, a tiny Node.js repo that reuses the same target-side CI and traceability kit while narrowing edits to a small code surface. The first two live bounded-code retries failed in useful ways on `src/task-summary.js` (`PR #2` / run `#57`, then `PR #4` / run `#58`), exposing how easily the provider can break behavior-sensitive exports. A third narrower retry then passed on `eval/target-code-small`: issue `#5` / comment `#162` -> task `trq-7d9a75db740f` -> session `ags-b02a30c22316` -> `PR #6` -> run `#59` (`success`), with bounded edits to `src/task-priority.js` and converged traceability.
 - Evidence Class: `external target service evaluation`
-- Next Action: Provision `target-code-small`, then run the first bounded `@agent run code` evaluation and write back the resulting PR, CI, traceability, and edit-boundary evidence.
-- Exit Path: Move out after the first bounded-code external-target run is captured or explicitly deferred.
+- Next Action: Move out at the next maintenance pass unless an immediate follow-up is needed to turn the two failed retries into a narrower prompt or rubric improvement.
+- Exit Path: Move out after the first bounded-code external-target run is captured and the canonical case note carries both the passed evidence and the earlier failed retries.
 - Canonical Case: `docs/testing/items/TC-007-external-target-bounded-code-evaluation-baseline.md`
 - Escalation Check: Update issue, roadmap, WBS, or ADR surfaces if the code-focused fixture reveals a new service-boundary or evaluation-model assumption beyond the existing docs-only baseline.
-- Notes: This case should stay narrow on purpose; the goal is to compare service-evaluation behavior across fixture families without jumping to broader pilot claims.
+- Notes: This case should stay narrow on purpose; the goal is to compare service-evaluation behavior across fixture families without jumping to broader pilot claims. The first two failed retries are worth keeping because they show a real bounded-code quality failure mode even though the third retry passed.
 
 ## Change Log
 - 2026-04-21: Initial version.
@@ -144,3 +144,4 @@ It does not replace CI run history, forge issue or PR history, roadmap/WBS plann
 - 2026-04-24: Moved `TC-006` to ready after adding the first `target-docs` fixture plus provisioning/reset commands.
 - 2026-04-24: Marked `TC-006` passed after post-fix external-target run `#002` completed successfully on `eval/target-docs` with PR `#4` and CI run `#56`.
 - 2026-04-24: Added `TC-007` to track the second external-target fixture family and the first bounded-code service-evaluation baseline.
+- 2026-04-24: Marked `TC-007` passed after narrowed retry `external-target-code-20260424-003` completed successfully on `eval/target-code-small` with PR `#6` and CI run `#59`, while retaining the first two failed retries as useful evaluation evidence.
