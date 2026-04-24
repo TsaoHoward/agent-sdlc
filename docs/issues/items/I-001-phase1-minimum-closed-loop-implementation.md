@@ -3,7 +3,7 @@
 ## Metadata
 - Issue ID: I-001
 - Status: In Progress
-- Last Updated: 2026-04-23
+- Last Updated: 2026-04-24
 - Owner: Project Maintainer
 - Related Docs / WBS: `docs/roadmap.md` Phase 1; `docs/wbs.md` WBS `3`, `3.1`, `3.2`, `3.3`, `3.4`, `3.5`, `3.6`, `3.7`, `3.8`, `3.9`
 - Source Dashboard: docs/issues/issue-dashboard.md
@@ -100,6 +100,9 @@ The repository is intentionally still in an early-phase, structure-first posture
   - sessions `ags-33be3cb8741c`, `ags-b8311df3ef0c`, `ags-9f4217fcbdc7`, and `ags-327998def612` produced proposals `PR #1`, `#30`, `#31`, and `#32`
   - local Actions runs `#51`-`#54` all completed successfully, with traceability converging to `ci_status: success`, `ready-for-human-review`, and `proposal_body_sync_status: synced`
   - provider response handling now extracts the first valid JSON object from mixed output to reduce session failures from provider formatting noise
+- A next-day governance follow-up then made the branch expectation explicit:
+  - `docs/policies/branch-and-local-forge-sync.md` now records the Phase 1 rule that proposal content must come from the forge target branch and that the default local seeded repo must be reseeded before proposal or CI validation when workspace `HEAD` has advanced
+  - the same rule is now linked from README, environment bootstrap guidance, and the PR/CI path document so stale forge `main` is treated as a governed workflow hazard rather than only a troubleshooting detail
 
 ## Dependencies And Constraints
 - Work should stay aligned to Phase 1 and WBS 3 rather than pulling Phase 2 observability or multi-source scope forward.
@@ -194,3 +197,4 @@ If implementation uncovers a major unresolved decision, the issue should stay ac
 - 2026-04-23: Expanded provider-enabled DeepSeek coverage to `documentation_update`, `review_follow_up`, and `ci_failure_investigation` through local PRs `#25`-`#27`.
 - 2026-04-23: Corrected local CI evidence for PRs `#25`-`#29` after identifying stale forge seeding as the `Finalize CI Traceability` 401 root cause in runs `#46`-`#49`, then reseeded forge `main` and added proposal preflight guardrails.
 - 2026-04-23: Recorded fresh post-fix provider revalidation across all enabled tokens with successful CI runs `#51`-`#54`, and captured provider JSON extraction hardening for mixed-output responses.
+- 2026-04-24: Added the formal branch/local-forge synchronization policy and linked it back into Phase 1 proposal and bootstrap guidance.

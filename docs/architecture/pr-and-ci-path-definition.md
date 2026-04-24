@@ -75,8 +75,11 @@ The smallest sufficient Phase 1 CI policy is:
 
 ### Runtime / Proposal Logic
 - prepare branch content
+- source proposal content from the forge target repository and target branch rather than an arbitrary local workspace snapshot
 - create or update the proposal branch
 - surface the PR with summary and traceability block
+
+For the default local seeded-forge workflow, maintainers must also keep local forge `main` aligned with the workspace commit under test before creating fresh proposal branches. See `docs/policies/branch-and-local-forge-sync.md`.
 
 ### CI
 - run objective verification

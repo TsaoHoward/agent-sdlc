@@ -91,6 +91,7 @@ Command behavior:
 Seed behavior:
 - `npm run dev:gitea-repo -- ensure-local-repo --owner <owner> --repo <repo> --seed-from <path>` now force-pushes the source repo's current `HEAD` into the local Gitea repo's `main` branch so local PR and CI testing use the same tracked workflow files as the active workspace
 - the same repo helper now also ensures the tracked issue-comment and review-follow-up webhook set points at the configured control-host callback URLs
+- this reseed behavior is now governed by `docs/policies/branch-and-local-forge-sync.md`; for the default local seeded repo, reseed local forge `main` before proposal or CI validation whenever the workspace commit under test has not yet been pushed into the local forge
 
 Local CI fallback:
 - `.gitea/workflows/phase1-ci.yml` supports `workflow_dispatch` so maintainers can manually dispatch the tracked workflow against a proposal branch for targeted reruns or local debugging
@@ -221,3 +222,4 @@ Starting the containers is no longer the only bootstrap step, but several workfl
 - 2026-04-21: Updated the bootstrap posture after adding review-event replay and webhook entrypoints so Gitea review/close events can drive traceability refresh without a session-specific manual command.
 - 2026-04-21: Updated the bootstrap posture after wiring the default local repo webhook set and managed control-host listeners into the repo-owned local startup path.
 - 2026-04-21: Updated the bootstrap posture after confirming that local Gitea host callbacks need `webhook.ALLOWED_HOST_LIST=external,private`, then validating live PR close/reopen delivery into the bootstrap-managed review listener.
+- 2026-04-24: Linked the new branch/local-forge synchronization policy so seeded local `main` alignment is treated as part of the governed bootstrap workflow.

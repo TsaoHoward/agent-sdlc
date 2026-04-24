@@ -75,6 +75,7 @@ Use these files as the primary planning sources of truth:
 - `docs/decisions/decision-backlog.md`: decision dashboard for pending and recently selected choices
 - `docs/issues/issue-dashboard.md`: issue dashboard for active near-term project issues and blockers
 - `docs/policies/`: intake, issue-management, and change-control rules
+- `docs/policies/branch-and-local-forge-sync.md`: proposal-branch and local-forge synchronization rule for Phase 1 local validation
 - `docs/policies/configuration-management.md`: repository-wide config template and local-config policy
 - `docs/templates/`: formatting templates for AI-maintained planning docs
 - `prompts/init-project.prompt.md`: initialization prompt for Codex or similar agents
@@ -157,6 +158,7 @@ docker build -f docker/worker-runtime/Dockerfile -t agent-sdlc-worker-runtime:te
 ```
 
 When `--seed-from .` is used, the local Gitea repo is seeded from the source repo's current `HEAD` into remote `main` so the local forge sees the same tracked workflow and platform files as the active workspace.
+For the default local seeded-repo workflow, reseed local forge `main` before proposal or CI validation whenever the workspace commit under test has not yet been pushed into the local forge; the formal rule now lives in `docs/policies/branch-and-local-forge-sync.md`.
 If a local regression ever prevents auto-created Actions runs for fresh PR events, the tracked workflow also supports `workflow_dispatch` so maintainers can manually dispatch `phase1-ci` against the proposal branch during troubleshooting.
 
 The default local ports come from the tracked `config/dev/gitea-bootstrap.template.json`. Operators can generate an ignored local override at `config/dev/gitea-bootstrap.json` with `npm run dev:gitea-bootstrap-config`; loaders prefer that local file when present and otherwise fall back to the template.

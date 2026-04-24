@@ -3,7 +3,7 @@
 ## Document Metadata
 - Version: 0.1
 - Status: Active
-- Last Updated: 2026-04-23
+- Last Updated: 2026-04-24
 - Owner: Project Maintainer
 
 ## Purpose
@@ -22,6 +22,7 @@ See also:
 - `docs/testing/test-framework.md`
 - `docs/testing/test-dashboard.md`
 - `docs/testing/items/`
+- `docs/policies/branch-and-local-forge-sync.md`
 
 ## Recommended Run Order
 Use this sequence when you want a full operator-facing regression pass:
@@ -436,3 +437,4 @@ PRs and issues created for local smoke tests may be left as evidence during the 
 - 2026-04-23: Added CLI Procedure E (`TC-005`) as the manual real-AI connectivity flow across `code`, `docs`, `review`, and `ci`.
 - 2026-04-23: Corrected CI evidence for runs `#46`-`#49` after identifying stale forge seeding as the failure root cause, and documented the new proposal stale-seed preflight behavior.
 - 2026-04-23: Recorded fresh post-fix provider revalidation across all enabled task tokens with successful runs `#51`-`#54`.
+- 2026-04-24: Linked the formal branch/local-forge synchronization policy from the operator runbook.
