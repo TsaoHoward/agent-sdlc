@@ -46,6 +46,7 @@ It does not replace forge issues, roadmap/WBS planning structure, the decision b
 | Issue ID | Title | Status | Related Docs / WBS | Next Action | Exit Path |
 |---|---|---|---|---|---|
 | I-001 | Phase 1 Minimum Closed Loop Implementation Packaging | In Progress | `docs/roadmap.md` Phase 1; WBS `3`, `3.1`-`3.11` | Continue hardening the provider-enabled agent execution path, keep the testing workflow and user capability matrix current, preserve the CI-to-host traceability callback path, enforce the new forge-seed preflight in proposal creation, and improve operator-facing artifact browsing while keeping self-targeted local runs framed as platform regression rather than broad service proof | Archive after the first slice is underway and the remaining work is split or absorbed into active execution tracking |
+| I-004 | Second External Target Fixture Family | In Progress | `docs/roadmap.md` Phase 1; WBS `3.10`, `3.11` | Land `target-code-small`, verify the new provision/reset command surface, and keep the first bounded-code evaluation tracked separately from fixture bootstrap | Move out after the second fixture family is baseline-ready and the remaining work is only the first live bounded-code evaluation |
 | I-003 | Platform Self-Test And External Target Service-Evaluation Separation | Done | ADR-0009; `docs/roadmap.md` Phase 1; WBS `3.10`, `3.11` | Move out at the next maintenance pass if no immediate second-fixture follow-up is needed | Move to archive after the first external target-repo path exists and the testing workflow clearly distinguishes platform regression from service evaluation |
 | I-002 | Configuration Template Policy Compliance Gaps | Done | ADR-0008; `docs/policies/configuration-management.md`; WBS `3.1`, `3.3`, `3.5`, `3.9` | Move out of the active dashboard at the next issue-maintenance pass if no new config-template gap appears | Archive after the current completion no longer needs active dashboard visibility |
 
@@ -64,6 +65,17 @@ It does not replace forge issues, roadmap/WBS planning structure, the decision b
 - Supporting Notes: `docs/issues/items/I-001-phase1-minimum-closed-loop-implementation.md`
 - Promotion / Escalation Check: Update `docs/decisions/decision-backlog.md` and ADRs only if implementation uncovers a new major boundary, ownership, or governance decision.
 - Notes: This item seeds the issue workflow with the project's current highest-signal active issue after the Phase 0 and Phase 1 design baseline.
+
+### I-004 - Second External Target Fixture Family
+- Status: `In Progress`
+- Related Docs / WBS: `docs/issues/items/I-004-second-external-target-fixture-family.md`; WBS `3.10`, `3.11`
+- Why It Matters: The current service-evaluation surface has one passed docs-only external target, but still lacks a second fixture family that exercises bounded code changes outside the platform repo.
+- Current State: The next controlled fixture family is `target-code-small`, intended to keep the same target-side CI and traceability kit while shifting the editable surface from docs-only content to a tiny Node.js codebase. The fixture baseline and provision/reset command surface are now in place, and `eval/target-code-small` has been seeded into the local forge. This follow-up stays inside ADR-0009's existing ownership boundary and is about evidence breadth, not a new architecture decision.
+- Next Action: Land the `target-code-small` fixture, verify the provision/reset command surface, and keep the first live bounded-code evaluation tracked as a separate testing item.
+- Exit Path: Move this item out after the second fixture family is baseline-ready and the remaining work is only the first live evaluation run.
+- Supporting Notes: `docs/issues/items/I-004-second-external-target-fixture-family.md`
+- Promotion / Escalation Check: Promote only if the second fixture family forces a new platform/target-repo ownership rule, a new CI ownership model, or a broader service-boundary change beyond ADR-0009.
+- Notes: This keeps the immediate next step concrete without overloading I-003 after the first separation milestone is already complete.
 
 ### I-003 - Platform Self-Test And External Target Service-Evaluation Separation
 - Status: `Done`
@@ -133,3 +145,4 @@ It does not replace forge issues, roadmap/WBS planning structure, the decision b
 - 2026-04-24: Added I-003 to track the new ADR-0009 requirement to separate platform self-test evidence from external target-repo service-evaluation evidence.
 - 2026-04-24: Moved I-003 to in progress after landing the first `target-docs` external fixture and local provisioning/reset command surface.
 - 2026-04-24: Marked I-003 done after fixing nested-fixture seeding and collecting the first valid external-target evidence set on `eval/target-docs`.
+- 2026-04-24: Added I-004 to track the second external-target fixture family for the first bounded-code evaluation baseline.

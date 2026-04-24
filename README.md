@@ -43,7 +43,7 @@ Current progress:
 ## Current Todo
 - improve operator-facing artifact browsing or listing now that traceability, CI metadata, and review sync are in place
 - keep `docs/user-capability-matrix.md` aligned with the actual supported `@agent` surfaces, task tokens, and lifecycle boundaries
-- expand beyond the first `target-docs` external-target baseline only when a second fixture family (`code` or `ci`) is worth the extra coordination cost
+- capture the first bounded-code external-target evidence on `target-code-small` now that the second fixture family baseline exists
 - keep explicit service-state labeling (`Workbench`, `Internal Eval`, `Pilot`, `Production`) and promotion rules aligned with real evidence
 - decide how much more of the local operator workflow should be consolidated into the default bootstrap before moving on to broader Phase 2 concerns
 - keep the Phase 1 slice narrow and avoid pulling in broader observability, multi-source intake, or deployment concerns too early
@@ -157,6 +157,11 @@ npm run review-surface:webhook
 npm run dev:gitea-bootstrap-config
 npm run dev:agent-execution-config
 npm run dev:gitea-repo -- ensure-local-repo --owner howard --repo agent-sdlc --seed-from .
+npm run eval:targets
+npm run eval:target-docs:provision
+npm run eval:target-docs:reset
+npm run eval:target-code-small:provision
+npm run eval:target-code-small:reset
 npm run dev:gitea-runner -- ensure-runner
 npm run proposal-surface -- create-gitea-pr --session .agent-sdlc/state/agent-sessions/<agent_session_id>.json
 docker build -f docker/worker-runtime/Dockerfile -t agent-sdlc-worker-runtime:test .

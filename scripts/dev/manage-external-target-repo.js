@@ -4,6 +4,14 @@ const { spawnSync } = require("child_process");
 const { getRepoRoot, toRepoRelativePath } = require("../lib/project-state");
 
 const TARGET_DEFINITIONS = {
+  "target-code-small": {
+    owner: "eval",
+    repo: "target-code-small",
+    fixturePath: path.join("fixtures", "targets", "target-code-small"),
+    recommendedTaskToken: "code",
+    summary:
+      "Controlled bounded-code external target with a minimal target-side CI integration kit.",
+  },
   "target-docs": {
     owner: "eval",
     repo: "target-docs",

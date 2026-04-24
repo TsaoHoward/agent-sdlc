@@ -38,10 +38,11 @@ This plan currently covers local validation of the Phase 1 closed loop for:
 - CI verification linkage
 - review-follow-up and PR close/reopen synchronization
 - explicit separation between platform self-test evidence and external target-repo service-evaluation evidence
+- the first docs-only and bounded-code external target fixture families used for internal-eval service evidence
 
 ## Related Phase And WBS
 - Related Phase: `docs/roadmap.md` Phase 1
-- Primary WBS: `docs/wbs.md` WBS `3`, `3.1`, `3.2`, `3.3`, `3.4`, `3.5`, `3.6`, `3.7`, `3.9`
+- Primary WBS: `docs/wbs.md` WBS `3`, `3.1`, `3.2`, `3.3`, `3.4`, `3.5`, `3.6`, `3.7`, `3.9`, `3.10`, `3.11`
 
 ## Environment Matrix
 | Environment / Mode | Purpose | Primary Entry Point | Typical Evidence |
@@ -98,6 +99,7 @@ The current local validation window is considered healthy when:
 | `TC-004` | Agent Execution Adapter Smoke | CLI replay | verify config resolution and provider-enabled session evidence for all currently enabled task classes |
 | `TC-005` | Real AI Connectivity Manual Flow | CLI half-live | provide a repeatable operator-facing runbook for validating real provider connectivity from issue-command intent to PR and CI evidence |
 | `TC-006` | External Target Service-Evaluation Baseline | External target evaluation | verify that at least one non-platform target repo can carry the bounded workflow and produce service-quality evidence distinct from platform regression |
+| `TC-007` | External Target Bounded-Code Evaluation Baseline | External target evaluation | verify that the bounded-code path can be exercised on a non-platform repo with a reusable fixture and explicit edit-boundary rubric |
 
 ## Cadence And Triggers
 Run the relevant local regression cases when:
@@ -126,3 +128,4 @@ Current interpretation rule:
 - 2026-04-23: Expanded `TC-004` scope to include provider-enabled `documentation_update` validation in addition to `bounded_code_change`.
 - 2026-04-23: Expanded `TC-004` scope to include provider-enabled `review_follow_up` and `ci_failure_investigation`, and added `TC-005` as the manual real-AI connectivity runbook.
 - 2026-04-24: Added the external-target evidence distinction and `TC-006` so service-quality claims are not based only on self-targeted platform runs.
+- 2026-04-24: Added `TC-007` for the second external-target fixture family so bounded-code service evaluation can be tracked separately from the first docs-only baseline.

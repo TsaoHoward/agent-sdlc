@@ -60,6 +60,10 @@ Typical entry points:
 - run a bounded `@agent` path or replay flow against that target repo
 - score the resulting PR, CI result, and edit boundary against a reusable rubric
 
+Current fixture families:
+- `target-docs` for docs-only external-target evaluation
+- `target-code-small` for bounded-code external-target evaluation
+
 ## Observation Surfaces By Lifecycle Stage
 | Lifecycle Stage | Primary Observation Surface | Secondary Evidence |
 |---|---|---|
@@ -116,3 +120,4 @@ For deeper local debugging, the framework permits these evidence surfaces:
 ## Change Log
 - 2026-04-21: Initial version.
 - 2026-04-24: Added Mode D and the evidence-classification rule that separates platform regression from external target service evaluation.
+- 2026-04-24: Recorded the second external-target fixture family so Mode D covers both docs-only and bounded-code baseline evaluation.

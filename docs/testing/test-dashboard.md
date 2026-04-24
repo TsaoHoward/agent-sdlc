@@ -45,6 +45,7 @@ It does not replace CI run history, forge issue or PR history, roadmap/WBS plann
 | TC-004 | Agent Execution Adapter Smoke | Passed | CLI replay | `docs/roadmap.md` Phase 1; WBS `3.9` | Re-run when adapter parsing, provider config, allowed task classes, or path guardrails change | Move out at the next maintenance pass if no new provider-enabled regression appears |
 | TC-005 | Real AI Connectivity Manual Flow | Passed | CLI half-live | `docs/roadmap.md` Phase 1; WBS `3.7`, `3.9` | Re-run when operator runbook steps, provider config, or token coverage changes | Move out at the next maintenance pass if no new operator-facing manual-flow gap appears |
 | TC-006 | External Target Service-Evaluation Baseline | Passed | External target evaluation | ADR-0009; `docs/roadmap.md` Phase 1; WBS `3.10`, `3.11` | Move out at the next maintenance pass if no immediate follow-up remains beyond additional fixture expansion | Move out after the first external target-repo procedure is live and the current dashboard no longer needs to carry the baseline setup work |
+| TC-007 | External Target Bounded-Code Evaluation Baseline | Ready | External target evaluation | `docs/roadmap.md` Phase 1; WBS `3.10`, `3.11` | Provision `target-code-small`, then run the first bounded `@agent run code` evaluation and record the resulting evidence | Move out after the first bounded-code external-target run is captured or explicitly deferred |
 
 ## Test Items
 
@@ -112,6 +113,19 @@ It does not replace CI run history, forge issue or PR history, roadmap/WBS plann
 - Escalation Check: Update issue, roadmap, WBS, or ADR surfaces if the first external target-repo path reveals a new environment, source-of-truth, or service-boundary assumption.
 - Notes: This case is intentionally about service-evaluation credibility rather than only about more local smoke coverage. The first fixture stays docs-only on purpose so the repo boundary changes without also widening task risk at the same time. A same-day nested-fixture seeding bug was fixed before the passed evidence set was recorded.
 
+### TC-007 - External Target Bounded-Code Evaluation Baseline
+- Status: `Ready`
+- Mode: `External target evaluation`
+- Related Docs / WBS: `docs/testing/items/TC-007-external-target-bounded-code-evaluation-baseline.md`; WBS `3.10`, `3.11`
+- Why It Matters: The current external-target evidence proves docs-only behavior on a non-platform repo, but it does not yet say how the bounded-code path behaves outside `agent-sdlc`.
+- Current State: The second fixture family is now `target-code-small`, a tiny Node.js repo that reuses the same target-side CI and traceability kit while narrowing edits to a small code surface. The fixture scripts pass locally, and `npm run eval:target-code-small:provision` has already seeded `eval/target-code-small`; the first real bounded-code evaluation is the remaining evidence step.
+- Evidence Class: `external target service evaluation`
+- Next Action: Provision `target-code-small`, then run the first bounded `@agent run code` evaluation and write back the resulting PR, CI, traceability, and edit-boundary evidence.
+- Exit Path: Move out after the first bounded-code external-target run is captured or explicitly deferred.
+- Canonical Case: `docs/testing/items/TC-007-external-target-bounded-code-evaluation-baseline.md`
+- Escalation Check: Update issue, roadmap, WBS, or ADR surfaces if the code-focused fixture reveals a new service-boundary or evaluation-model assumption beyond the existing docs-only baseline.
+- Notes: This case should stay narrow on purpose; the goal is to compare service-evaluation behavior across fixture families without jumping to broader pilot claims.
+
 ## Change Log
 - 2026-04-21: Initial version.
 - 2026-04-21: Reopened `TC-003` after a fresh GUI run showed that the current default issue-comment path stops at `workspace-prepared` and still requires manual proposal continuation.
@@ -129,3 +143,4 @@ It does not replace CI run history, forge issue or PR history, roadmap/WBS plann
 - 2026-04-24: Added `TC-006` and marked the existing active cases as platform-regression evidence while the first external target-repo service-evaluation baseline is still being introduced.
 - 2026-04-24: Moved `TC-006` to ready after adding the first `target-docs` fixture plus provisioning/reset commands.
 - 2026-04-24: Marked `TC-006` passed after post-fix external-target run `#002` completed successfully on `eval/target-docs` with PR `#4` and CI run `#56`.
+- 2026-04-24: Added `TC-007` to track the second external-target fixture family and the first bounded-code service-evaluation baseline.

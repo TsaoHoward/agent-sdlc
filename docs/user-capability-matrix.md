@@ -87,6 +87,7 @@ This matrix therefore separates:
 | Start a session from a task request | `node scripts/agent-control.js start-session --task-request <path>` | direct session start from a normalized task request | Implemented | `docs/architecture/agent-control-integration-plan.md` |
 | Auto-create proposal during session start | `node scripts/agent-control.js start-session --task-request <path> --auto-create-proposal` | current live issue-comment continuation path for auto-approved requests | Implemented | `docs/testing/local-test-procedures.md` |
 | Create or refresh a proposal PR | `node scripts/proposal-surface.js create-gitea-pr --session <path>` | branch and PR proposal path from a prepared session workspace | Implemented | `docs/testing/items/TC-002-cli-proposal-and-traceability-smoke.md` |
+| Provision or reset an external target fixture | `npm run eval:targets`; `npm run eval:target-docs:provision`; `npm run eval:target-docs:reset`; `npm run eval:target-code-small:provision`; `npm run eval:target-code-small:reset` | seed controlled non-platform repos for service-evaluation evidence without reusing the platform repo as the target under test | Implemented | `docs/testing/items/TC-006-external-target-service-evaluation-baseline.md`, `docs/testing/items/TC-007-external-target-bounded-code-evaluation-baseline.md` |
 | Sync review outcome from a proposal | `node scripts/review-surface.js sync-gitea-pr-review-outcome --proposal <proposal_ref>` | refresh durable review state and PR traceability after review activity | Implemented | `docs/environment-bootstrap.md` |
 | Sync proposal traceability from a proposal | `node scripts/review-surface.js sync-gitea-proposal-traceability --proposal <proposal_ref>` | refresh canonical and session-local traceability copies for proposal/CI convergence or diagnostics | Implemented | `scripts/review-surface.js` |
 | Run review-follow-up webhook listener | `node scripts/review-surface.js serve-configured-gitea-review-webhook` | accept PR review and PR state-change events for automatic traceability refresh, configured from template/local bootstrap config | Implemented | `docs/environment-bootstrap.md` |
@@ -121,6 +122,7 @@ For the current live Phase 1 `@agent` path, the implemented lifecycle is:
 - Operator-facing artifact browsing remains a narrower follow-up outside this matrix's core capability scope.
 - The current local seeded `howard/agent-sdlc` path remains a valid platform-regression route, but broader service-quality claims now require external target-repo evaluation rather than self-targeted platform runs alone.
 - The first external-target evidence set is now `eval/target-docs` issue `#3` / comment `#153` -> task `trq-f77d70ed7f92` -> session `ags-7f12724630cc` -> PR `#4` -> run `#56` (`success`), with bounded edits to `README.md` and `docs/faq.md`.
+- A second fixture family now exists as `eval/target-code-small`, but it is still baseline-only until `TC-007` captures the first real bounded-code external-target run.
 
 ## Maintenance Rule
 Update this document when any of the following change:
@@ -144,3 +146,4 @@ When a change is substantial enough to alter the supported workflow shape, also 
 - 2026-04-23: Corrected stale forge-seeded CI failures (`#46`-`#49`) and completed fresh multi-token revalidation with successful runs `#51`-`#54`.
 - 2026-04-24: Added the current user/service-state interpretation and clarified that self-targeted platform runs are still platform-regression evidence rather than sufficient broader service proof by themselves.
 - 2026-04-24: Recorded the first valid external-target internal-eval evidence on `eval/target-docs` after fixing nested-fixture seeding.
+- 2026-04-24: Added the external-target fixture provisioning operator surface and recorded `eval/target-code-small` as the next bounded-code internal-eval baseline.

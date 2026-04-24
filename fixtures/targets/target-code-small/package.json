@@ -1,0 +1,14 @@
+{
+  "name": "target-code-small",
+  "version": "0.1.0",
+  "private": true,
+  "description": "Controlled external bounded-code target for agent-sdlc service evaluation",
+  "type": "commonjs",
+  "engines": {
+    "node": ">=22"
+  },
+  "scripts": {
+    "validate:platform": "node scripts/validate-code-target.js",
+    "typecheck": "node scripts/typecheck-target.js"
+  }
+}
