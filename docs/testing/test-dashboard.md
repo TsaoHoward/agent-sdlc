@@ -3,7 +3,7 @@
 ## Document Metadata
 - Version: 0.1
 - Status: Active
-- Last Updated: 2026-04-24
+- Last Updated: 2026-04-29
 - Owner: Project Maintainer
 - Source Template: docs/templates/test-dashboard.template.md
 
@@ -46,6 +46,7 @@ It does not replace CI run history, forge issue or PR history, roadmap/WBS plann
 | TC-005 | Real AI Connectivity Manual Flow | Passed | CLI half-live | `docs/roadmap.md` Phase 1; WBS `3.7`, `3.9` | Re-run when operator runbook steps, provider config, or token coverage changes | Move out at the next maintenance pass if no new operator-facing manual-flow gap appears |
 | TC-006 | External Target Service-Evaluation Baseline | Passed | External target evaluation | ADR-0009; `docs/roadmap.md` Phase 1; WBS `3.10`, `3.11` | Move out at the next maintenance pass if no immediate follow-up remains beyond additional fixture expansion | Move out after the first external target-repo procedure is live and the current dashboard no longer needs to carry the baseline setup work |
 | TC-007 | External Target Bounded-Code Evaluation Baseline | Passed | External target evaluation | `docs/roadmap.md` Phase 1; WBS `3.10`, `3.11` | Move out at the next maintenance pass unless immediate follow-up is needed on bounded-code prompt quality | Move out after the first bounded-code external-target run is captured and written back into the canonical case note |
+| TC-008 | Phase 1 Manual Deliver Acceptance | Passed | Manual acceptance | `docs/phase1-deliverable.md`; `docs/roadmap.md` Phase 1; WBS `3.7`, `3.9`, `3.10`, `3.11` | Move out at the next maintenance pass unless a fresh P1 acceptance rerun or bounded-code follow-up keeps it active | Move out after the current acceptance window once the checklist no longer needs dashboard visibility |
 
 ## Test Items
 
@@ -106,7 +107,7 @@ It does not replace CI run history, forge issue or PR history, roadmap/WBS plann
 - Mode: `External target evaluation`
 - Related Docs / WBS: `docs/testing/items/TC-006-external-target-service-evaluation-baseline.md`; WBS `3.10`, `3.11`
 - Why It Matters: The project now has a durable rule that self-targeted platform runs are useful but not sufficient for broader service-quality claims. This case is the first step toward evidence from a non-platform target repo.
-- Current State: The first controlled external-target baseline now exists as `fixtures/targets/target-docs/`, with repo-local provisioning/reset commands and a minimal target-side CI integration kit. A post-fix live docs evaluation now passes on `eval/target-docs`: issue `#3` / comment `#153` -> task `trq-f77d70ed7f92` -> session `ags-7f12724630cc` -> PR `#4` -> run `#56` (`success`). The resulting change stayed bounded to `README.md` and `docs/faq.md`, and host-side traceability converged to `review.status=ready-for-human-review` with `proposal_body_sync_status=synced`.
+- Current State: The first controlled external-target baseline now exists as `fixtures/targets/target-docs/`, with repo-local provisioning/reset commands and a minimal target-side CI integration kit. A fresh 2026-04-24 manual rerun now passes on `eval/target-docs`: issue `#5` / comment `#169` -> task `trq-530938b564d7` -> session `ags-cf7e0c1b0033` -> PR `#6` -> UI run `#3` (`success`). The resulting change stayed bounded to `README.md` and `docs/faq.md`, and host-side traceability converged to `review.status=ready-for-human-review` with `proposal_body_sync_status=synced`.
 - Next Action: Move this bootstrap case out at the next maintenance pass unless a near-term second fixture or external-target regression keeps it active.
 - Exit Path: Move out after the first external target-repo procedure is runnable and the current dashboard no longer needs to carry the bootstrap/setup work directly.
 - Canonical Case: `docs/testing/items/TC-006-external-target-service-evaluation-baseline.md`
@@ -118,13 +119,25 @@ It does not replace CI run history, forge issue or PR history, roadmap/WBS plann
 - Mode: `External target evaluation`
 - Related Docs / WBS: `docs/testing/items/TC-007-external-target-bounded-code-evaluation-baseline.md`; WBS `3.10`, `3.11`
 - Why It Matters: The current external-target evidence proves docs-only behavior on a non-platform repo, but it does not yet say how the bounded-code path behaves outside `agent-sdlc`.
-- Current State: The second fixture family is now `target-code-small`, a tiny Node.js repo that reuses the same target-side CI and traceability kit while narrowing edits to a small code surface. The first two live bounded-code retries failed in useful ways on `src/task-summary.js` (`PR #2` / run `#57`, then `PR #4` / run `#58`), exposing how easily the provider can break behavior-sensitive exports. A third narrower retry then passed on `eval/target-code-small`: issue `#5` / comment `#162` -> task `trq-7d9a75db740f` -> session `ags-b02a30c22316` -> `PR #6` -> run `#59` (`success`), with bounded edits to `src/task-priority.js` and converged traceability.
+- Current State: The second fixture family is now `target-code-small`, a tiny Node.js repo that reuses the same target-side CI and traceability kit while narrowing edits to a small code surface. Earlier retries failed in useful ways on `src/task-summary.js` (`PR #2` / run `#57`, then `PR #4` / run `#58`), exposing how easily the provider can break behavior-sensitive exports. A fresh 2026-04-24 manual rerun added one more useful boundary signal before the passing run: the first comment was rejected fail-closed because its `summary:` payload was `284` characters and exceeded the intake contract, so no task or session was created. After shortening the request, the retry passed on `eval/target-code-small`: issue `#7` / comment `#173` -> task `trq-7f9ab84dbce5` -> session `ags-f90ba2a103be` -> `PR #8` -> UI run `#4` (`success`), with bounded edits to `src/task-priority.js` and converged traceability.
 - Evidence Class: `external target service evaluation`
 - Next Action: Move out at the next maintenance pass unless an immediate follow-up is needed to turn the two failed retries into a narrower prompt or rubric improvement.
 - Exit Path: Move out after the first bounded-code external-target run is captured and the canonical case note carries both the passed evidence and the earlier failed retries.
 - Canonical Case: `docs/testing/items/TC-007-external-target-bounded-code-evaluation-baseline.md`
 - Escalation Check: Update issue, roadmap, WBS, or ADR surfaces if the code-focused fixture reveals a new service-boundary or evaluation-model assumption beyond the existing docs-only baseline.
 - Notes: This case should stay narrow on purpose; the goal is to compare service-evaluation behavior across fixture families without jumping to broader pilot claims. The first two failed retries are worth keeping because they show a real bounded-code quality failure mode even though the third retry passed.
+
+### TC-008 - Phase 1 Manual Deliver Acceptance
+- Status: `Passed`
+- Mode: `Manual acceptance`
+- Related Docs / WBS: `docs/phase1-deliverable.md`; `docs/testing/items/TC-008-phase1-manual-deliver-acceptance.md`; WBS `3.7`, `3.9`, `3.10`, `3.11`
+- Why It Matters: The repo now has enough P1 evidence that future runs should stop reconstructing the intended validation order from multiple docs. This case turns the current slice into one delivery-oriented manual confirmation path.
+- Current State: A fresh 2026-04-24 manual walkthrough completed the full composite path and ended with the explicit label `accepted for current P1 manual confirmation`. The replay path passed through `trq-c9b2fa3064fb` -> `ags-796b088fafa1`, the live GUI-equivalent issue-comment path passed through `trq-08c59229d0a9` -> `ags-e52b3bc208c0` -> `PR #34` -> UI run `#56`, the external docs rerun passed through `trq-530938b564d7` -> `PR #6` -> UI run `#3`, and the external bounded-code rerun passed through one fail-closed overlong-summary rejection before successful retry `trq-7f9ab84dbce5` -> `PR #8` -> UI run `#4`.
+- Next Action: Move this composite acceptance case out at the next maintenance pass unless a fresh P1 rerun or bounded-code hardening change needs another acceptance cycle.
+- Exit Path: Move out after the current acceptance window if the case is no longer needed as an active handoff item and the canonical note remains sufficient.
+- Canonical Case: `docs/testing/items/TC-008-phase1-manual-deliver-acceptance.md`
+- Escalation Check: Update issue, roadmap, WBS, or ADR surfaces only if the acceptance flow reveals a new boundary or promotion assumption rather than a normal regression.
+- Notes: This is intentionally a composite case; it should link to existing procedures rather than duplicate every command in the dashboard.
 
 ## Change Log
 - 2026-04-21: Initial version.
@@ -145,3 +158,5 @@ It does not replace CI run history, forge issue or PR history, roadmap/WBS plann
 - 2026-04-24: Marked `TC-006` passed after post-fix external-target run `#002` completed successfully on `eval/target-docs` with PR `#4` and CI run `#56`.
 - 2026-04-24: Added `TC-007` to track the second external-target fixture family and the first bounded-code service-evaluation baseline.
 - 2026-04-24: Marked `TC-007` passed after narrowed retry `external-target-code-20260424-003` completed successfully on `eval/target-code-small` with PR `#6` and CI run `#59`, while retaining the first two failed retries as useful evaluation evidence.
+- 2026-04-24: Added `TC-008` as the delivery-oriented manual acceptance flow for the current P1 slice, linked to the new `docs/phase1-deliverable.md` comparison and acceptance packaging.
+- 2026-04-29: Marked `TC-008` passed after writing back the 2026-04-24 full manual walkthrough and refreshed `TC-006` / `TC-007` with new external-target rerun evidence.

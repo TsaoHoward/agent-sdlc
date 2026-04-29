@@ -3,7 +3,7 @@
 ## Document Metadata
 - Version: 0.1
 - Status: Active
-- Last Updated: 2026-04-24
+- Last Updated: 2026-04-29
 - Owner: Project Maintainer
 
 ## Purpose
@@ -20,6 +20,8 @@ Use it when you need one place to answer:
 - which parts of the end-to-end lifecycle are automated versus still generic scaffold
 - which manual operator commands exist alongside the live `@agent` path
 - what kind of user this current implementation is actually for right now
+
+If you want a shorter operator-facing explanation in Traditional Chinese, start with `docs/user-guide.zh-TW.md` first and come back here when you need the fuller matrix.
 
 ## Linked Planning Context
 - Project vision: `docs/project-overview.md`
@@ -148,3 +150,4 @@ When a change is substantial enough to alter the supported workflow shape, also 
 - 2026-04-24: Recorded the first valid external-target internal-eval evidence on `eval/target-docs` after fixing nested-fixture seeding.
 - 2026-04-24: Added the external-target fixture provisioning operator surface and recorded `eval/target-code-small` as the next bounded-code internal-eval baseline.
 - 2026-04-24: Recorded the first valid bounded-code external-target internal-eval evidence on `eval/target-code-small`, alongside two earlier failed retries that exposed behavior-sensitive bounded-code failure modes.
+- 2026-04-29: Linked the new concise Traditional Chinese guide as the lighter-weight entrypoint for current-state explanation.

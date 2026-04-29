@@ -3,7 +3,7 @@
 ## Metadata
 - Test ID: TC-007
 - Status: Passed
-- Last Updated: 2026-04-24
+- Last Updated: 2026-04-29
 - Owner: Project Maintainer
 - Mode: External target evaluation
 - Related Docs / WBS: `docs/policies/service-state-and-evaluation.md`; WBS `3.10`, `3.11`
@@ -25,16 +25,18 @@ This case is intended to cover:
 - local provision command: `npm run eval:target-code-small:provision`
 - local reset command: `npm run eval:target-code-small:reset`
 - seeded local forge target: `gitea:localhost:43000/eval/target-code-small`
-- baseline status: fixture and command surface validated, with the first valid bounded-code external-target evidence now captured
+- baseline status: fixture and command surface validated, with one earlier passing run and one fresh rerun that preserved an important fail-closed intake boundary before the final successful retry
 
 ## Latest Known Result
 - Date: 2026-04-24
 - Fixture: `fixtures/targets/target-code-small/`
 - Local repo: `eval/target-code-small`
-- Trigger issue/comment: issue `#5`, comment `#162`
-- Task/session: `trq-7d9a75db740f` -> `ags-b02a30c22316`
-- Proposal PR: `#6`
-- CI run: `#59` (`success`)
+- Trigger issue/comment: issue `#7`, comment `#173`
+- Task/session: `trq-7f9ab84dbce5` -> `ags-f90ba2a103be`
+- Proposal PR: `#8`
+- CI run:
+  - UI run number `#4` (`success`)
+  - internal workflow run id `63`
 - Changed files:
   - `src/task-priority.js`
 - Validation command outcome:
@@ -43,6 +45,23 @@ This case is intended to cover:
   - `ci.ci_status=success`
   - `review.status=ready-for-human-review`
   - `review.proposal_body_sync_status=synced`
+
+## Fresh Fail-Closed Retry Before The Latest Pass
+- Date: 2026-04-24
+- Trigger issue/comment: issue `#7`, comment `#172`
+- Observation: the first bounded-code retry was rejected before task creation because the `summary:` payload was `284` characters, exceeding the intake contract limit
+- Result:
+  - source event was retained
+  - no task request was created
+  - no session was started
+- Interpretation: this should be treated as useful command-contract evidence, not as a webhook failure
+
+## Earlier Passed Result
+- Date: 2026-04-24
+- Trigger issue/comment: issue `#5`, comment `#162`
+- Task/session: `trq-7d9a75db740f` -> `ags-b02a30c22316`
+- Proposal PR: `#6`
+- CI run: UI run number `#59` (`success`)
 
 ## Earlier Failed Attempts
 - `external-target-code-20260424-001`
@@ -110,3 +129,4 @@ This case is intended to cover:
 - 2026-04-24: Initial version.
 - 2026-04-24: Updated after validating the `target-code-small` fixture scripts and provision command.
 - 2026-04-24: Marked passed after narrowed retry `external-target-code-20260424-003` completed with task `trq-7d9a75db740f`, session `ags-b02a30c22316`, PR `#6`, and successful CI run `#59`, while preserving the earlier failed retries as useful evaluation evidence.
+- 2026-04-29: Refreshed the latest-known result with the 2026-04-24 manual rerun on issue `#7`, preserved the fail-closed overlong-summary rejection from comment `#172`, and recorded the successful retry on comment `#173` as task `trq-7f9ab84dbce5`, session `ags-f90ba2a103be`, PR `#8`, and UI run `#4`.

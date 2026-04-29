@@ -3,7 +3,7 @@
 ## Document Metadata
 - Version: 0.1
 - Status: Active
-- Last Updated: 2026-04-24
+- Last Updated: 2026-04-29
 - Owner: Project Maintainer
 
 ## Purpose
@@ -11,6 +11,7 @@ This directory is the durable testing workflow surface for the repository.
 
 Use it to:
 - understand the current local validation strategy
+- understand the current Phase 1 delivery-oriented manual acceptance path
 - run repeatable CLI and GUI smoke procedures
 - find stable local test data such as URLs, usernames, passwords, and repo names
 - track active near-term testing work separately from long-lived test procedures
@@ -20,17 +21,20 @@ Use it to:
 ## Recommended Reading Order
 1. `docs/testing/test-plan.md`
 2. `docs/testing/test-framework.md`
-3. `docs/testing/local-test-procedures.md`
-4. `docs/testing/test-dashboard.md`
-5. `docs/testing/items/*.md` referenced by active dashboard items
-6. `docs/testing/test-archive.md`
-7. `docs/policies/testing-management.md`
+3. `docs/phase1-deliverable.md`
+4. `docs/user-guide.zh-TW.md`
+5. `docs/testing/local-test-procedures.md`
+6. `docs/testing/test-dashboard.md`
+7. `docs/testing/items/*.md` referenced by active dashboard items
+8. `docs/testing/test-archive.md`
+9. `docs/policies/testing-management.md`
 
 ## Workflow Map
 | Document | Use It For | When To Update |
 |---|---|---|
 | `docs/testing/test-plan.md` | stable scope, entry criteria, exit criteria, and default local data | when the durable test scope or local defaults change |
 | `docs/testing/test-framework.md` | execution modes, evidence surfaces, and write-back rules | when the testing model or expected evidence changes |
+| `docs/phase1-deliverable.md` | current P1 delivery scope, docs-vs-code interpretation, and manual acceptance order | when the current P1 delivery claim or acceptance sequence changes |
 | `docs/testing/local-test-procedures.md` | operator-facing CLI and GUI walkthroughs | when commands, credentials, URLs, or observation steps change |
 | `docs/testing/test-dashboard.md` | active near-term test work that still deserves attention | when current-cycle validation state changes |
 | `docs/testing/items/` | canonical case definitions and exact procedures | when a test case needs stable, detailed steps |
@@ -47,9 +51,10 @@ For a fresh local validation pass:
 7. treat those current runs as platform self-test / platform regression when they target `howard/agent-sdlc`
 8. run `TC-006` when you need service-evaluation evidence beyond the platform repo, starting with `npm run eval:target-docs:provision` or `npm run eval:target-docs:reset`
 9. run `TC-007` when you need the first bounded-code service-evaluation case beyond docs-only evidence, starting with `npm run eval:target-code-small:provision` or `npm run eval:target-code-small:reset`
-10. write any new gap back into `docs/testing/test-dashboard.md`, then update issue or decision docs if the result changes project-level understanding
+10. run `TC-008` when you want one delivery-oriented manual acceptance pass that chains the current P1 procedures in their intended order
+11. write any new gap back into `docs/testing/test-dashboard.md`, then update issue or decision docs if the result changes project-level understanding
 
-The latest reproducible live issue-comment reference is the 2026-04-21 run on `howard/agent-sdlc#11`, which created task request `trq-bd85673302e7`, session `ags-335855297620`, root traceability `.agent-sdlc/traceability/trq-bd85673302e7.json`, and proposal `PR #12` automatically after the strengthened listener path was deployed. The latest CLI half-live verification after commit `292f535` then created synthetic task request `trq-route1-hostsync-final-20260421225724`, session `ags-9c860e1f0026`, and proposal `PR #23`, which produced one successful `pull_request` run (`#41`) and automatically converged the PR body, host root traceability file, and session-local workspace copy. Provider-enabled agent execution validation has now been revalidated across all currently enabled issue-comment tokens with fresh post-fix evidence: `code` (`trq-c9b2fa3064fb`, `PR #1`, run `#51`), `docs` (`trq-8dc2bbe48812`, `PR #30`, run `#52`), `review` (`trq-fd8ca8f8d18f`, `PR #31`, run `#53`), and `ci` (`trq-7765e00f85d4`, `PR #32`, run `#54`).
+The latest reproducible live issue-comment reference is now the 2026-04-24 manual-acceptance rerun on `howard/agent-sdlc#33`, which created task request `trq-08c59229d0a9`, session `ags-e52b3bc208c0`, proposal `PR #34`, and successful UI run `#56`. The latest replay/proposal refresh path in that same walkthrough also reconfirmed `trq-c9b2fa3064fb` -> `ags-796b088fafa1` with updated `PR #1` CI convergence after stale-seed preflight and reseed. Provider-enabled agent execution evidence remains available across all currently enabled issue-comment tokens, and the same walkthrough also refreshed external-target proofs on `eval/target-docs` (`trq-530938b564d7`, `PR #6`, UI run `#3`) and `eval/target-code-small` (`trq-7f9ab84dbce5`, `PR #8`, UI run `#4` after one fail-closed overlong-summary rejection).
 
 Current correction status (2026-04-23): stale-seed CI failures in runs `#46`-`#49` are resolved by reseeding local forge `main` and enforcing proposal stale-seed preflight before branch push.
 
@@ -95,3 +100,5 @@ See `docs/policies/testing-management.md` for the full governance rule set.
 - 2026-04-24: Recorded the first valid external-target evidence set on `eval/target-docs` after fixing nested-fixture seeding.
 - 2026-04-24: Added `TC-007` and the `target-code-small` fixture family as the next external-target bounded-code evaluation baseline.
 - 2026-04-24: Recorded the first valid bounded-code external-target evidence set on `eval/target-code-small` after two earlier failed retries exposed behavior-sensitive bounded-code failure modes.
+- 2026-04-24: Added `docs/phase1-deliverable.md` and `TC-008` as the delivery-oriented manual acceptance entrypoint for the current P1 slice.
+- 2026-04-29: Added the concise Traditional Chinese guide to the recommended reading order and recorded the fresh 2026-04-24 manual-acceptance evidence set.

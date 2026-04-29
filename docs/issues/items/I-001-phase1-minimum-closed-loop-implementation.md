@@ -3,7 +3,7 @@
 ## Metadata
 - Issue ID: I-001
 - Status: In Progress
-- Last Updated: 2026-04-24
+- Last Updated: 2026-04-29
 - Owner: Project Maintainer
 - Related Docs / WBS: `docs/roadmap.md` Phase 1; `docs/wbs.md` WBS `3`, `3.1`, `3.2`, `3.3`, `3.4`, `3.5`, `3.6`, `3.7`, `3.8`, `3.9`
 - Source Dashboard: docs/issues/issue-dashboard.md
@@ -103,6 +103,16 @@ The repository is intentionally still in an early-phase, structure-first posture
 - A next-day governance follow-up then made the branch expectation explicit:
   - `docs/policies/branch-and-local-forge-sync.md` now records the Phase 1 rule that proposal content must come from the forge target branch and that the default local seeded repo must be reseeded before proposal or CI validation when workspace `HEAD` has advanced
   - the same rule is now linked from README, environment bootstrap guidance, and the PR/CI path document so stale forge `main` is treated as a governed workflow hazard rather than only a troubleshooting detail
+- A same-day packaging follow-up then turned the current state into a delivery-oriented handoff:
+  - `docs/phase1-deliverable.md` now summarizes what Phase 1 currently delivers, what remains out of scope, and how the current docs-oriented versus bounded-code evidence should be interpreted
+  - the new comparison explicitly treats `eval/target-docs` as the steadier first manual acceptance checkpoint and `eval/target-code-small` as the stricter bounded-code quality gate because the code fixture kept two earlier failed retries before the passing narrowed run
+  - `docs/testing/items/TC-008-phase1-manual-deliver-acceptance.md` now defines a step-by-step manual acceptance path that chains the existing canonical cases instead of requiring operators to reconstruct the intended order from multiple notes
+- A 2026-04-24 fresh manual acceptance walkthrough then revalidated that packaging in practice:
+  - the walkthrough completed with the explicit label `accepted for current P1 manual confirmation`
+  - the platform replay/proposal/live GUI slices all passed again, including issue `#33` / comment `#166` -> task `trq-08c59229d0a9` -> session `ags-e52b3bc208c0` -> `PR #34` -> UI run `#56`
+  - the external docs rerun passed on `eval/target-docs` through task `trq-530938b564d7`, session `ags-cf7e0c1b0033`, `PR #6`, and UI run `#3`
+  - the external bounded-code rerun first failed closed because the `summary:` payload exceeded the 280-character intake limit, then passed on the shortened retry through task `trq-7f9ab84dbce5`, session `ags-f90ba2a103be`, `PR #8`, and UI run `#4`
+  - a concise Traditional Chinese operator guide now also exists at `docs/user-guide.zh-TW.md` so the current P1 slice can be explained without requiring every reader to start from the full capability matrix
 
 ## Dependencies And Constraints
 - Work should stay aligned to Phase 1 and WBS 3 rather than pulling Phase 2 observability or multi-source scope forward.
@@ -149,10 +159,13 @@ If implementation uncovers a major unresolved decision, the issue should stay ac
 - continue hardening the minimal provider-backed agent execution path from the validated `bounded_code_change`, `documentation_update`, `review_follow_up`, and `ci_failure_investigation` DeepSeek session/proposal smokes
 - keep the newly validated opt-in DeepSeek adapter path bounded and repeatable when real credentials are enabled in ignored project config
 - keep `docs/user-capability-matrix.md` aligned with the actual supported `@agent` locations, task tokens, and manual operator surfaces as the implementation evolves
+- keep `docs/user-guide.zh-TW.md` aligned with the simpler operator-facing explanation of the same current-state boundaries
 - keep the strengthened live issue-comment path in place now that it auto-creates the proposal and root traceability file
 - keep the CI-to-host traceability callback path stable so `.agent-sdlc/traceability/<task_request_id>.json` continues to converge automatically after CI success
 - keep the route-1 duplicate-CI cleanup covered by future local PR-creation validation so new proposal-path changes do not reintroduce an immediate second CI run
 - keep the forge-repository runtime clone path in place and reseed local forge `main` from current `HEAD` before local proposal-flow validation when the operator is testing unpushed changes
+- use `docs/phase1-deliverable.md` and `TC-008` as the default near-term manual confirmation package instead of relying on scattered dashboard references
+- use the current docs-vs-code comparison to decide whether bounded-code follow-up should focus on prompt narrowing, rubric tightening, or both
 - investigate local artifact listing visibility only if operator-facing browsing of stored workflow artifacts becomes necessary
 - expand the current project-local bootstrap entrypoints as those WBS 3 interfaces become real services or commands
 - split or reframe this dashboard item once the implementation slices are concrete enough to track separately
@@ -198,3 +211,5 @@ If implementation uncovers a major unresolved decision, the issue should stay ac
 - 2026-04-23: Corrected local CI evidence for PRs `#25`-`#29` after identifying stale forge seeding as the `Finalize CI Traceability` 401 root cause in runs `#46`-`#49`, then reseeded forge `main` and added proposal preflight guardrails.
 - 2026-04-23: Recorded fresh post-fix provider revalidation across all enabled tokens with successful CI runs `#51`-`#54`, and captured provider JSON extraction hardening for mixed-output responses.
 - 2026-04-24: Added the formal branch/local-forge synchronization policy and linked it back into Phase 1 proposal and bootstrap guidance.
+- 2026-04-24: Added the delivery-oriented Phase 1 packaging note, the docs-vs-code comparison, and the new `TC-008` manual acceptance handoff.
+- 2026-04-29: Wrote back the fresh `TC-008` acceptance walkthrough and linked the new concise Traditional Chinese operator guide into the Phase 1 packaging context.

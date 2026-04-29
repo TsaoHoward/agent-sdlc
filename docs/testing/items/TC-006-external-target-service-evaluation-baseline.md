@@ -3,7 +3,7 @@
 ## Metadata
 - Test ID: TC-006
 - Status: Passed
-- Last Updated: 2026-04-24
+- Last Updated: 2026-04-29
 - Owner: Project Maintainer
 - Mode: External target evaluation
 - Related Docs / WBS: ADR-0009; `docs/policies/service-state-and-evaluation.md`; WBS `3.10`, `3.11`
@@ -27,16 +27,18 @@ This case now has a concrete baseline:
 - local reset command: `npm run eval:target-docs:reset`
 - seeded local forge target: `gitea:localhost:43000/eval/target-docs`
 
-The first post-fix bounded docs run has now completed successfully. The current local `howard/agent-sdlc` seeded repo still remains the main platform-regression baseline for platform self-test, while `eval/target-docs` now provides the first captured external-target service-evaluation evidence set.
+The first post-fix bounded docs run completed successfully, and a fresh 2026-04-24 manual rerun also completed successfully. The current local `howard/agent-sdlc` seeded repo still remains the main platform-regression baseline for platform self-test, while `eval/target-docs` now provides repeatable external-target service-evaluation evidence.
 
 ## Latest Known Result
 - Date: 2026-04-24
 - Fixture: `fixtures/targets/target-docs/`
 - Local repo: `eval/target-docs`
-- Trigger issue/comment: issue `#3`, comment `#153`
-- Task/session: `trq-f77d70ed7f92` -> `ags-7f12724630cc`
-- Proposal PR: `#4`
-- CI run: `#56` (`success`)
+- Trigger issue/comment: issue `#5`, comment `#169`
+- Task/session: `trq-530938b564d7` -> `ags-cf7e0c1b0033`
+- Proposal PR: `#6`
+- CI run:
+  - UI run number `#3` (`success`)
+  - internal workflow run id `62`
 - Changed files:
   - `README.md`
   - `docs/faq.md`
@@ -46,6 +48,13 @@ The first post-fix bounded docs run has now completed successfully. The current 
   - `ci.ci_status=success`
   - `review.status=ready-for-human-review`
   - `review.proposal_body_sync_status=synced`
+
+## Earlier Passed Result
+- Date: 2026-04-24
+- Trigger issue/comment: issue `#3`, comment `#153`
+- Task/session: `trq-f77d70ed7f92` -> `ags-7f12724630cc`
+- Proposal PR: `#4`
+- CI run: UI run number `#56` (`success`)
 
 ## Known Correction
 - The earlier trigger `external-target-eval-20260424-001` should not be treated as valid service-evaluation evidence for the target fixture.
@@ -116,3 +125,4 @@ The first post-fix bounded docs run has now completed successfully. The current 
 - 2026-04-24: Initial draft.
 - 2026-04-24: Moved to ready after adding the first `target-docs` fixture and local provision/reset command surface.
 - 2026-04-24: Marked passed after post-fix run `external-target-eval-20260424-002` completed with task `trq-f77d70ed7f92`, session `ags-7f12724630cc`, PR `#4`, and successful CI run `#56`.
+- 2026-04-29: Refreshed the latest-known result with the 2026-04-24 manual rerun on issue `#5` / comment `#169`, which completed as task `trq-530938b564d7`, session `ags-cf7e0c1b0033`, PR `#6`, and successful UI run `#3`.

@@ -22,6 +22,7 @@ Use `docs/testing/README.md` as the navigation entrypoint for this workflow.
 - make CLI replay, half-live, and full-live validation paths explicit
 - keep test scope aligned to the current roadmap and WBS
 - support repeatable manual observation of intake, runtime, proposal, CI, and review behavior
+- support a delivery-oriented manual acceptance pass for the current P1 slice
 
 ## Non-Goals
 - replacing CI as the independent verifier
@@ -39,6 +40,7 @@ This plan currently covers local validation of the Phase 1 closed loop for:
 - review-follow-up and PR close/reopen synchronization
 - explicit separation between platform self-test evidence and external target-repo service-evaluation evidence
 - the first docs-only and bounded-code external target fixture families used for internal-eval service evidence
+- the current P1 manual acceptance package that combines platform regression, provider-backed execution, and external-target checks in one ordered flow
 
 ## Related Phase And WBS
 - Related Phase: `docs/roadmap.md` Phase 1
@@ -52,6 +54,7 @@ This plan currently covers local validation of the Phase 1 closed loop for:
 | GUI live | exercise the real local operator workflow through Gitea UI | Gitea web UI at `http://localhost:43000/` | issue/comment history, PR UI, Actions UI, review or close/reopen state |
 | CI-linked validation | confirm independent verifier behavior on the PR path | local Gitea Actions runner plus `.gitea/workflows/phase1-ci.yml` | workflow runs, verification metadata, PR traceability updates |
 | External target evaluation | validate service behavior against a non-platform target repo | first controlled external target repo baseline under WBS `3.10` | non-platform PRs, CI results, task-quality rubric evidence |
+| Manual acceptance | confirm the current P1 slice as one operator-facing delivery package | `docs/phase1-deliverable.md`; `TC-008` | one explicit acceptance conclusion plus linked case evidence |
 
 ## Default Local Test Data
 These defaults assume the tracked local bootstrap template or matching generated local config is being used without environment overrides.
@@ -100,6 +103,7 @@ The current local validation window is considered healthy when:
 | `TC-005` | Real AI Connectivity Manual Flow | CLI half-live | provide a repeatable operator-facing runbook for validating real provider connectivity from issue-command intent to PR and CI evidence |
 | `TC-006` | External Target Service-Evaluation Baseline | External target evaluation | verify that at least one non-platform target repo can carry the bounded workflow and produce service-quality evidence distinct from platform regression |
 | `TC-007` | External Target Bounded-Code Evaluation Baseline | External target evaluation | verify that the bounded-code path can be exercised on a non-platform repo with a reusable fixture and explicit edit-boundary rubric |
+| `TC-008` | Phase 1 Manual Deliver Acceptance | Manual acceptance | verify the current P1 slice in the intended operator order and capture one delivery-oriented acceptance outcome |
 
 ## Cadence And Triggers
 Run the relevant local regression cases when:
@@ -129,3 +133,4 @@ Current interpretation rule:
 - 2026-04-23: Expanded `TC-004` scope to include provider-enabled `review_follow_up` and `ci_failure_investigation`, and added `TC-005` as the manual real-AI connectivity runbook.
 - 2026-04-24: Added the external-target evidence distinction and `TC-006` so service-quality claims are not based only on self-targeted platform runs.
 - 2026-04-24: Added `TC-007` for the second external-target fixture family so bounded-code service evaluation can be tracked separately from the first docs-only baseline.
+- 2026-04-24: Added `TC-008` and the delivery-oriented manual acceptance path for the current P1 slice.

@@ -24,8 +24,8 @@ The repo is no longer planning-only. It now has a working minimum closed-loop sc
 
 The goal is still **not** to deliver the full platform immediately. The current focus is to harden the smallest useful issue-driven experience without collapsing architecture boundaries.
 The current local `howard/agent-sdlc` seeded repo path should now be treated as a **platform workbench / internal-eval baseline**, not as sufficient evidence that the service is ready for broader pilot or production use on non-platform repositories.
-The first valid external-target service-evaluation evidence now exists on `eval/target-docs`: issue `#3` / comment `#153` -> task `trq-f77d70ed7f92` -> session `ags-7f12724630cc` -> PR `#4` -> CI run `#56` (`success`).
-The first valid bounded-code external-target evidence now also exists on `eval/target-code-small`: issue `#5` / comment `#162` -> task `trq-7d9a75db740f` -> session `ags-b02a30c22316` -> PR `#6` -> CI run `#59` (`success`), after two earlier failed retries exposed behavior-sensitive code-change failure modes.
+The first valid external-target service-evaluation evidence now exists on `eval/target-docs`: issue `#5` / comment `#169` -> task `trq-530938b564d7` -> session `ags-cf7e0c1b0033` -> PR `#6` -> UI CI run `#3` (`success`).
+The first valid bounded-code external-target evidence now also has a fresh rerun on `eval/target-code-small`: the first attempt fail-closed because the `summary:` payload exceeded the 280-character intake limit, then issue `#7` / comment `#173` -> task `trq-7f9ab84dbce5` -> session `ags-f90ba2a103be` -> PR `#8` -> UI CI run `#4` (`success`) completed with bounded edits to `src/task-priority.js`.
 
 ## Progress Against Target Experience
 Target experience:
@@ -45,6 +45,7 @@ Current progress:
 - improve operator-facing artifact browsing or listing now that traceability, CI metadata, and review sync are in place
 - keep `docs/user-capability-matrix.md` aligned with the actual supported `@agent` surfaces, task tokens, and lifecycle boundaries
 - compare the current docs-only and bounded-code external-target evidence and decide whether the next follow-up is prompt hardening, rubric refinement, or a third fixture family
+- keep the new Phase 1 deliverable and manual acceptance pack aligned with the actual operator validation flow
 - keep explicit service-state labeling (`Workbench`, `Internal Eval`, `Pilot`, `Production`) and promotion rules aligned with real evidence
 - decide how much more of the local operator workflow should be consolidated into the default bootstrap before moving on to broader Phase 2 concerns
 - keep the Phase 1 slice narrow and avoid pulling in broader observability, multi-source intake, or deployment concerns too early
@@ -67,6 +68,8 @@ Use these files as the primary planning sources of truth:
 ## Repository Guide
 - `AGENTS.md`: agent working rules and update requirements
 - `docs/project-overview.md`: problem statement, goals, scope, constraints
+- `docs/phase1-deliverable.md`: current Phase 1 delivery scope, docs-vs-code evidence interpretation, and manual acceptance entrypoint
+- `docs/user-guide.zh-TW.md`: 較精簡、直接的繁體中文使用說明
 - `docs/user-capability-matrix.md`: current supported user-facing `@agent` surfaces, task tokens, and lifecycle coverage
 - `docs/operating-model.md`: how humans and agents should collaborate
 - `docs/environment-requirements.md`: centralized environment inventory and readiness tracking

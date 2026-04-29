@@ -3,7 +3,7 @@
 ## Document Metadata
 - Version: 0.1
 - Status: Active
-- Last Updated: 2026-04-24
+- Last Updated: 2026-04-29
 - Owner: Project Maintainer
 
 ## Purpose
@@ -22,6 +22,7 @@ Current evidence classification:
 - they remain necessary and valid, but they are not by themselves sufficient as long-term service-quality evidence for non-platform target repos
 
 See also:
+- `docs/phase1-deliverable.md`
 - `docs/testing/README.md`
 - `docs/testing/test-plan.md`
 - `docs/testing/test-framework.md`
@@ -37,9 +38,13 @@ Use this sequence when you want a full operator-facing regression pass:
 4. run CLI Procedure D to confirm provider adapter behavior
 5. run CLI Procedure E to confirm real AI connectivity end to end
 6. run GUI Procedure C to confirm the live Gitea experience
-7. write any new gap back into `docs/testing/test-dashboard.md`
+7. run `TC-008` when you want to treat the current P1 slice as one delivery-oriented acceptance pass
+8. write any new gap back into `docs/testing/test-dashboard.md`
 
 You may also run any procedure independently when you only need one layer.
+
+When the goal is not only regression but current P1 delivery confirmation, start from `docs/phase1-deliverable.md` and use `TC-008` as the master checklist. The procedures below remain the detailed operator steps that `TC-008` points to.
+If you want a shorter Traditional Chinese explanation before the detailed test flow, read `docs/user-guide.zh-TW.md` first.
 
 ## Latest Known Reference
 The latest reproducible local full-flow reference is:
@@ -446,3 +451,5 @@ PRs and issues created for local smoke tests may be left as evidence during the 
 - 2026-04-23: Recorded fresh post-fix provider revalidation across all enabled task tokens with successful runs `#51`-`#54`.
 - 2026-04-24: Linked the formal branch/local-forge synchronization policy from the operator runbook.
 - 2026-04-24: Marked the current procedures as platform-regression evidence unless a later external target-repo procedure says otherwise.
+- 2026-04-24: Linked the new P1 delivery-oriented acceptance pack and `TC-008` from the operator run order.
+- 2026-04-29: Linked the concise Traditional Chinese guide as the lighter-weight entrypoint before the detailed operator walkthrough.
