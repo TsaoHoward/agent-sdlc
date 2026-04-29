@@ -82,6 +82,14 @@ npm run dev:env:status
 - review webhook listener 已啟動
 - runner online
 
+如果你剛改過這個 repo 的 tracked 檔案，而且想拿 `howard/agent-sdlc` 當 live 測試目標，先補這一步：
+
+```powershell
+npm run dev:gitea-repo -- ensure-local-repo --owner howard --repo agent-sdlc --seed-from .
+```
+
+原因是目前本機 Gitea 的 `main` 必須和你正在測的 workspace `HEAD` 對齊；不然系統會在 proposal 建立前 fail-closed。
+
 Gitea 預設網址：
 - `http://localhost:43000/`
 
@@ -111,6 +119,7 @@ summary: Add a short note to README.md and one matching docs update.
 - `code` 路徑一定要把需求寫得短、窄、清楚
 - `summary:` 不是越長越好
 - bounded-code 路徑目前有明確 intake 邊界，`summary:` 太長會直接 fail-closed
+- 如果你用的是本機 seeded `howard/agent-sdlc`，在測試前要注意 forge `main` 有沒有 reseed 到最新 workspace `HEAD`
 
 目前手動驗證中已觀察到：
 - `docs` external target 可以穩定通過
@@ -135,6 +144,20 @@ summary: Add a short note to README.md and one matching docs update.
 - `ci_status: success`
 - `review.status: ready-for-human-review`
 - `proposal_body_sync_status: synced`
+
+## 失敗時現在會看到什麼
+如果請求沒有成功走完整條 live 流程，現在不應該只剩下「看起來沒反應」。
+
+目前至少有幾種可見回報：
+- intake 格式不符合時，issue thread 會收到 `agent-admin` 的說明 comment
+- 如果 proposal 建立前被 stale-forge preflight 擋下，issue thread 會收到原因和 reseed 指令
+- 如果 agent 執行完後判定不需要改任何 repo 檔案，系統會停止在建 PR 之前，並在 issue thread 回報這次是 no-op
+
+常見修復指令：
+
+```powershell
+npm run dev:gitea-repo -- ensure-local-repo --owner howard --repo agent-sdlc --seed-from .
+```
 
 ## 怎麼判斷目前比較建議跑哪條
 如果你是第一次確認功能，建議順序是：
@@ -171,3 +194,4 @@ summary: Add a short note to README.md and one matching docs update.
 
 ## 變更紀錄
 - 2026-04-29: 初版，提供較精簡、直接的繁體中文操作說明。
+- 2026-04-29: 補上 seeded local forge reseed 前置條件，並說明 fail-closed / no-op 時的 issue-thread 可見回報。

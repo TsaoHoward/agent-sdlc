@@ -107,6 +107,7 @@ For the current live Phase 1 `@agent` path, the implemented lifecycle is:
 8. CI completion now syncs reviewer-facing PR traceability plus canonical and session-local traceability copies.
 9. Human review remains the merge gate.
 10. Later review, close, or reopen events can refresh review outcome traceability through the review surface.
+11. When the bounded request is rejected fail-closed, stopped by stale-forge proposal preflight, or finishes as a no-op with zero repo file edits, the issue thread can now receive a bounded operator-facing status comment instead of failing silently.
 
 ## Evidence Surfaces By Stage
 | Stage | Durable Evidence |
@@ -120,6 +121,8 @@ For the current live Phase 1 `@agent` path, the implemented lifecycle is:
 ## Current Boundaries And Gaps
 - Only Gitea issue comments are currently live `@agent` entrypoints.
 - The four task tokens currently drive classification, policy, and traceability. The opt-in agent execution adapter now supports all four issue-comment tokens (`bounded_code_change`, `documentation_update`, `review_follow_up`, `ci_failure_investigation`) and has passed provider-enabled local validation for each, but live default behavior remains scaffold-first unless the operator enables agent execution in ignored project config.
+- For the default local seeded `howard/agent-sdlc` repo, proposal creation can still fail closed when local forge `main` lags workspace `HEAD`; current user-facing mitigation is an issue-thread status comment plus the documented reseed command.
+- A completed agent session with zero repo file edits is now treated as a visible no-op rather than silently creating a traceability-only PR, but richer user-facing explanation and retry guidance still deserve follow-up hardening.
 - CI remains an independent verifier and human review remains the merge control point.
 - Operator-facing artifact browsing remains a narrower follow-up outside this matrix's core capability scope.
 - The current local seeded `howard/agent-sdlc` path remains a valid platform-regression route, but broader service-quality claims now require external target-repo evaluation rather than self-targeted platform runs alone.

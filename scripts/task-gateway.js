@@ -11,7 +11,12 @@ const {
   toRepoRelativePath,
   writeJson,
 } = require("./lib/project-state");
-const { readGiteaBootstrapConfig } = require("./lib/gitea-client");
+const {
+  createIssueComment,
+  loadLocalGiteaSettings,
+  parseGiteaRepositoryRef,
+  readGiteaBootstrapConfig,
+} = require("./lib/gitea-client");
 
 const DEFAULT_WEBHOOK_HOST = "127.0.0.1";
 const DEFAULT_WEBHOOK_PORT = 4010;
@@ -533,7 +538,11 @@ function startAgentSession(repoRoot, taskRequestPath, options = {}) {
     parsedOutput = JSON.parse(outputText);
   }
 
-  if (result.status !== 0 && (!parsedOutput || parsedOutput.status !== "blocked")) {
+  if (result.status !== 0) {
+    if (parsedOutput) {
+      return parsedOutput;
+    }
+
     const failureText = (result.stderr || result.stdout || "session starter failed").trim();
     throw new Error(`Session starter failed: ${failureText}`);
   }
@@ -556,6 +565,161 @@ function buildAcceptedOutput(repoRoot, normalizeResult, sessionStartResult = nul
   }
 
   return output;
+}
+
+function looksLikeAgentCommand(commentBody) {
+  const normalizedBody = String(commentBody || "").replace(/\r\n/gu, "\n").trimStart();
+  return normalizedBody.toLowerCase().startsWith("@agent");
+}
+
+function buildIssueFeedbackComment(payload) {
+  const {
+    title,
+    taskRequestId = null,
+    agentSessionId = null,
+    status = null,
+    stage = null,
+    reasonCode = null,
+    detail = null,
+    summary = null,
+    remediation = null,
+  } = payload;
+
+  const lines = [title, ""];
+
+  if (taskRequestId) {
+    lines.push(`- Task Request: \`${taskRequestId}\``);
+  }
+
+  if (agentSessionId) {
+    lines.push(`- Agent Session: \`${agentSessionId}\``);
+  }
+
+  if (status) {
+    lines.push(`- Status: \`${status}\``);
+  }
+
+  if (stage) {
+    lines.push(`- Stage: \`${stage}\``);
+  }
+
+  if (reasonCode) {
+    lines.push(`- Reason Code: \`${reasonCode}\``);
+  }
+
+  if (detail) {
+    lines.push(`- Detail: ${detail}`);
+  }
+
+  if (summary) {
+    lines.push(`- Agent Summary: ${summary}`);
+  }
+
+  if (remediation) {
+    lines.push("");
+    lines.push("Suggested next step:");
+    lines.push("```text");
+    lines.push(remediation);
+    lines.push("```");
+  }
+
+  return `${lines.join("\n")}\n`;
+}
+
+function buildRejectionFeedback(normalizeResult) {
+  return buildIssueFeedbackComment({
+    title: "Agent could not accept this request.",
+    status: normalizeResult.status,
+    reasonCode: normalizeResult.reasonCode,
+    detail: normalizeResult.message,
+  });
+}
+
+function extractRemediationCommand(detail) {
+  const match = String(detail || "").match(/(npm run dev:gitea-repo -- ensure-local-repo[^\r\n]*)/u);
+  return match ? match[1] : null;
+}
+
+function buildSessionFeedback(normalizeResult, sessionStartResult) {
+  const taskRequestId = normalizeResult.taskRequestId;
+  const agentSessionId = sessionStartResult.agent_session_id || null;
+  const status = sessionStartResult.status || null;
+  const stage = sessionStartResult.runtime_handoff_status || null;
+  const detail = sessionStartResult.message || null;
+  const remediation = extractRemediationCommand(detail);
+  const agentExecution = sessionStartResult.agent_execution || null;
+
+  if (stage === "agent-execution-noop") {
+    return buildIssueFeedbackComment({
+      title: "Agent finished reviewing this request but did not create a PR.",
+      taskRequestId,
+      agentSessionId,
+      status,
+      stage,
+      detail:
+        "The bounded agent execution completed without producing any repository file edits, so the system stopped before proposal creation.",
+      summary: agentExecution && agentExecution.summary ? agentExecution.summary : null,
+    });
+  }
+
+  if (status === "blocked") {
+    return buildIssueFeedbackComment({
+      title: "Agent accepted this request but stopped for approval.",
+      taskRequestId,
+      agentSessionId,
+      status,
+      reasonCode: sessionStartResult.reasonCode || null,
+      detail: sessionStartResult.message || null,
+    });
+  }
+
+  return buildIssueFeedbackComment({
+    title: "Agent accepted this request but could not finish the live workflow.",
+    taskRequestId,
+    agentSessionId,
+    status,
+    stage,
+    detail,
+    summary: agentExecution && agentExecution.summary ? agentExecution.summary : null,
+    remediation,
+  });
+}
+
+async function tryPostIssueFeedback(repoRoot, payload, commentBody) {
+  if (!commentBody || !payload || !payload.repository || !payload.issue) {
+    return null;
+  }
+
+  const repositoryHost =
+    parseHostFromUrl(payload.repository.html_url) ||
+    parseHostFromUrl(payload.repository.clone_url) ||
+    parseHostFromUrl(payload.repository.ssh_url) ||
+    "localhost";
+  const repositoryFullName = payload.repository.full_name;
+  if (!repositoryFullName || !payload.issue.number) {
+    return null;
+  }
+
+  const repositoryRef = `gitea:${repositoryHost}/${repositoryFullName}`;
+  const repositoryInfo = parseGiteaRepositoryRef(repositoryRef);
+  const settings = loadLocalGiteaSettings(repoRoot);
+
+  return createIssueComment(
+    settings,
+    repositoryInfo.owner,
+    repositoryInfo.repo,
+    payload.issue.number,
+    commentBody,
+    repositoryRef,
+  );
+}
+
+async function postIssueFeedbackSafely(repoRoot, payload, commentBody) {
+  try {
+    await tryPostIssueFeedback(repoRoot, payload, commentBody);
+  } catch {
+    // Feedback is best-effort; intake should still return its primary status.
+  }
 }
 
 function handleNormalizeFromFile(repoRoot, eventPath, autoStartSession) {
@@ -607,7 +771,7 @@ function startWebhookServer(repoRoot, options) {
       chunks.push(chunk);
     });
 
-    request.on("end", () => {
+    request.on("end", async () => {
       try {
         const rawText = Buffer.concat(chunks).toString("utf8");
         const payload = JSON.parse(rawText);
@@ -625,6 +789,9 @@ function startWebhookServer(repoRoot, options) {
         );
 
         if (normalizeResult.status !== "accepted") {
+          if (looksLikeAgentCommand(payload.comment && payload.comment.body)) {
+            await postIssueFeedbackSafely(repoRoot, payload, buildRejectionFeedback(normalizeResult));
+          }
           writeJsonResponse(response, 202, normalizeResult);
           return;
         }
@@ -634,6 +801,17 @@ function startWebhookServer(repoRoot, options) {
           sessionStartResult = startAgentSession(repoRoot, normalizeResult.taskRequestPath, {
             autoCreateProposal: true,
           });
+          if (
+            sessionStartResult &&
+            (sessionStartResult.status !== "completed" ||
+              sessionStartResult.runtime_handoff_status === "agent-execution-noop")
+          ) {
+            await postIssueFeedbackSafely(
+              repoRoot,
+              payload,
+              buildSessionFeedback(normalizeResult, sessionStartResult),
+            );
+          }
         }
 
         writeJsonResponse(

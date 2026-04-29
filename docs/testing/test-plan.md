@@ -3,7 +3,7 @@
 ## Document Metadata
 - Version: 0.1
 - Status: Active
-- Last Updated: 2026-04-24
+- Last Updated: 2026-04-29
 - Owner: Project Maintainer
 
 ## Purpose
@@ -38,6 +38,7 @@ This plan currently covers local validation of the Phase 1 closed loop for:
 - branch and PR proposal creation
 - CI verification linkage
 - review-follow-up and PR close/reopen synchronization
+- bounded issue-thread feedback for fail-closed intake, stale-forge proposal stops, and no-op agent results
 - explicit separation between platform self-test evidence and external target-repo service-evaluation evidence
 - the first docs-only and bounded-code external target fixture families used for internal-eval service evidence
 - the current P1 manual acceptance package that combines platform regression, provider-backed execution, and external-target checks in one ordered flow

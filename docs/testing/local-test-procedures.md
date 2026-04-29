@@ -201,6 +201,7 @@ npm run dev:gitea-repo -- ensure-local-repo --owner howard --repo agent-sdlc --s
 ```
 
 If proposal creation fails with a stale-forge preflight message, run the reseed command above and retry with a fresh session.
+For the live issue-comment path, the same failure should now also write a bounded status comment back into the issue thread so the operator is not left with a silent stop.
 
 3. Reuse the latest session from Procedure A, or create a fresh one, then create a PR:
 
@@ -228,6 +229,7 @@ What to observe:
 - `proposal_ref` and `proposal_url` are present in the traceability file
 - the PR body includes task request, session, source, execution profile, CI, and review status fields
 - if no human review exists yet, the review block remains in an awaiting state rather than failing silently
+- if proposal creation is blocked by stale local forge state, the issue thread should receive a visible remediation comment with the reseed command
 
 ## CLI Procedure D - Agent Execution Adapter Smoke
 Canonical case: `TC-004`
@@ -335,6 +337,8 @@ This is the operator-facing walkthrough for the current GUI live path.
 npm run dev:gitea-repo -- ensure-local-repo --owner howard --repo agent-sdlc --seed-from .
 ```
 
+5. If you changed tracked repo files since the last local-forge reseed, run the same reseed command before judging live proposal behavior.
+
 ### Part 2 - Create A Live Issue Comment Task
 1. In the repo UI, open the `Issues` tab.
 2. Create a new issue with a distinct title such as:
@@ -365,12 +369,14 @@ Expected behavior:
 - the issue comment produces a retained source event
 - a new task request is written
 - a session starts automatically for the auto-approved task class
+- if the request is rejected fail-closed, the issue thread should receive a bounded `agent-admin` feedback comment instead of appearing silent
 
 ### Part 3 - Observe Proposal And CI
 Current Phase 1 behavior:
 - the live issue comment auto-creates the task request
 - the live issue comment auto-starts the session
 - the strengthened listener path now auto-creates the proposal PR and root traceability file
+- if the live path stops at stale-forge preflight or at a no-op agent result, the issue thread should now receive a bounded status comment instead of silently stopping
 
 Then:
 1. In the repo UI, open the `Pull Requests` tab.

@@ -308,6 +308,17 @@ async function createPullRequest(settings, owner, repo, body, repositoryRef = nu
   });
 }
 
+async function createIssueComment(settings, owner, repo, index, body, repositoryRef = null) {
+  return requestJson(settings, {
+    method: "POST",
+    pathname: `api/v1/repos/${owner}/${repo}/issues/${index}/comments`,
+    baseUrl: getForgeBaseUrl(settings, repositoryRef),
+    body: {
+      body,
+    },
+  });
+}
+
 async function updatePullRequest(settings, owner, repo, index, body, repositoryRef = null) {
   return requestJson(settings, {
     method: "PATCH",
@@ -330,6 +341,7 @@ async function listPullReviews(settings, owner, repo, index, repositoryRef = nul
 
 module.exports = {
   buildRepositoryUrls,
+  createIssueComment,
   createPullRequest,
   createRepositoryForUser,
   createRepositoryHook,

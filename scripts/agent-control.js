@@ -278,6 +278,21 @@ async function main() {
 
     let proposalResult = null;
     if (autoCreateProposal) {
+      const completedWithNoEdits =
+        sessionRecord.agent_execution &&
+        sessionRecord.agent_execution.status === "completed" &&
+        Array.isArray(sessionRecord.agent_execution.changed_files) &&
+        sessionRecord.agent_execution.changed_files.length === 0;
+
+      if (completedWithNoEdits) {
+        sessionRecord.session_state = "completed";
+        sessionRecord.runtime_handoff_status = "agent-execution-noop";
+        sessionRecord.runtime_handoff_reason =
+          "Agent execution completed without producing repository file edits, so no proposal PR was created.";
+        sessionRecord.completed_at = utcNow();
+        sessionRecord.updated_at = sessionRecord.completed_at;
+        sessionRecordPath = persistSessionRecord(statePaths, sessionRecord);
+      } else {
       try {
         proposalResult = createProposal(repoRoot, sessionRecordPath);
         Object.assign(sessionRecord, readJson(sessionRecordPath));
@@ -304,6 +319,7 @@ async function main() {
         );
         process.exit(1);
       }
+      }
     }
 
     const output = {
@@ -317,6 +333,7 @@ async function main() {
         ? {
             status: sessionRecord.agent_execution.status,
             reason: sessionRecord.agent_execution.reason,
+            summary: sessionRecord.agent_execution.summary,
             changed_files: sessionRecord.agent_execution.changed_files,
             artifact_ref: sessionRecord.agent_execution.artifact_ref,
           }
