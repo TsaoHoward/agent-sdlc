@@ -48,7 +48,7 @@ It does not replace CI run history, forge issue or PR history, roadmap/WBS plann
 | TC-007 | External Target Bounded-Code Evaluation Baseline | Passed | External target evaluation | `docs/roadmap.md` Phase 1; WBS `3.10`, `3.11` | Move out at the next maintenance pass unless immediate follow-up is needed on bounded-code prompt quality | Move out after the first bounded-code external-target run is captured and written back into the canonical case note |
 | TC-008 | Phase 1 Manual Deliver Acceptance | Passed | Manual acceptance | `docs/phase1-deliverable.md`; `docs/roadmap.md` Phase 1; WBS `3.7`, `3.9`, `3.10`, `3.11` | Move out at the next maintenance pass unless a fresh P1 acceptance rerun or bounded-code follow-up keeps it active | Move out after the current acceptance window once the checklist no longer needs dashboard visibility |
 | TC-009 | Issue-Comment Feedback Coverage | Deferred | GUI live / webhook replay | `docs/roadmap.md` Phase 1; WBS `3.1`, `3.8`, `3.9` | Keep the rejection-feedback proof as current baseline evidence, and treat deterministic no-op repro as deferred UX hardening unless a new regression makes it active again | Move out after the remaining no-op coverage gap is either promoted back into active validation or intentionally parked beyond the current close window |
-| TC-010 | Large-File Documentation Update Guardrail | In Progress | GUI live / proposal diff review | `docs/roadmap.md` Phase 1; WBS `3.9` | Mitigate the current large-file docs truncation failure and capture one repeatable post-fix run proving the docs-safe path preserves untouched tail content or fails closed instead | Move out after the large-file docs-update regression is durably covered and no active tail-truncation risk remains |
+| TC-010 | Large-File Documentation Update Guardrail | Ready | GUI live / proposal diff review | `docs/roadmap.md` Phase 1; WBS `3.9` | Keep the deterministic local guardrail verification as current baseline, then run one live issue-comment rerun to capture normal workflow evidence for the new fail-closed behavior | Move out after the large-file docs-update regression is durably covered and no active tail-truncation risk remains |
 
 ## Test Items
 
@@ -154,12 +154,12 @@ It does not replace CI run history, forge issue or PR history, roadmap/WBS plann
 - Notes: This case is intentionally focused on user-visible feedback, not on proposal or CI correctness.
 
 ### TC-010 - Large-File Documentation Update Guardrail
-- Status: `In Progress`
+- Status: `Ready`
 - Mode: `GUI live / proposal diff review`
 - Related Docs / WBS: `docs/testing/items/TC-010-large-file-documentation-update-guardrail.md`; `docs/issues/items/I-006-large-file-documentation-truncation-risk.md`; WBS `3.9`
 - Why It Matters: A supported docs-safe task should not pass validation while deleting unseen tail content from a large markdown file.
-- Current State: Fresh live evidence from issue `#41` / comment `#193` -> task `trq-097cad6b8f77` -> session `ags-2736c300be71` -> PR `#42` -> commit `83acd236a04c1d59dbf109c964e389308b53a053` shows the current failure mode clearly. `README.md` is `11606` bytes, the execution config still caps `maxFileBytes` at `8000`, and the provider diff added a small weather note while deleting the unseen tail of the file.
-- Next Action: Implement the narrowest guardrail or contract hardening that prevents partial-context full-file rewrite, then rerun this case with durable evidence.
+- Current State: Fresh live evidence from issue `#41` / comment `#193` -> task `trq-097cad6b8f77` -> session `ags-2736c300be71` -> PR `#42` -> commit `83acd236a04c1d59dbf109c964e389308b53a053` showed the failure mode clearly. `README.md` is `11606` bytes, the execution config still caps `maxFileBytes` at `8000`, and the provider diff added a small weather note while deleting the unseen tail of the file. A narrow fail-closed guardrail has now landed, and a deterministic local stubbed verification on 2026-04-30 confirmed the execution path blocks truncated-context full-file rewrite before any file write occurs.
+- Next Action: Keep that deterministic verification as the current baseline, then rerun this case through the normal issue-comment workflow and capture the post-fix evidence.
 - Exit Path: Move out after a repeatable post-fix run proves that the large-file docs-update path preserves untouched content safely or fails closed before proposal creation.
 - Canonical Case: `docs/testing/items/TC-010-large-file-documentation-update-guardrail.md`
 - Escalation Check: Keep this case active whenever execution-contract changes can affect large-file prompt context, file rewrite mode, or docs-safe proposal quality.
@@ -189,3 +189,4 @@ It does not replace CI run history, forge issue or PR history, roadmap/WBS plann
 - 2026-04-29: Added `TC-009` to keep the new issue-thread rejection feedback covered and to track the still-needed deterministic no-op repro.
 - 2026-04-29: Reframed `TC-009` as deferred follow-up after applying the current Phase 1 close interpretation that deterministic no-op repro is a coverage gap rather than a baseline blocker.
 - 2026-04-29: Added `TC-010` after a fresh docs-safe run on `README.md` exposed a large-file truncation regression caused by partial context plus full-file rewrite response requirements.
+- 2026-04-30: Moved `TC-010` to ready after landing the fail-closed guardrail and verifying it through a deterministic local stubbed execution.

@@ -2,8 +2,8 @@
 
 ## Metadata
 - Test ID: TC-010
-- Status: In Progress
-- Last Updated: 2026-04-29
+- Status: Ready
+- Last Updated: 2026-04-30
 - Owner: Project Maintainer
 - Mode: GUI live / proposal diff review
 - Related Docs / WBS: `docs/issues/items/I-006-large-file-documentation-truncation-risk.md`; `config/agent-execution.template.yaml`; WBS `3.9`
@@ -46,6 +46,16 @@ Capture one repeatable post-fix run where:
 - the provider-backed docs update either preserves the untouched tail correctly or fails closed before proposal creation
 - the resulting proposal diff no longer shows destructive tail truncation
 
+## Current Post-Fix Baseline
+One deterministic local guardrail verification now exists:
+- date: 2026-04-30
+- mode: local stubbed `executeAgentSlice` run
+- setup: temporary repo with a large `README.md`, low `maxFileBytes`, and mocked provider response that tries to rewrite `README.md`
+- observed result: execution failed closed with the truncated-context guardrail message before any destructive file write
+
+This means the code-level mitigation is present.
+The remaining work is one live rerun through the normal issue-comment path to confirm the same safe behavior at the workflow surface.
+
 ## Evidence To Capture
 - task request JSON
 - session JSON
@@ -56,5 +66,10 @@ Capture one repeatable post-fix run where:
 ## Exit Rule
 This case can move to `Passed` once a repeatable post-fix run proves that the large-file docs-update path no longer truncates unseen content.
 
+This case can stay `Ready` after the code-level guardrail lands while waiting for:
+- one live rerun through the standard issue-comment flow
+- capture of the resulting fail-closed or preserved-content evidence in durable project records
+
 ## Change Log
 - 2026-04-29: Initial version after analyzing PR `#42` / commit `83acd236a04c1d59dbf109c964e389308b53a053` and turning the large-file truncation regression into a dedicated guardrail test item.
+- 2026-04-30: Recorded the first deterministic local guardrail verification and reframed the remaining step as a live workflow rerun.

@@ -2,8 +2,8 @@
 
 ## Metadata
 - Issue ID: I-006
-- Status: In Progress
-- Last Updated: 2026-04-29
+- Status: Ready For Review
+- Last Updated: 2026-04-30
 - Owner: Project Maintainer
 - Related Phase / WBS: `docs/roadmap.md` Phase 1; WBS `3.9`
 - Source Dashboard: `docs/issues/issue-dashboard.md`
@@ -64,6 +64,24 @@ Reasonable next-step options include:
 The safest narrow first fix is likely:
 - do not allow full-file rewrite of a context file that was marked `truncated: true`
 
+## Landed Narrow Fix
+The first narrow mitigation is now implemented in `scripts/lib/agent-execution.js`:
+- context files that exceed `maxFileBytes` are still marked `truncated: true`
+- if the provider then attempts to rewrite one of those same files, the execution path now fails closed before writing the edit
+- the failure message explicitly says the file exceeded the context-file limit and that full-file rewrite is refused for partial-context input
+
+This does not yet make large-file docs updates fully supported.
+It makes the failure safe and visible instead of destructive.
+
+## Verification
+The landed guardrail now has one local deterministic verification:
+- date: 2026-04-30
+- mode: local stubbed execution of `executeAgentSlice`
+- setup: temporary repo with a large `README.md`, `maxFileBytes: 100`, and a mocked provider response that tries to rewrite `README.md`
+- observed result: execution threw `Agent edit is blocked because README.md exceeded the context-file limit and was truncated before provider execution. Refusing full-file rewrite for partial-context input.`
+
+The remaining follow-up is a live rerun through the normal issue-comment path so the project can confirm the same behavior in proposal-facing workflow state.
+
 ## Boundaries
 This is an implementation and quality-hardening issue inside the existing WBS `3.9` execution boundary.
 
@@ -80,5 +98,9 @@ This issue can move out of the active dashboard once:
 - a regression test or canonical repro exists for the scenario
 - `docs/phase1-close-checklist.md`, `docs/wbs.md`, and `docs/testing/test-dashboard.md` all agree on the post-fix interpretation
 
+Near-term review target:
+- confirm whether the landed fail-closed guardrail is sufficient for Phase 1 close, or whether Phase 1 also requires a live rerun through the full issue-comment path before the blocker is considered cleared
+
 ## Change Log
 - 2026-04-29: Initial version after analyzing PR `#42` / commit `83acd236a04c1d59dbf109c964e389308b53a053` and identifying the `maxFileBytes` plus full-file-response contract as the likely root cause.
+- 2026-04-30: Recorded the landed fail-closed guardrail and the first deterministic local verification that blocked truncated-context full-file rewrite before file write.

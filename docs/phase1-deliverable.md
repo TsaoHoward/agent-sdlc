@@ -21,7 +21,7 @@ Use it when you need one durable place to answer:
 - Primary WBS: `docs/wbs.md` WBS `3.1` through `3.11`
 - Current service state: `Workbench` with fresh `Internal Eval` rerun evidence
 - Not yet in scope: Phase 2 rollout, pilot promotion gates, production posture
-- Current close-out note: the 2026-04-24 manual acceptance remains valid historical evidence, but final WBS `3.9` close-out is currently blocked by the 2026-04-29 large-file `documentation_update` truncation regression tracked under `I-006` / `TC-010`
+- Current close-out note: the 2026-04-24 manual acceptance remains valid historical evidence. The 2026-04-29 large-file `documentation_update` truncation regression is now mitigated by a fail-closed guardrail, but final WBS `3.9` close-out still awaits one live workflow rerun tracked under `I-006` / `TC-010`
 
 ## What Phase 1 Currently Delivers
 - one live trigger surface: `Gitea issue comment -> @agent run <token>`
@@ -91,7 +91,8 @@ Use it when you need one durable place to answer:
 ## Post-Acceptance Follow-Up
 - On 2026-04-29, issue `#41` / comment `#193` -> task `trq-097cad6b8f77` -> session `ags-2736c300be71` -> PR `#42` showed that a small `documentation_update` against `README.md` could delete the unseen tail of a large file.
 - The likely root cause is the current execution contract in `scripts/lib/agent-execution.js`: context files are truncated at `maxFileBytes: 8000`, but the provider response schema still requires complete file content.
-- This follow-up is now tracked under `I-006` and `TC-010`, and it currently blocks treating WBS `3.9` as fully closed.
+- A narrow fail-closed guardrail now blocks provider rewrite of any file whose supplied context was truncated, and a deterministic local stubbed verification has already confirmed that the guardrail stops the destructive rewrite before file write.
+- This follow-up remains tracked under `I-006` and `TC-010`, and WBS `3.9` still waits for one live rerun before it can be treated as fully closed.
 
 ## Manual Acceptance Package
 Use the following sequence when you want a step-by-step Phase 1 manual confirmation pass.
@@ -129,3 +130,4 @@ Use the following sequence when you want a step-by-step Phase 1 manual confirmat
 - 2026-04-29: Recorded the fresh `TC-008` manual walkthrough results, including the updated docs-versus-code comparison and acceptance conclusion from the 2026-04-24 rerun.
 - 2026-04-29: Linked the new Phase 1 close checklist as the durable close-out decision surface.
 - 2026-04-29: Added the post-acceptance note that the large-file docs-update truncation regression now blocks final WBS `3.9` close-out despite the earlier accepted manual evidence.
+- 2026-04-30: Updated the post-acceptance note after landing the fail-closed large-file guardrail and shifting the remaining close-out step to one live rerun.

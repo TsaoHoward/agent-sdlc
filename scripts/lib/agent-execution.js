@@ -124,6 +124,14 @@ function chooseContextFiles(workspaceDir, taskRequest, fileList, maxFileBytes) {
     });
 }
 
+function buildTruncatedContextPathSet(contextFiles) {
+  return new Set(
+    (Array.isArray(contextFiles) ? contextFiles : [])
+      .filter((entry) => entry && entry.truncated)
+      .map((entry) => normalizeWorkspacePath(entry.path)),
+  );
+}
+
 function truncateText(value, maxBytes) {
   const text = String(value || "");
   const buffer = Buffer.from(text, "utf8");
@@ -402,7 +410,13 @@ async function callDeepSeek({ config, apiKey, prompt }) {
   };
 }
 
-function applyProviderEdits({ workspaceDir, edits, maxChangedFiles, taskClass }) {
+function applyProviderEdits({
+  workspaceDir,
+  edits,
+  maxChangedFiles,
+  taskClass,
+  truncatedContextPaths = new Set(),
+}) {
   const normalizedEdits = Array.isArray(edits) ? edits : [];
   if (normalizedEdits.length > maxChangedFiles) {
     throw new Error(
@@ -415,6 +429,11 @@ function applyProviderEdits({ workspaceDir, edits, maxChangedFiles, taskClass })
     const relativePath = normalizeWorkspacePath(edit.path);
     if (!isPathAllowedForTaskClass(taskClass, relativePath)) {
       throw new Error(`Agent edit path is not allowed for task class ${taskClass}: ${relativePath}`);
+    }
+    if (truncatedContextPaths.has(relativePath)) {
+      throw new Error(
+        `Agent edit is blocked because ${relativePath} exceeded the context-file limit and was truncated before provider execution. Refusing full-file rewrite for partial-context input.`,
+      );
     }
     const targetPath = path.resolve(workspaceDir, relativePath);
     const workspaceRoot = path.resolve(workspaceDir);
@@ -527,6 +546,7 @@ async function executeAgentSlice({ repoRoot, taskRequest, sessionRecord, workspa
     fileList,
     Number(config.maxFileBytes),
   );
+  const truncatedContextPaths = buildTruncatedContextPathSet(contextFiles);
   const prompt = buildExecutionPrompt({
     taskRequest,
     sessionRecord,
@@ -540,6 +560,7 @@ async function executeAgentSlice({ repoRoot, taskRequest, sessionRecord, workspa
     edits: providerResult.parsed.edits,
     maxChangedFiles: Number(config.maxChangedFiles),
     taskClass: taskRequest.task_class,
+    truncatedContextPaths,
   });
   const validationCommands = runValidationCommands({
     workspaceDir,
