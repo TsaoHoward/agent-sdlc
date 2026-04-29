@@ -81,6 +81,27 @@ Concrete follow-up slices worth considering:
 2. a recurring UX review rubric inside `TC-008` or its successor acceptance flow
 3. an issue-management convention for classifying operator confusion separately from backend defects
 
+## DFD Output Mechanism
+The project should also add a concrete DFD output mechanism so lifecycle and UX failures are easier to see before they become support incidents.
+
+Why this matters:
+- current JSON evidence is useful for deep troubleshooting, but it is not an operator-friendly map of where a request stopped
+- the same class of "it looked silent" problem can recur if the project has records without a readable flow summary
+- a durable DFD output can turn troubleshooting from ad hoc file inspection into a repeatable diagnostic and review step
+
+Minimum expectations for the first slice:
+- produce a bounded view of the request path from issue comment through intake, session start, agent execution, proposal creation, CI, and issue-thread feedback
+- make stop points explicit, including rejection, blocked, failed, no-op, and proposal-created outcomes
+- be derivable from durable repo-owned evidence rather than chat memory
+- stay inside current architecture boundaries and avoid becoming a hidden orchestration authority
+
+Possible shapes to compare:
+1. a checked-in documentation artifact template that maintainers fill during acceptance or incident review
+2. a generated Markdown or JSON summary derived from task/session/traceability records
+3. a lightweight visual DFD export that is built from the same lifecycle evidence used in debugging
+
+The first slice should bias toward a low-risk reviewer-facing artifact rather than a new control-plane subsystem. If the project later promotes generated DFD output into a durable source of operational truth, that should go through the decision backlog and likely ADR review.
+
 ## Boundaries
 This follow-up should stay inside the current Phase 1 architecture boundaries:
 - task gateway remains the intake authority
@@ -100,6 +121,8 @@ After the current P1 packaging window, choose one narrow next slice:
 3. richer no-op explanation
 4. storage evolution evaluation for operational state
 5. unified UX discovery and acceptance coverage
+6. concrete DFD output generation for lifecycle and UX diagnostics
 
 ## Change Log
 - 2026-04-29: Initial version after landing the minimal bounded issue-thread feedback and no-op guardrail fix.
+- 2026-04-29: Added the need for a concrete DFD output mechanism so lifecycle and UX failures can be diagnosed from durable evidence rather than chat-only observation.

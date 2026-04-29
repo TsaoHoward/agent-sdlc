@@ -2,7 +2,7 @@
 
 ## Metadata
 - Test ID: TC-009
-- Status: In Progress
+- Status: Deferred
 - Last Updated: 2026-04-29
 - Owner: Project Maintainer
 - Mode: GUI live / webhook replay
@@ -55,6 +55,11 @@ notes: should reject
 ### Current Gap
 The no-op stop is now implemented in `agent-control`, but provider behavior on repeated prompts is not deterministic enough to treat one historical task as a stable canonical repro.
 
+Under the current Phase 1 close interpretation, this is treated as deferred coverage hardening rather than a close blocker because:
+- the zero-edit stop already exists in the live control flow
+- the issue-thread feedback path is already proven live through rejection coverage
+- the remaining gap is repeatable evidence quality, not missing baseline user-facing behavior
+
 ### Required Future Proof
 Capture one repeatable run where:
 - agent execution completes with zero repo file edits
@@ -70,5 +75,17 @@ Capture one repeatable run where:
 ## Exit Rule
 This case can move to `Passed` once both rejection feedback and no-op feedback have stable repeatable evidence.
 
+This case can stay `Deferred` during Phase 1 close as long as:
+- rejection feedback remains proven
+- no-op stopping remains implemented
+- the remaining repro gap is tracked as follow-up rather than forgotten
+
+## Follow-Up Trigger
+Promote this case back to active work if any of the following becomes true:
+- a regression causes the issue-thread feedback surface to disappear again
+- the project adopts a narrow no-op harness that makes deterministic repro practical
+- a new DFD or lifecycle-diagnostic output mechanism creates a concrete way to package repeatable no-op evidence
+
 ## Change Log
 - 2026-04-29: Initial version after validating the rejection-feedback replay path and recording the remaining deterministic no-op repro gap.
+- 2026-04-29: Reframed the remaining no-op repro gap as deferred coverage hardening under the current Phase 1 close interpretation.

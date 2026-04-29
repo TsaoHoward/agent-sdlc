@@ -14,6 +14,7 @@ Use it when you need one durable place to answer:
 - what is still explicitly out of scope
 - how to manually confirm the delivered behavior step by step
 - how the current docs-oriented and bounded-code evidence should be interpreted
+- how close-out should be judged without relying on chat-only memory
 
 ## Current Delivery Position
 - Related roadmap phase: `docs/roadmap.md` Phase 1
@@ -108,6 +109,7 @@ Use the following sequence when you want a step-by-step Phase 1 manual confirmat
 
 ## Related Documents
 - `README.md`
+- `docs/phase1-close-checklist.md`
 - `docs/user-capability-matrix.md`
 - `docs/testing/README.md`
 - `docs/testing/local-test-procedures.md`
@@ -118,3 +120,4 @@ Use the following sequence when you want a step-by-step Phase 1 manual confirmat
 ## Change Log
 - 2026-04-24: Initial version.
 - 2026-04-29: Recorded the fresh `TC-008` manual walkthrough results, including the updated docs-versus-code comparison and acceptance conclusion from the 2026-04-24 rerun.
+- 2026-04-29: Linked the new Phase 1 close checklist as the durable close-out decision surface.

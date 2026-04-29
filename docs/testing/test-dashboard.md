@@ -47,7 +47,7 @@ It does not replace CI run history, forge issue or PR history, roadmap/WBS plann
 | TC-006 | External Target Service-Evaluation Baseline | Passed | External target evaluation | ADR-0009; `docs/roadmap.md` Phase 1; WBS `3.10`, `3.11` | Move out at the next maintenance pass if no immediate follow-up remains beyond additional fixture expansion | Move out after the first external target-repo procedure is live and the current dashboard no longer needs to carry the baseline setup work |
 | TC-007 | External Target Bounded-Code Evaluation Baseline | Passed | External target evaluation | `docs/roadmap.md` Phase 1; WBS `3.10`, `3.11` | Move out at the next maintenance pass unless immediate follow-up is needed on bounded-code prompt quality | Move out after the first bounded-code external-target run is captured and written back into the canonical case note |
 | TC-008 | Phase 1 Manual Deliver Acceptance | Passed | Manual acceptance | `docs/phase1-deliverable.md`; `docs/roadmap.md` Phase 1; WBS `3.7`, `3.9`, `3.10`, `3.11` | Move out at the next maintenance pass unless a fresh P1 acceptance rerun or bounded-code follow-up keeps it active | Move out after the current acceptance window once the checklist no longer needs dashboard visibility |
-| TC-009 | Issue-Comment Feedback Coverage | In Progress | GUI live / webhook replay | `docs/roadmap.md` Phase 1; WBS `3.1`, `3.8`, `3.9` | Keep the new bounded issue-thread feedback path covered for malformed-command rejection now, then add a stable deterministic no-op repro before moving it out | Move out after both rejection and no-op feedback behaviors have stable repeatable coverage in the canonical case note |
+| TC-009 | Issue-Comment Feedback Coverage | Deferred | GUI live / webhook replay | `docs/roadmap.md` Phase 1; WBS `3.1`, `3.8`, `3.9` | Keep the rejection-feedback proof as current baseline evidence, and treat deterministic no-op repro as deferred UX hardening unless a new regression makes it active again | Move out after the remaining no-op coverage gap is either promoted back into active validation or intentionally parked beyond the current close window |
 
 ## Test Items
 
@@ -141,13 +141,13 @@ It does not replace CI run history, forge issue or PR history, roadmap/WBS plann
 - Notes: This is intentionally a composite case; it should link to existing procedures rather than duplicate every command in the dashboard.
 
 ### TC-009 - Issue-Comment Feedback Coverage
-- Status: `In Progress`
+- Status: `Deferred`
 - Mode: `GUI live / webhook replay`
 - Related Docs / WBS: `docs/testing/items/TC-009-issue-comment-feedback-coverage.md`; `docs/user-guide.zh-TW.md`; WBS `3.1`, `3.8`, `3.9`
 - Why It Matters: The live issue-comment path should not look silent when intake rejects a malformed request or when the bounded workflow stops before PR creation.
-- Current State: A fresh 2026-04-29 temporary-listener replay validated the new rejection-feedback path by posting a malformed `@agent run docs` payload against issue `#35`, which produced visible issue comment `#188` from `agent-admin` with the bounded rejection reason. The new zero-edit no-op stop is implemented in `agent-control`, but it still needs a stable deterministic repro because provider behavior on repeated prompts is not reliable enough to use one historical task as a canonical test by itself.
-- Next Action: Keep the rejection-feedback replay in the canonical note and add a stable no-op reproduction method before considering this coverage complete.
-- Exit Path: Move out after both rejection and no-op feedback behaviors have repeatable coverage and no active UX regression remains.
+- Current State: A fresh 2026-04-29 temporary-listener replay validated the new rejection-feedback path by posting a malformed `@agent run docs` payload against issue `#35`, which produced visible issue comment `#188` from `agent-admin` with the bounded rejection reason. The new zero-edit no-op stop is implemented in `agent-control`, but it still lacks a stable deterministic repro because provider behavior on repeated prompts is not reliable enough to use one historical task as a canonical test by itself. Under the current Phase 1 close interpretation, that remaining gap is treated as deferred UX hardening rather than a baseline blocker.
+- Next Action: Keep the rejection-feedback replay in the canonical note, and only promote deterministic no-op repro back into active work if the project chooses a narrow no-op test harness or a generated DFD/diagnostic artifact that makes the coverage practical.
+- Exit Path: Move out after the remaining no-op coverage gap is either promoted back into active validation with a concrete repro strategy or intentionally parked beyond the current close window.
 - Canonical Case: `docs/testing/items/TC-009-issue-comment-feedback-coverage.md`
 - Escalation Check: Open or update issue tracking when the live issue-thread feedback path disappears, duplicates excessively, or starts hiding important failure context again.
 - Notes: This case is intentionally focused on user-visible feedback, not on proposal or CI correctness.
@@ -174,3 +174,4 @@ It does not replace CI run history, forge issue or PR history, roadmap/WBS plann
 - 2026-04-24: Added `TC-008` as the delivery-oriented manual acceptance flow for the current P1 slice, linked to the new `docs/phase1-deliverable.md` comparison and acceptance packaging.
 - 2026-04-29: Marked `TC-008` passed after writing back the 2026-04-24 full manual walkthrough and refreshed `TC-006` / `TC-007` with new external-target rerun evidence.
 - 2026-04-29: Added `TC-009` to keep the new issue-thread rejection feedback covered and to track the still-needed deterministic no-op repro.
+- 2026-04-29: Reframed `TC-009` as deferred follow-up after applying the current Phase 1 close interpretation that deterministic no-op repro is a coverage gap rather than a baseline blocker.

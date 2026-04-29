@@ -1,9 +1,9 @@
 # Decision Backlog
 
 ## Document Metadata
-- Version: 0.5
+- Version: 0.6
 - Status: Active
-- Last Updated: 2026-04-24
+- Last Updated: 2026-04-29
 - Owner: Project Maintainer
 - Source Template: docs/templates/decision-backlog.template.md
 
@@ -35,9 +35,18 @@ It is not an ADR. It tracks active, narrowed, recently selected, and deferred ma
 ## Dashboard
 | Decision ID | Title | Status | Related Docs / WBS | Next Action |
 |---|---|---|---|---|
+| D-013 | Lifecycle DFD Output Mechanism | Open | `docs/roadmap.md` Phase 1 follow-up; WBS `3.1`, `3.8`, `3.9`; `docs/issues/items/I-005-issue-comment-failure-and-noop-ux-hardening.md` | Decide whether the first DFD output should be documentation-only, generated from runtime evidence, or both; keep it as follow-up unless Phase 1 close explicitly promotes it |
 | D-012 | Phase 1 Minimal Real Agent Execution Shape | Decided | `docs/roadmap.md` Phase 1; `docs/wbs.md` WBS `3.9` | Continue WBS `3.9` hardening from the validated DeepSeek path; move out at the next decision-maintenance pass if no new boundary decision appears |
 
 ## Decision Items
+### D-013 - Lifecycle DFD Output Mechanism
+- Status: `Open`
+- Related Docs / WBS: `docs/roadmap.md` Phase 1 follow-up; `docs/wbs.md` WBS `3.1`, `3.8`, `3.9`; `docs/issues/items/I-005-issue-comment-failure-and-noop-ux-hardening.md`; `docs/phase1-close-checklist.md`
+- Why It Matters: The project now has enough lifecycle evidence to debug failures, but not yet a durable operator-friendly flow artifact that makes rejection, blocked, failed, no-op, and proposal-created outcomes easy to inspect without chat reconstruction.
+- Current State: The repo retains source events, task requests, agent sessions, runtime artifacts, and traceability records under `.agent-sdlc/`, and the new bounded issue-thread feedback surface prevents the worst "silent failure" UX. That is useful evidence, but it does not yet provide a concrete DFD-style output mechanism that maintainers can use during acceptance, incident review, or UX hardening to see exactly where a request stopped.
+- Next Action: Decide whether the first slice should be a documentation-owned artifact, a generated summary derived from lifecycle evidence, or a hybrid. Prefer a reviewer-facing artifact first, keep architecture boundaries intact, and only promote to ADR if the chosen shape changes source-of-truth ownership, introduces a new operational authority, or materially changes cross-cutting governance.
+- Exit Path: Move this item out once the first DFD output mechanism is selected and either captured in existing docs/process surfaces or promoted to ADR-backed implementation work.
+
 ### D-012 - Phase 1 Minimal Real Agent Execution Shape
 - Status: `Decided`
 - Related Docs / WBS: `docs/roadmap.md` Phase 1; `docs/wbs.md` WBS `3.9`; `docs/architecture/agent-control-integration-plan.md`; `docs/architecture/runtime-isolation.md`
@@ -68,3 +77,4 @@ It is not an ADR. It tracks active, narrowed, recently selected, and deferred ma
 - 2026-04-23: Corrected local CI evidence for runs `#46`-`#49` after identifying stale forge seeding as the failure root cause; landed reseed plus proposal preflight mitigation with no new architecture-boundary decision discovered.
 - 2026-04-23: Recorded fresh post-fix provider revalidation success across all enabled tokens with runs `#51`-`#54`, plus provider JSON extraction hardening, with no new architecture-boundary decision discovered.
 - 2026-04-24: Promoted the platform/target repo separation and service-evaluation evidence model directly to ADR-0009 after selecting the direction to distinguish platform regression from external target-repo service evidence.
+- 2026-04-29: Added D-013 to track the need for a concrete lifecycle DFD output mechanism as a follow-up diagnostic and UX-discovery design decision.
