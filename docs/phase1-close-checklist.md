@@ -1,7 +1,7 @@
 # Phase 1 Close Checklist
 
 ## Document Metadata
-- Version: 0.2
+- Version: 0.3
 - Status: Active
 - Last Updated: 2026-04-29
 - Owner: Project Maintainer
@@ -41,7 +41,9 @@ Current open tracking surfaces:
 - `docs/wbs.md`: WBS `3` = `In Progress`
 - `docs/wbs.md`: WBS `3.9` = `In Progress`
 - `docs/issues/issue-dashboard.md`: `I-001` = `In Progress`
-- `docs/testing/test-dashboard.md`: `TC-009` = `In Progress`
+- `docs/issues/issue-dashboard.md`: `I-006` = `In Progress`
+- `docs/testing/test-dashboard.md`: `TC-009` = `Deferred`
+- `docs/testing/test-dashboard.md`: `TC-010` = `In Progress`
 
 ## Close Decision Rule
 Phase 1 can be closed for baseline purposes when:
@@ -59,6 +61,9 @@ As of 2026-04-29, the current close interpretation is:
 2. bounded-code hardening is not treated as a Phase 1 close blocker because the current Phase 1 claim is intentionally narrow: the bounded-code path is real, review-sensitive, and already evidenced, but not yet promoted as routine low-risk automation.
 3. richer UX hardening, operational-state storage evolution, and future observability improvements remain valid follow-up work, but should not keep WBS `3` / `3.9` open unless they are explicitly re-promoted into the close path.
 4. the project should still add a concrete DFD output mechanism as a follow-up design slice so future operator-visible failures are easier to diagnose and less likely to remain chat-only observations.
+
+This interpretation is still subject to newly discovered baseline regressions.
+On 2026-04-29, a fresh provider-driven `documentation_update` on `README.md` showed a deterministic large-file truncation risk: the execution prompt capped context-file content at `8000` bytes while still asking the provider to return complete file content, which led PR `#42` / commit `83acd236a04c1d59dbf109c964e389308b53a053` to delete the unseen tail of `README.md`. That specific regression is treated as a real close blocker until mitigated.
 
 ## Checklist
 
@@ -96,8 +101,9 @@ As of 2026-04-29, the current close interpretation is:
 ## Current Candidate Blockers
 As of 2026-04-29, the likely remaining close-out blockers are administrative close-out gaps rather than missing baseline capability:
 
-1. WBS `3` / `3.9`, `I-001`, and the linked testing/dashboard surfaces still need one explicit maintenance pass that applies this close interpretation consistently.
-2. `docs/phase1-deliverable.md`, `docs/wbs.md`, `docs/issues/issue-dashboard.md`, and `docs/testing/test-dashboard.md` must agree on what is closed, what is deferred, and what remains active follow-up.
+1. The current `documentation_update` path can truncate large files because provider context is capped at `maxFileBytes=8000` while the response schema still asks for complete file contents; this must be mitigated before WBS `3.9` can be treated as closed.
+2. WBS `3` / `3.9`, `I-001`, and the linked testing/dashboard surfaces still need one explicit maintenance pass that applies the current close interpretation consistently after the large-file regression is tracked.
+3. `docs/phase1-deliverable.md`, `docs/wbs.md`, `docs/issues/issue-dashboard.md`, and `docs/testing/test-dashboard.md` must agree on what is closed, what is deferred, and what remains active follow-up.
 
 ## Current Non-Blocker Follow-Up
 These should not block Phase 1 closure unless the maintainer explicitly re-promotes them:
@@ -112,10 +118,11 @@ These should not block Phase 1 closure unless the maintainer explicitly re-promo
 ## Near-Term Close Sequence
 Recommended order:
 1. write back the close interpretation to `TC-009`, `I-001`, and the linked dashboards
-2. update WBS `3.9` and `3`
-3. refresh `docs/phase1-deliverable.md` with the final close interpretation
-4. add the DFD output mechanism to durable issue/decision tracking as deferred follow-up
-5. move any no-longer-near-term active dashboard items out during the same maintenance pass
+2. track the new large-file `documentation_update` truncation regression in issue/testing surfaces and decide the minimum mitigation
+3. update WBS `3.9` and `3`
+4. refresh `docs/phase1-deliverable.md` with the final close interpretation
+5. add the DFD output mechanism to durable issue/decision tracking as deferred follow-up
+6. move any no-longer-near-term active dashboard items out during the same maintenance pass
 
 ## Open Close Questions
 - Which narrow design slice should own the first concrete DFD output mechanism: lifecycle review artifact generation, E2E evidence packaging, or operator-facing diagnostics?
@@ -135,3 +142,4 @@ Recommended order:
 ## Change Log
 - 2026-04-29: Initial version.
 - 2026-04-29: Recorded the current close interpretation that deterministic no-op coverage and bounded-code hardening are deferred follow-up rather than Phase 1 close blockers, and added the DFD output mechanism as a tracked follow-up need.
+- 2026-04-29: Recorded the newly discovered large-file documentation truncation regression as a real close blocker for WBS `3.9` until the execution contract is hardened.

@@ -21,6 +21,7 @@ Use it when you need one durable place to answer:
 - Primary WBS: `docs/wbs.md` WBS `3.1` through `3.11`
 - Current service state: `Workbench` with fresh `Internal Eval` rerun evidence
 - Not yet in scope: Phase 2 rollout, pilot promotion gates, production posture
+- Current close-out note: the 2026-04-24 manual acceptance remains valid historical evidence, but final WBS `3.9` close-out is currently blocked by the 2026-04-29 large-file `documentation_update` truncation regression tracked under `I-006` / `TC-010`
 
 ## What Phase 1 Currently Delivers
 - one live trigger surface: `Gitea issue comment -> @agent run <token>`
@@ -75,6 +76,7 @@ Use it when you need one durable place to answer:
 - `code` is a valid Phase 1 capability, but the fresh rerun still showed that small bounded-code tasks depend on both intake-discipline and behavior-sensitive edit quality.
 - The fresh fail-closed rejection on a `284`-character `summary:` is a useful P1 boundary signal, not merely operator error; command-contract compliance is part of the current service behavior.
 - For manual acceptance, `docs` should be used to prove external-target continuity first, then `code` should be run as the stricter gate that checks edit quality rather than only lifecycle continuity.
+- A fresh 2026-04-29 repo-local docs-safe run also revealed a separate contract-level risk: when a target markdown file exceeds the current `maxFileBytes` cap, the provider can receive only a partial file while still being asked to return complete content. That regression affects close-out judgment for WBS `3.9` even though the earlier 2026-04-24 acceptance evidence remains useful historical proof.
 
 ## Latest Manual Acceptance Outcome
 - Run date: 2026-04-24
@@ -85,6 +87,11 @@ Use it when you need one durable place to answer:
   - real-agent execution path passed
   - external docs target passed cleanly
   - external bounded-code target passed after one fail-closed retry on intake length
+
+## Post-Acceptance Follow-Up
+- On 2026-04-29, issue `#41` / comment `#193` -> task `trq-097cad6b8f77` -> session `ags-2736c300be71` -> PR `#42` showed that a small `documentation_update` against `README.md` could delete the unseen tail of a large file.
+- The likely root cause is the current execution contract in `scripts/lib/agent-execution.js`: context files are truncated at `maxFileBytes: 8000`, but the provider response schema still requires complete file content.
+- This follow-up is now tracked under `I-006` and `TC-010`, and it currently blocks treating WBS `3.9` as fully closed.
 
 ## Manual Acceptance Package
 Use the following sequence when you want a step-by-step Phase 1 manual confirmation pass.
@@ -121,3 +128,4 @@ Use the following sequence when you want a step-by-step Phase 1 manual confirmat
 - 2026-04-24: Initial version.
 - 2026-04-29: Recorded the fresh `TC-008` manual walkthrough results, including the updated docs-versus-code comparison and acceptance conclusion from the 2026-04-24 rerun.
 - 2026-04-29: Linked the new Phase 1 close checklist as the durable close-out decision surface.
+- 2026-04-29: Added the post-acceptance note that the large-file docs-update truncation regression now blocks final WBS `3.9` close-out despite the earlier accepted manual evidence.
