@@ -152,6 +152,10 @@ function buildTaskClassGuidance(taskClass) {
         "runtime or CI workflow changes",
         "policy or ADR changes unless explicitly requested by the task summary",
       ],
+      truncated_file_strategy: [
+        "if a context file is marked truncated, do not use full-file replace mode for that file",
+        "prefer insert_after, insert_before, append, or prepend using exact visible anchors",
+      ],
     };
   }
 
@@ -232,12 +236,16 @@ function buildExecutionPrompt({ taskRequest, sessionRecord, fileList, contextFil
         documentation_update: ["README.md", "docs/**"],
         ci_failure_investigation: ["docs/testing/**", "docs/examples/**"],
       },
+      supported_edit_modes: ["replace", "append", "prepend", "insert_after", "insert_before"],
       response_schema: {
         summary: "short human-readable summary",
         edits: [
           {
             path: "repo-relative path to write",
-            content: "complete UTF-8 file content",
+            mode: "replace | append | prepend | insert_after | insert_before",
+            anchor: "exact existing text to match for insert_after or insert_before",
+            content:
+              "complete UTF-8 file content for replace mode, or the exact text fragment to insert/append/prepend for non-replace modes",
           },
         ],
         validation_commands: ["optional exact command from allowed_validation_commands"],
@@ -427,10 +435,11 @@ function applyProviderEdits({
   const changedFiles = [];
   for (const edit of normalizedEdits) {
     const relativePath = normalizeWorkspacePath(edit.path);
+    const mode = normalizeEditMode(edit.mode);
     if (!isPathAllowedForTaskClass(taskClass, relativePath)) {
       throw new Error(`Agent edit path is not allowed for task class ${taskClass}: ${relativePath}`);
     }
-    if (truncatedContextPaths.has(relativePath)) {
+    if (truncatedContextPaths.has(relativePath) && mode === "replace") {
       throw new Error(
         `Agent edit is blocked because ${relativePath} exceeded the context-file limit and was truncated before provider execution. Refusing full-file rewrite for partial-context input.`,
       );
@@ -442,11 +451,82 @@ function applyProviderEdits({
     }
 
     fs.mkdirSync(path.dirname(targetPath), { recursive: true });
-    fs.writeFileSync(targetPath, `${String(edit.content || "").replace(/\r\n/g, "\n")}`, "utf8");
+    const currentContent = fs.existsSync(targetPath) ? fs.readFileSync(targetPath, "utf8") : "";
+    const nextContent = buildNextFileContent({
+      currentContent,
+      mode,
+      anchor: edit.anchor,
+      content: edit.content,
+      path: relativePath,
+    });
+    fs.writeFileSync(targetPath, nextContent, "utf8");
     changedFiles.push(relativePath);
   }
 
   return changedFiles;
+}
+
+function normalizeEditMode(candidate) {
+  const value = String(candidate || "replace").trim().toLowerCase();
+  const allowedModes = new Set(["replace", "append", "prepend", "insert_after", "insert_before"]);
+  if (!allowedModes.has(value)) {
+    throw new Error(`Unsupported agent edit mode: ${candidate}`);
+  }
+
+  return value;
+}
+
+function normalizeEditContent(value) {
+  return String(value || "").replace(/\r\n/gu, "\n");
+}
+
+function requireAnchor(mode, anchor, relativePath) {
+  const normalizedAnchor = String(anchor || "");
+  if (normalizedAnchor === "") {
+    throw new Error(`Agent edit mode ${mode} requires a non-empty anchor for ${relativePath}.`);
+  }
+
+  return normalizedAnchor;
+}
+
+function buildNextFileContent({ currentContent, mode, anchor, content, path: relativePath }) {
+  const normalizedCurrent = String(currentContent || "");
+  const normalizedContent = normalizeEditContent(content);
+
+  if (mode === "replace") {
+    return normalizedContent;
+  }
+
+  if (mode === "append") {
+    return `${normalizedCurrent}${normalizedContent}`;
+  }
+
+  if (mode === "prepend") {
+    return `${normalizedContent}${normalizedCurrent}`;
+  }
+
+  if (mode === "insert_after") {
+    const normalizedAnchor = requireAnchor(mode, anchor, relativePath);
+    const anchorIndex = normalizedCurrent.indexOf(normalizedAnchor);
+    if (anchorIndex === -1) {
+      throw new Error(`Agent edit anchor was not found for ${relativePath}.`);
+    }
+
+    const insertIndex = anchorIndex + normalizedAnchor.length;
+    return `${normalizedCurrent.slice(0, insertIndex)}${normalizedContent}${normalizedCurrent.slice(insertIndex)}`;
+  }
+
+  if (mode === "insert_before") {
+    const normalizedAnchor = requireAnchor(mode, anchor, relativePath);
+    const anchorIndex = normalizedCurrent.indexOf(normalizedAnchor);
+    if (anchorIndex === -1) {
+      throw new Error(`Agent edit anchor was not found for ${relativePath}.`);
+    }
+
+    return `${normalizedContent}${normalizedCurrent.slice(0, anchorIndex)}${normalizedCurrent.slice(anchorIndex)}`;
+  }
+
+  throw new Error(`Unhandled agent edit mode: ${mode}`);
 }
 
 function runValidationCommands({ workspaceDir, commands, allowedCommands, maxCommands }) {

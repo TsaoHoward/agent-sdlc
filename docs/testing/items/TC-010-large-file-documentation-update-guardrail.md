@@ -53,7 +53,11 @@ One deterministic local guardrail verification now exists:
 - setup: temporary repo with a large `README.md`, low `maxFileBytes`, and mocked provider response that tries to rewrite `README.md`
 - observed result: execution failed closed with the truncated-context guardrail message before any destructive file write
 
-This means the code-level mitigation is present.
+The same deterministic local validation also confirmed partial capability restoration:
+- mode: local stubbed `insert_after` edit on the same truncated `README.md`
+- observed result: the note was inserted successfully and the `## Tail` section remained intact
+
+This means the code-level mitigation is present and the safe fragment-edit path is now available.
 The remaining work is one live rerun through the normal issue-comment path to confirm the same safe behavior at the workflow surface.
 
 ## Evidence To Capture
@@ -69,7 +73,9 @@ This case can move to `Passed` once a repeatable post-fix run proves that the la
 This case can stay `Ready` after the code-level guardrail lands while waiting for:
 - one live rerun through the standard issue-comment flow
 - capture of the resulting fail-closed or preserved-content evidence in durable project records
+- confirmation that the live provider actually uses the new safe fragment-edit contract on a large-file docs request when appropriate
 
 ## Change Log
 - 2026-04-29: Initial version after analyzing PR `#42` / commit `83acd236a04c1d59dbf109c964e389308b53a053` and turning the large-file truncation regression into a dedicated guardrail test item.
 - 2026-04-30: Recorded the first deterministic local guardrail verification and reframed the remaining step as a live workflow rerun.
+- 2026-04-30: Added the deterministic local `insert_after` success proof showing that large-file docs updates are no longer limited to fail-closed behavior only.
