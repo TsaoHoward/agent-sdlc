@@ -3,7 +3,7 @@
 ## Document Metadata
 - Version: 0.1
 - Status: Active
-- Last Updated: 2026-04-29
+- Last Updated: 2026-04-30
 - Owner: Project Maintainer
 
 ## Purpose
@@ -21,7 +21,7 @@ Use it when you need one durable place to answer:
 - Primary WBS: `docs/wbs.md` WBS `3.1` through `3.11`
 - Current service state: `Workbench` with fresh `Internal Eval` rerun evidence
 - Not yet in scope: Phase 2 rollout, pilot promotion gates, production posture
-- Current close-out note: the 2026-04-24 manual acceptance remains valid historical evidence. The 2026-04-29 large-file `documentation_update` truncation regression is now mitigated by a fail-closed guardrail plus safe fragment-edit support, but final WBS `3.9` close-out still awaits one live workflow rerun tracked under `I-006` / `TC-010`
+- Current close-out note: the 2026-04-24 manual acceptance remains valid historical evidence, and the 2026-04-30 live rerun on issue `#41` / comment `#204` cleared the last large-file docs-update blocker for WBS `3.9`. Phase 1 is now closed for current baseline purposes, with richer UX/storage/DFD follow-up intentionally deferred.
 
 ## What Phase 1 Currently Delivers
 - one live trigger surface: `Gitea issue comment -> @agent run <token>`
@@ -55,6 +55,9 @@ Use it when you need one durable place to answer:
   - `docs`: `PR #30`
   - `review`: `PR #31`
   - `ci`: `PR #32`
+- large-file docs-safe rerun evidence is now also available:
+  - issue `#41` / comment `#204` -> task `trq-763eac216fe1` -> session `ags-716c62e3f62c` -> `PR #44` -> UI run `#71` (`success`)
+  - `README.md` changed with `2` additions and `0` deletions, clearing the earlier tail-truncation regression
 
 ### External Target Service Evaluation
 - docs-oriented fresh rerun: `eval/target-docs` issue `#5` / comment `#169` -> task `trq-530938b564d7` -> session `ags-cf7e0c1b0033` -> `PR #6` -> UI run `#3` (`success`)
@@ -76,7 +79,7 @@ Use it when you need one durable place to answer:
 - `code` is a valid Phase 1 capability, but the fresh rerun still showed that small bounded-code tasks depend on both intake-discipline and behavior-sensitive edit quality.
 - The fresh fail-closed rejection on a `284`-character `summary:` is a useful P1 boundary signal, not merely operator error; command-contract compliance is part of the current service behavior.
 - For manual acceptance, `docs` should be used to prove external-target continuity first, then `code` should be run as the stricter gate that checks edit quality rather than only lifecycle continuity.
-- A fresh 2026-04-29 repo-local docs-safe run also revealed a separate contract-level risk: when a target markdown file exceeds the current `maxFileBytes` cap, the provider can receive only a partial file while still being asked to return complete content. That regression affects close-out judgment for WBS `3.9` even though the earlier 2026-04-24 acceptance evidence remains useful historical proof.
+- A fresh 2026-04-29 repo-local docs-safe run revealed a contract-level truncation risk on large markdown files, but the landed fail-closed plus safe fragment-edit fix is now revalidated by the 2026-04-30 live rerun on `PR #44`.
 
 ## Latest Manual Acceptance Outcome
 - Run date: 2026-04-24
@@ -93,7 +96,7 @@ Use it when you need one durable place to answer:
 - The likely root cause is the current execution contract in `scripts/lib/agent-execution.js`: context files are truncated at `maxFileBytes: 8000`, but the provider response schema still requires complete file content.
 - A narrow fail-closed guardrail now blocks provider rewrite of any file whose supplied context was truncated, and safe fragment-edit modes now allow bounded updates such as `insert_after` without regenerating the whole file.
 - Deterministic local stubbed verification has already confirmed both that destructive replace is blocked and that a large truncated file can still be updated safely without losing its tail.
-- This follow-up remains tracked under `I-006` and `TC-010`, and WBS `3.9` still waits for one live rerun before it can be treated as fully closed.
+- That follow-up is now resolved for the current Phase 1 window: the live rerun on issue `#41` / comment `#204` produced `PR #44` with additions-only `README.md` diff plus CI run `#71` success, so WBS `3.9` can now be treated as closed.
 
 ## Manual Acceptance Package
 Use the following sequence when you want a step-by-step Phase 1 manual confirmation pass.
@@ -133,3 +136,4 @@ Use the following sequence when you want a step-by-step Phase 1 manual confirmat
 - 2026-04-29: Added the post-acceptance note that the large-file docs-update truncation regression now blocks final WBS `3.9` close-out despite the earlier accepted manual evidence.
 - 2026-04-30: Updated the post-acceptance note after landing the fail-closed large-file guardrail and shifting the remaining close-out step to one live rerun.
 - 2026-04-30: Expanded the post-acceptance note after adding safe fragment-edit support so large-file docs updates are no longer limited to fail-closed behavior only.
+- 2026-04-30: Recorded the successful live rerun on `PR #44` / run `#71` and marked the large-file docs-update blocker closed for current Phase 1 baseline purposes.

@@ -3,7 +3,7 @@
 ## Document Metadata
 - Version: 0.1
 - Status: Active
-- Last Updated: 2026-04-29
+- Last Updated: 2026-04-30
 - Owner: Project Maintainer
 
 ## Purpose
@@ -11,7 +11,7 @@ This document is the durable current-state matrix for what a user can ask the sy
 
 It is intentionally tied to:
 - the project vision in `docs/project-overview.md`
-- the active implementation packaging issue in `docs/issues/issue-dashboard.md`
+- the closed Phase 1 packaging note in `docs/issues/items/I-001-phase1-minimum-closed-loop-implementation.md`
 - the current Phase 1 plan in `docs/roadmap.md` and `docs/wbs.md`
 
 Use it when you need one place to answer:
@@ -25,7 +25,7 @@ If you want a shorter operator-facing explanation in Traditional Chinese, start 
 
 ## Linked Planning Context
 - Project vision: `docs/project-overview.md`
-- Active issue packaging: `docs/issues/issue-dashboard.md` item `I-001`
+- Phase 1 packaging note: `docs/issues/items/I-001-phase1-minimum-closed-loop-implementation.md`
 - Related roadmap phase: `docs/roadmap.md` Phase 1
 - Related WBS items: `docs/wbs.md` WBS `3.1`, `3.2`, `3.3`, `3.4`, `3.5`, `3.6`, `3.7`, `3.8`, `3.9`, `3.10`, `3.11`
 
@@ -46,7 +46,7 @@ Why:
 - the first external-target evidence set now exists on `eval/target-docs`, but that is still an `Internal Eval` proof point rather than enough evidence for `Pilot` or `Production`
 
 ## Current Service State
-- Overall current state: `Workbench` with the first real `Internal Eval` external-target evidence now captured
+- Overall current state: `Workbench` with the first real `Internal Eval` external-target evidence now captured and the Phase 1 baseline close window completed
 - Not yet justified from current evidence: `Pilot`, `Production`
 
 ## Project-Vision Link
@@ -154,3 +154,4 @@ When a change is substantial enough to alter the supported workflow shape, also 
 - 2026-04-24: Added the external-target fixture provisioning operator surface and recorded `eval/target-code-small` as the next bounded-code internal-eval baseline.
 - 2026-04-24: Recorded the first valid bounded-code external-target internal-eval evidence on `eval/target-code-small`, alongside two earlier failed retries that exposed behavior-sensitive bounded-code failure modes.
 - 2026-04-29: Linked the new concise Traditional Chinese guide as the lighter-weight entrypoint for current-state explanation.
+- 2026-04-30: Updated the packaging reference after moving `I-001` out of the active dashboard during final Phase 1 close-out.

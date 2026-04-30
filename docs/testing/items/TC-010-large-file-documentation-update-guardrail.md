@@ -2,7 +2,7 @@
 
 ## Metadata
 - Test ID: TC-010
-- Status: Ready
+- Status: Passed
 - Last Updated: 2026-04-30
 - Owner: Project Maintainer
 - Mode: GUI live / proposal diff review
@@ -58,7 +58,20 @@ The same deterministic local validation also confirmed partial capability restor
 - observed result: the note was inserted successfully and the `## Tail` section remained intact
 
 This means the code-level mitigation is present and the safe fragment-edit path is now available.
-The remaining work is one live rerun through the normal issue-comment path to confirm the same safe behavior at the workflow surface.
+
+That live rerun has now been captured through the normal issue-comment path:
+- issue `#41` / comment `#204`
+- task request `trq-763eac216fe1`
+- session `ags-716c62e3f62c`
+- PR `#44`
+- proposal head commit `50cc67782c085816f64e2d97e2aecb33af21c435`
+- CI run `#71` (`success`)
+
+Observed workflow result:
+- provider-backed execution completed successfully against large `README.md`
+- the resulting PR changed `README.md` with `2` additions and `0` deletions
+- the unseen tail stayed intact, so the truncation regression did not recur
+- traceability converged to `ci_status: success`, `review.status: ready-for-human-review`, and `proposal_body_sync_status: synced`
 
 ## Evidence To Capture
 - task request JSON
@@ -70,12 +83,10 @@ The remaining work is one live rerun through the normal issue-comment path to co
 ## Exit Rule
 This case can move to `Passed` once a repeatable post-fix run proves that the large-file docs-update path no longer truncates unseen content.
 
-This case can stay `Ready` after the code-level guardrail lands while waiting for:
-- one live rerun through the standard issue-comment flow
-- capture of the resulting fail-closed or preserved-content evidence in durable project records
-- confirmation that the live provider actually uses the new safe fragment-edit contract on a large-file docs request when appropriate
+This condition is now satisfied for the current Phase 1 close window.
 
 ## Change Log
 - 2026-04-29: Initial version after analyzing PR `#42` / commit `83acd236a04c1d59dbf109c964e389308b53a053` and turning the large-file truncation regression into a dedicated guardrail test item.
 - 2026-04-30: Recorded the first deterministic local guardrail verification and reframed the remaining step as a live workflow rerun.
 - 2026-04-30: Added the deterministic local `insert_after` success proof showing that large-file docs updates are no longer limited to fail-closed behavior only.
+- 2026-04-30: Recorded the live rerun on issue `#41` / comment `#204`, which produced `PR #44` with additions-only `README.md` diff and cleared the active regression case.

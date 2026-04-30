@@ -2,8 +2,8 @@
 
 ## Metadata
 - Issue ID: I-001
-- Status: In Progress
-- Last Updated: 2026-04-29
+- Status: Done
+- Last Updated: 2026-04-30
 - Owner: Project Maintainer
 - Related Docs / WBS: `docs/roadmap.md` Phase 1; `docs/wbs.md` WBS `3`, `3.1`, `3.2`, `3.3`, `3.4`, `3.5`, `3.6`, `3.7`, `3.8`, `3.9`
 - Source Dashboard: docs/issues/issue-dashboard.md
@@ -11,6 +11,8 @@
 
 ## Summary
 The project has completed its minimum closed-loop design baseline and now has the first executable Phase 1 slices for webhook intake, runtime handoff, proposal creation, PR-triggered CI verification, and explicit review-outcome synchronization. This note captures the remaining packaging gap so future runs can continue from the new review-linked traceability surface without rediscovering the same context.
+
+That remaining packaging gap is now closed for Phase 1 baseline purposes: the last active blocker was the large-file `documentation_update` truncation regression, and the post-fix live rerun on issue `#41` / comment `#204` confirmed `trq-763eac216fe1` -> `ags-716c62e3f62c` -> `PR #44` -> run `#71` with safe `README.md` additions only.
 
 ## Why It Matters
 The repository is intentionally still in an early-phase, structure-first posture. Without a durable packaging note, Phase 1 implementation can fragment into ad hoc coding or repeatedly restart from design review instead of moving through bounded implementation slices.

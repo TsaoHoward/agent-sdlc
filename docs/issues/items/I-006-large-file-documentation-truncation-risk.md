@@ -2,7 +2,7 @@
 
 ## Metadata
 - Issue ID: I-006
-- Status: Ready For Review
+- Status: Done
 - Last Updated: 2026-04-30
 - Owner: Project Maintainer
 - Related Phase / WBS: `docs/roadmap.md` Phase 1; WBS `3.9`
@@ -14,7 +14,7 @@ The current provider-backed `documentation_update` path can truncate large files
 
 That means a small intended docs edit can become a destructive whole-file rewrite that drops unseen tail content.
 
-The destructive path is now blocked, and a narrower safe fragment-edit path has been added for large-file docs updates, but the live workflow still needs one post-fix rerun before the issue can be considered cleared.
+The destructive path is now blocked, a narrower safe fragment-edit path has been added for large-file docs updates, and a live rerun has now confirmed the restored workflow behavior.
 
 ## Why This Exists
 The current agent execution contract combines two individually reasonable constraints into a risky pair:
@@ -92,7 +92,19 @@ The same local verification also confirmed restored partial capability:
 - mode: local stubbed `insert_after` edit on the same truncated `README.md`
 - observed result: the requested note was inserted successfully and the unseen tail content remained intact
 
-The remaining follow-up is a live rerun through the normal issue-comment path so the project can confirm the same safe fragment-edit behavior in proposal-facing workflow state.
+A live rerun through the normal issue-comment path has now confirmed the same safe behavior in proposal-facing workflow state:
+- issue `#41` / comment `#204`
+- task request `trq-763eac216fe1`
+- session `ags-716c62e3f62c`
+- PR `#44`
+- proposal head commit `50cc67782c085816f64e2d97e2aecb33af21c435`
+- CI run `#71` (`success`)
+
+Observed result:
+- provider-backed execution completed successfully against `README.md`
+- the resulting PR changed `README.md` with `2` additions and `0` deletions
+- the unseen tail was preserved, so the regression shape from PR `#42` did not recur
+- traceability converged to `ci_status: success`, `review.status: ready-for-human-review`, and `proposal_body_sync_status: synced`
 
 ## Boundaries
 This is an implementation and quality-hardening issue inside the existing WBS `3.9` execution boundary.
@@ -110,10 +122,12 @@ This issue can move out of the active dashboard once:
 - a regression test or canonical repro exists for the scenario
 - `docs/phase1-close-checklist.md`, `docs/wbs.md`, and `docs/testing/test-dashboard.md` all agree on the post-fix interpretation
 
-Near-term review target:
-- confirm whether the landed fragment-edit support plus fail-closed guardrail are sufficient for Phase 1 close, or whether Phase 1 also requires a live rerun through the full issue-comment path before the blocker is considered cleared
+Current disposition:
+- the landed fragment-edit support plus fail-closed guardrail are now treated as sufficient for Phase 1 close because the needed live rerun evidence has been captured
+- longer-term contract improvements such as targeted slice loading or richer patch semantics remain optional follow-up, not active blockers
 
 ## Change Log
 - 2026-04-29: Initial version after analyzing PR `#42` / commit `83acd236a04c1d59dbf109c964e389308b53a053` and identifying the `maxFileBytes` plus full-file-response contract as the likely root cause.
 - 2026-04-30: Recorded the landed fail-closed guardrail and the first deterministic local verification that blocked truncated-context full-file rewrite before file write.
 - 2026-04-30: Recorded the new safe fragment-edit modes and the deterministic local verification that `insert_after` can update a truncated large file without deleting its unseen tail.
+- 2026-04-30: Recorded the live rerun on issue `#41` / comment `#204`, which produced `PR #44` with `README.md` additions only and cleared the Phase 1 blocker.
