@@ -24,6 +24,7 @@ Changes that modify:
 - system boundaries
 - source-of-truth ownership
 - policy ownership
+- configuration template or local-config governance
 - runtime isolation assumptions
 - CI or deploy ownership
 - replaceability assumptions
@@ -31,12 +32,14 @@ Changes that modify:
 ## 2. Required Actions by Category
 ### Category A
 - update WBS status if applicable
+- update issue dashboard or supporting issue notes if active issue state changed
 - update implementation notes if such docs exist later
 
 ### Category B
 - update roadmap and/or WBS
 - explain the reason for the planning shift
 - ensure roadmap and WBS still map correctly
+- update issue dashboard when the planning shift creates, resolves, or reframes an active issue item
 - update the decision backlog when the planning shift introduces, resolves, or narrows a meaningful major decision item
 - remove or narrow any stale open-question entries that the planning shift resolved
 
@@ -44,6 +47,7 @@ Changes that modify:
 - write or update an ADR before implementation
 - update relevant architecture docs
 - update policies if governance changes
+- update issue dashboard or supporting issue notes when active issue state or exit paths change because of the governance decision
 - update the decision backlog to show promotion status and remaining detail decisions, if any
 - move the promoted item out of the active decision backlog once the durable ADR link exists
 - update any supporting notes, roadmap, or WBS entries that would otherwise still describe the selected direction as unresolved
@@ -54,6 +58,7 @@ Return to roadmap/WBS/ADR review when:
 - a task adds a new control-plane assumption
 - a task changes which layer owns a responsibility
 - a task weakens replaceability between layers
+- a task changes whether module configuration is committed, generated, ignored, or template-backed
 - a task changes who verifies or deploys
 
 ## 4. Silent Drift Is Not Allowed

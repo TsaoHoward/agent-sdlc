@@ -89,5 +89,6 @@ This initialization baseline is successful if it provides:
 - a stable architecture narrative
 - a maintainable roadmap and WBS
 - explicit governance rules
+- a durable user capability matrix that explains what users can trigger where and how that maps to the current workflow
 - reusable initialization prompt(s)
 - enough structure for future implementation work without forcing a premature design lock-in

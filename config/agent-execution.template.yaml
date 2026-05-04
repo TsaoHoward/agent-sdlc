@@ -1,0 +1,21 @@
+version: 1
+agentExecution:
+  enabled: false
+  backend: deepseek
+  mode: remote
+  baseUrl: https://api.deepseek.com
+  model: deepseek-chat
+  apiKey: ""
+  allowedTaskClasses:
+    - bounded_code_change
+    - documentation_update
+    - review_follow_up
+    - ci_failure_investigation
+  maxChangedFiles: 3
+  maxPromptBytes: 24000
+  maxFileBytes: 8000
+  maxFileListEntries: 120
+  maxValidationCommands: 1
+  allowedValidationCommands:
+    - "npm run validate:platform"
+    - npm run typecheck

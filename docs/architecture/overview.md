@@ -137,8 +137,9 @@ Deploy should remain separate from agent execution, especially in early phases.
 
 ## 3. Source of Truth Guidance
 ### Durable source of truth should live in:
-- forge/repo content for code and collaboration state
-- repository docs for architecture, roadmap, WBS, policy, and decisions
+- forge/repo content for code and collaboration state, including canonical issue, comment, PR, and review history
+- distinct target repositories when service quality is being evaluated beyond platform self-regression
+- repository docs for architecture, roadmap, WBS, policy, decisions, and curated issue-dashboard/supporting-note state used for cross-run planning and handoff
 - CI definitions for objective validation behavior
 
 ### Durable source of truth should not live only in:
@@ -161,6 +162,7 @@ The system should aim to preserve replaceability at these seams:
 - letting deployment become an accidental side effect of code generation
 - using prompts as the only durable workflow definition
 - binding architecture boundaries to a single vendor's product shape
+- treating the platform control repository as the only long-term evidence source for target-repo service quality
 
 ## 6. Near-Term Boundary Focus
 In early phases, the most important boundaries to defend are:
@@ -168,3 +170,4 @@ In early phases, the most important boundaries to defend are:
 - context/policy vs prompt-only behavior
 - agent runtime vs CI
 - CI vs deploy
+- platform control repo regression vs external target repo service evaluation

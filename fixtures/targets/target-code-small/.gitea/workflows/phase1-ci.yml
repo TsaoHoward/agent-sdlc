@@ -1,0 +1,63 @@
+name: target-code-small-ci
+
+on:
+  workflow_dispatch:
+  pull_request:
+    types:
+      - opened
+      - synchronize
+      - reopened
+
+jobs:
+  verify:
+    runs-on: ubuntu-22.04
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Setup Node
+        uses: actions/setup-node@v4
+        with:
+          node-version: "22"
+          cache: npm
+
+      - name: Install Dependencies
+        run: npm ci
+
+      - name: Collect Verification Metadata
+        run: node scripts/ci/collect-verification-metadata.js
+
+      - name: Attach CI Traceability
+        run: node scripts/ci/attach-ci-traceability.js
+
+      - name: Validate Target Code
+        id: validate_platform
+        run: npm run validate:platform
+        continue-on-error: true
+
+      - name: Typecheck Target Scripts And Source
+        id: typecheck
+        run: npm run typecheck
+        continue-on-error: true
+
+      - name: Finalize CI Traceability
+        if: always()
+        run: node scripts/ci/finalize-ci-traceability.js
+        env:
+          AGENT_SDLC_VALIDATE_PLATFORM_OUTCOME: ${{ steps.validate_platform.outcome }}
+          AGENT_SDLC_TYPECHECK_OUTCOME: ${{ steps.typecheck.outcome }}
+
+      - name: Sync Host Traceability
+        if: always()
+        run: node scripts/ci/sync-host-traceability.js
+        env:
+          AGENT_SDLC_HOST_TRACEABILITY_SYNC_URL: http://host.docker.internal:4011/hooks/internal/ci-traceability
+
+      - name: Upload Verification Metadata Artifact
+        if: always()
+        uses: actions/upload-artifact@v3
+        with:
+          name: verification-metadata
+          path: |
+            .agent-sdlc/ci/verification-metadata.json
+            .agent-sdlc/traceability/*.json

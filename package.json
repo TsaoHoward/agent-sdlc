@@ -1,0 +1,40 @@
+{
+  "name": "agent-sdlc",
+  "version": "0.1.0",
+  "private": true,
+  "description": "Agent-oriented SDLC platform baseline",
+  "type": "commonjs",
+  "engines": {
+    "node": ">=22"
+  },
+  "scripts": {
+    "dev:env:init": "node scripts/dev/ensure-gitea-bootstrap-config.js && powershell -File scripts/dev/manage-dev-environment.ps1 -Command init",
+    "dev:env:up": "node scripts/dev/ensure-gitea-bootstrap-config.js && powershell -File scripts/dev/manage-dev-environment.ps1 -Command up",
+    "dev:env:up:sqlite": "node scripts/dev/ensure-gitea-bootstrap-config.js && powershell -File scripts/dev/manage-dev-environment.ps1 -Command up -GiteaDatabaseMode sqlite",
+    "dev:env:up:no-gitea": "node scripts/dev/ensure-gitea-bootstrap-config.js && powershell -File scripts/dev/manage-dev-environment.ps1 -Command up -SkipGitea",
+    "dev:env:status": "powershell -File scripts/dev/manage-dev-environment.ps1 -Command status",
+    "dev:env:down": "powershell -File scripts/dev/manage-dev-environment.ps1 -Command down",
+    "task-gateway": "node scripts/task-gateway.js",
+    "task-gateway:example": "node scripts/task-gateway.js normalize-gitea-issue-comment --event docs/examples/gitea-issue-comment-event.example.json",
+    "task-gateway:webhook": "node scripts/task-gateway.js serve-configured-gitea-webhook",
+    "agent-control": "node scripts/agent-control.js",
+    "proposal-surface": "node scripts/proposal-surface.js",
+    "review-surface": "node scripts/review-surface.js",
+    "review-surface:webhook": "node scripts/review-surface.js serve-configured-gitea-review-webhook",
+    "dev:agent-execution-config": "node scripts/dev/ensure-agent-execution-config.js",
+    "dev:gitea-bootstrap-config": "node scripts/dev/ensure-gitea-bootstrap-config.js",
+    "dev:gitea-repo": "node scripts/dev/ensure-local-gitea-repo.js",
+    "eval:targets": "node scripts/dev/manage-external-target-repo.js list-targets",
+    "eval:target-docs:provision": "node scripts/dev/manage-external-target-repo.js provision-target --target target-docs",
+    "eval:target-docs:reset": "node scripts/dev/manage-external-target-repo.js reset-target --target target-docs",
+    "eval:target-code-small:provision": "node scripts/dev/manage-external-target-repo.js provision-target --target target-code-small",
+    "eval:target-code-small:reset": "node scripts/dev/manage-external-target-repo.js reset-target --target target-code-small",
+    "dev:gitea-runner": "node scripts/dev/ensure-local-gitea-runner.js",
+    "typecheck": "node ./node_modules/typescript/bin/tsc --noEmit",
+    "validate:platform": "node --check scripts/task-gateway.js && node --check scripts/agent-control.js && node --check scripts/proposal-surface.js && node --check scripts/review-surface.js && node --check scripts/ci/collect-verification-metadata.js && node --check scripts/ci/attach-ci-traceability.js && node --check scripts/ci/finalize-ci-traceability.js && node --check scripts/ci/sync-host-traceability.js && node --check scripts/ci/lib/proposal-context.js && node --check scripts/dev/ensure-agent-execution-config.js && node --check scripts/dev/ensure-gitea-bootstrap-config.js && node --check scripts/dev/ensure-local-gitea-repo.js && node --check scripts/dev/manage-external-target-repo.js && node --check scripts/dev/ensure-local-gitea-runner.js && node --check scripts/lib/agent-execution.js && node --check scripts/lib/simple-yaml.js && node --check scripts/lib/policy-loader.js && node --check scripts/lib/project-state.js && node --check scripts/lib/runtime-launcher.js && node --check scripts/lib/gitea-client.js && node --check scripts/lib/traceability.js"
+  },
+  "devDependencies": {
+    "@types/node": "^22.0.0",
+    "typescript": "^5.0.0"
+  }
+}

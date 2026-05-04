@@ -17,9 +17,12 @@ docs/architecture/overview.md
 docs/architecture/task-lifecycle.md
 docs/roadmap.md
 docs/wbs.md
+docs/issues/*.md
+docs/issues/items/*.md referenced by active dashboard items
 docs/decisions/*.md
 docs/policies/*.md
 
 Keep forge, task gateway, policy, agent control, runtime, CI, and deploy clearly separated.
 Do not put durable policy only in prompts.
 Do not let CI or deploy collapse into the agent layer.
+Update docs/issues/issue-dashboard.md when active project issue state would otherwise live only in chat.

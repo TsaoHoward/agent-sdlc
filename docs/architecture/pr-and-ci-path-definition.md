@@ -45,6 +45,7 @@ The PR body should show at least:
 - selected execution profile
 
 The linked metadata artifact may carry fuller machine-readable fields, including CI linkage.
+When CI starts and finishes, the proposal path may refresh the reviewer-facing traceability block so the PR surface shows the current CI run and whether the proposal is ready for human review.
 
 ### 5.1 Concrete Proposal Conventions
 The first proposal path should use these conventions:
@@ -74,8 +75,11 @@ The smallest sufficient Phase 1 CI policy is:
 
 ### Runtime / Proposal Logic
 - prepare branch content
+- source proposal content from the forge target repository and target branch rather than an arbitrary local workspace snapshot
 - create or update the proposal branch
 - surface the PR with summary and traceability block
+
+For the default local seeded-forge workflow, maintainers must also keep local forge `main` aligned with the workspace commit under test before creating fresh proposal branches. See `docs/policies/branch-and-local-forge-sync.md`.
 
 ### CI
 - run objective verification

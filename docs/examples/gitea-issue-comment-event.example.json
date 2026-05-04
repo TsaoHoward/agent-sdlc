@@ -1,0 +1,33 @@
+{
+  "eventType": "issue_comment",
+  "delivery": "example-delivery-001",
+  "headers": {
+    "x-gitea-event": "issue_comment",
+    "x-gitea-delivery": "example-delivery-001"
+  },
+  "payload": {
+    "action": "created",
+    "repository": {
+      "id": 1,
+      "full_name": "howard/agent-sdlc",
+      "default_branch": "main",
+      "html_url": "http://localhost:43000/howard/agent-sdlc"
+    },
+    "issue": {
+      "id": 12,
+      "number": 12,
+      "title": "Bootstrap the first closed loop"
+    },
+    "comment": {
+      "id": 34,
+      "body": "@agent run code\nsummary: scaffold task intake normalization and session records",
+      "html_url": "http://localhost:43000/howard/agent-sdlc/issues/12#issuecomment-34",
+      "created_at": "2026-04-15T15:00:00Z"
+    },
+    "sender": {
+      "id": 1,
+      "login": "howard",
+      "username": "howard"
+    }
+  }
+}

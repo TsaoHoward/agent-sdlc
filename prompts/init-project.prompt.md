@@ -20,8 +20,10 @@ Before doing anything substantial, read in this order:
 12. `docs/architecture/lifecycle-traceability-contract.md`
 13. `docs/roadmap.md`
 14. `docs/wbs.md`
-15. `docs/decisions/*.md`
-16. `docs/policies/*.md`
+15. `docs/issues/*.md`
+16. `docs/issues/items/*.md` referenced by active dashboard items
+17. `docs/decisions/*.md`
+18. `docs/policies/*.md`
 
 ## Your Immediate Goal
 Strengthen or initialize the repository baseline for an **agent-oriented SDLC system** whose target experience is:
@@ -62,6 +64,8 @@ Use this order when reporting back:
 ## Document Maintenance Rules
 - `docs/roadmap.md` must follow `docs/templates/roadmap.template.md`.
 - `docs/wbs.md` must follow `docs/templates/wbs.template.md`.
+- `docs/issues/issue-dashboard.md` must follow `docs/templates/issue-dashboard.template.md`.
+- supporting issue notes under `docs/issues/items/` should follow `docs/templates/issue-note.template.md` when created.
 - `docs/decisions/decision-backlog.md` must follow `docs/templates/decision-backlog.template.md`.
 - If template changes are required, update the template first, then update the generated document.
 - If an architecture-level change is needed, create or update an ADR before implementing it.
@@ -84,3 +88,4 @@ This initialization run should avoid:
 Scan the repository state, identify the current gap between the repo and the intended baseline, then update the smallest set of files needed to make the project more maintainable and less likely to drift.
 
 When you encounter a meaningful pending decision, update `docs/decisions/decision-backlog.md` rather than leaving the decision context only in chat.
+When you encounter a meaningful active project issue, update `docs/issues/issue-dashboard.md` rather than leaving the issue state only in chat.

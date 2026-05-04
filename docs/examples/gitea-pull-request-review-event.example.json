@@ -1,0 +1,39 @@
+{
+  "eventType": "pull_request_review",
+  "delivery": "example-delivery-review-001",
+  "headers": {
+    "x-gitea-event": "pull_request_review",
+    "x-gitea-delivery": "example-delivery-review-001"
+  },
+  "payload": {
+    "action": "submitted",
+    "repository": {
+      "id": 1,
+      "full_name": "howard/agent-sdlc",
+      "default_branch": "main",
+      "html_url": "http://localhost:43000/howard/agent-sdlc"
+    },
+    "pull_request": {
+      "id": 5,
+      "number": 5,
+      "title": "agent: validate opened PR CI traceability finalize (#43)",
+      "html_url": "http://localhost:43000/howard/agent-sdlc/pulls/5"
+    },
+    "review": {
+      "id": 1,
+      "state": "APPROVED",
+      "body": "Phase 1 review outcome sync validation",
+      "submitted_at": "2026-04-20T13:20:00Z",
+      "user": {
+        "id": 1,
+        "login": "howard",
+        "username": "howard"
+      }
+    },
+    "sender": {
+      "id": 1,
+      "login": "howard",
+      "username": "howard"
+    }
+  }
+}

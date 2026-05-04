@@ -1,9 +1,9 @@
 # Decision Archive
 
 ## Document Metadata
-- Version: 0.2
+- Version: 0.4
 - Status: Active
-- Last Updated: 2026-04-14
+- Last Updated: 2026-04-24
 - Owner: Project Maintainer
 
 ## Purpose
@@ -26,7 +26,15 @@ This is not a substitute for ADRs. It is only the move-out surface for items tha
 | D-003 | Agent Control Integration Plan | Closed | `docs/architecture/agent-control-integration-plan.md` | 2026-04-14 | Phase 1 starter boundary, record path, and failure taxonomy were made concrete in the control-plane design. |
 | D-004 | PR And CI Path Definition | Closed | `docs/architecture/pr-and-ci-path-definition.md` | 2026-04-14 | PR conventions, CI trigger timing, and metadata artifact location were operationalized in the design docs. |
 | D-006 | Traceability Display Strategy | Closed | `docs/architecture/lifecycle-traceability-contract.md` | 2026-04-14 | Reviewer-facing traceability block, metadata path, and retention defaults were written into the lifecycle contract. |
+| D-009 | Issue Document Workflow | Promoted To ADR | `ADR-0005` | 2026-04-15 | Added a durable issue dashboard, archive, and supporting-note workflow without replacing forge issue ownership. |
+| D-010 | Platform Implementation Stack And Packaging Baseline | Promoted To ADR | `ADR-0006` | 2026-04-15 | Selected TypeScript/Node.js plus npm as the platform core, kept docs/config multi-format by design, and set Dockerfile plus later compose packaging as the self-hosted path. |
+| D-011 | Testing Workflow As Durable Collaboration Surface | Promoted To ADR | `ADR-0007` | 2026-04-21 | Added a durable local testing plan, framework, dashboard, archive, and canonical case workflow without replacing CI or forge history. |
+| D-013 | Platform / Target Repo Separation And Service-Evaluation Evidence Model | Promoted To ADR | `ADR-0009` | 2026-04-24 | Directly promoted after selecting the rule that self-targeted platform runs remain valid for regression but cannot by themselves justify broader service-quality claims. |
 
 ## Change Log
 - 2026-04-14: Initial version.
 - 2026-04-14: Archived D-002, D-003, D-004, and D-006 after their selected defaults were synchronized into the architecture and planning docs.
+- 2026-04-15: Archived D-009 after promoting the issue-document workflow choice to ADR-0005.
+- 2026-04-15: Archived D-010 after promoting the platform implementation stack and packaging baseline to ADR-0006.
+- 2026-04-21: Archived D-011 after promoting the testing workflow choice to ADR-0007.
+- 2026-04-24: Archived D-013 after promoting the platform/target repo separation and service-evaluation evidence model to ADR-0009.

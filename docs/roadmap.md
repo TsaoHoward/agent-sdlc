@@ -3,7 +3,7 @@
 ## Document Metadata
 - Version: 0.1
 - Status: Draft
-- Last Updated: 2026-04-14
+- Last Updated: 2026-04-24
 - Owner: Project Maintainer
 - Source Template: docs/templates/roadmap.template.md
 
@@ -12,6 +12,10 @@
 - This roadmap must be consistent with `docs/architecture/overview.md`.
 - Each phase should map to one or more WBS sections in `docs/wbs.md`.
 - Assumptions and open questions must remain explicit.
+
+## Environment Requirements First
+This roadmap follows the environment capability requirements defined in `docs/environment-requirements.md`.
+Phase planning is sequenced from those requirements: define the environment baseline first, then schedule Phase 0 and Phase 1 against that baseline.
 
 ## Scope Summary
 ### Goals
@@ -35,13 +39,22 @@
 - The first PR path creates the branch and PR immediately.
 - The first traceability display uses a PR body summary plus linked metadata artifact.
 - The first traceability and session records use file-backed JSON records under `.agent-sdlc/`.
+- The platform's core control-plane implementation converges toward `TypeScript` on `Node.js LTS` with `npm` as the package surface.
+- Repo-owned Dockerfiles should define the control-plane and worker packaging baseline before the project consolidates into a repo-owned `docker compose` package.
 - CI remains independent and outside the agent control plane.
 - Human review remains a required merge control point.
+- the platform control repository and external target repositories should be treated as distinct concerns for service-quality evidence once the bootstrap closed loop is proven
+- self-targeted local runs against the platform repo count as platform regression evidence, not as sufficient pilot or production evidence by themselves
+- service-state labeling should distinguish at least `Workbench`, `Internal Eval`, `Pilot`, and `Production`
 
 ### Key Constraints
 - Avoid premature lock-in to a single tool.
 - Keep planning documents stable enough for future agent runs.
 - Separate architecture, policy, planning, and implementation concerns.
+
+## Environment Requirements First
+This roadmap is grounded on the environment capability requirements defined in `docs/environment-requirements.md`.
+Phase planning should follow those requirements: define what the environment must provide first, then schedule phases against that baseline.
 
 ---
 
@@ -54,6 +67,7 @@ Create durable planning, architecture, and operating documents that can guide fu
 - architecture boundaries
 - roadmap/WBS format
 - initial ADRs and policy docs
+- issue dashboard, archive, and supporting-note workflow
 - early execution profiles and traceability conventions
 - initialization prompt(s)
 
@@ -65,7 +79,9 @@ Create durable planning, architecture, and operating documents that can guide fu
 - architecture overview, context, and task lifecycle docs
 - roadmap and WBS
 - initial ADRs
+- issue dashboard, issue archive, and issue-note template
 - intake and change-control policies
+- issue-management policy
 - documented execution profiles and lifecycle traceability guidance
 - initialization prompt
 
@@ -79,6 +95,7 @@ Create durable planning, architecture, and operating documents that can guide fu
 - architecture boundaries are documented
 - shared environment requirements are tracked in one durable document
 - minimum execution profiles and lifecycle identifiers are documented in durable repo docs
+- active near-term project issues can be tracked durably with explicit exit paths and supporting notes when needed
 - future agents can bootstrap from repository docs instead of conversation memory alone
 
 ### Dependencies
@@ -105,18 +122,26 @@ Implement the smallest working path from task trigger to independently verified 
 - one traceability contract across lifecycle handoffs
 - one agent control integration
 - one isolated execution runtime
+- one minimal real agent execution path for one supported task class
 - one PR creation flow
 - one CI verification flow
 - one human review point
+- one durable user capability matrix linked to the implemented workflow
+- one initial distinction between platform self-test and external target-repo service evaluation
 
 ### Deliverables
 - task intake adapter
 - normalized task request model with stable identifiers and policy references
 - agent session starter
 - isolated worker runtime scaffold
+- minimal real agent execution adapter for one supported task class
 - branch/PR proposal path
 - CI workflow skeleton
+- repeatable local testing workflow with canonical CLI and GUI cases plus a durable testing dashboard
+- user capability matrix and current workflow map linked to the implemented Phase 1 surfaces
 - traceable task lifecycle contract and minimal logging
+- external target-repo evaluation baseline for at least one non-platform repo path
+- service-state and evaluation-evidence policy that distinguishes workbench regression from broader service-quality claims
 
 ### Entry Criteria
 - Phase 0 baseline completed
@@ -125,8 +150,13 @@ Implement the smallest working path from task trigger to independently verified 
 
 ### Exit Criteria
 - a supported task trigger can produce a bounded agent-run change proposal
+- at least one supported task class produces repository changes through a real bounded agent execution path rather than only generic workspace/proposal scaffolding
 - CI validates the proposed change independently
 - human review remains the merge gate
+- maintainers can execute documented local CLI and GUI validation procedures and capture the resulting evidence without relying on transient chat context
+- maintainers and users can recover where `@agent` is supported, what each supported task token currently means, and which parts of the lifecycle are automated from a durable repo document
+- maintainers can distinguish platform self-test evidence from service-evaluation evidence in durable docs
+- at least one external target-repo path exists so the project is not relying only on self-targeted platform runs when judging service behavior
 
 ### Dependencies
 - task model definition
@@ -159,6 +189,7 @@ Add breadth without collapsing system boundaries.
 - stronger repository conventions
 - better error handling and retry behavior
 - initial governance tooling
+- staging and pilot promotion gates for selected task classes and target repos
 
 ### Deliverables
 - more adapters
@@ -166,6 +197,7 @@ Add breadth without collapsing system boundaries.
 - lifecycle visibility and audit trail improvements
 - reusable task templates
 - failure classification and handling rules
+- staged rollout rules that control how workflows move from internal evaluation into pilot use
 
 ### Entry Criteria
 - Phase 1 closed loop is stable enough to demonstrate repeated use
@@ -175,6 +207,7 @@ Add breadth without collapsing system boundaries.
 - system supports more than one intake pattern or more than one supported work profile
 - governance and failure handling are explicit
 - replaceability assumptions remain intact
+- pilot-readiness claims rely on explicit promotion evidence rather than on workbench-only smoke success
 
 ### Dependencies
 - stable task request contract
@@ -250,3 +283,9 @@ This phase should only proceed when prior boundaries are understood and defended
 - 2026-04-14: Documented first-target assumptions for Gitea, policy representation, and runtime isolation.
 - 2026-04-14: Recorded selected Phase 1 directions for trigger path, policy layout, agent control, PR path, runtime egress, and traceability display.
 - 2026-04-14: Synchronized selected Phase 1 detail defaults for command parsing, policy file schema, session record storage, and PR traceability conventions.
+- 2026-04-15: Added a durable issue dashboard, archive, and supporting-note workflow to the Phase 0 baseline.
+- 2026-04-15: Recorded the platform implementation-stack baseline for TypeScript/Node.js, npm, repo-owned Dockerfiles, and later compose packaging.
+- 2026-04-21: Expanded the Phase 1 deliverables and exit criteria to include a durable local testing workflow with canonical cases and active dashboard tracking.
+- 2026-04-22: Expanded the Phase 1 workflow packaging to include a durable user capability matrix linked to the live `@agent` entrypoints and current lifecycle coverage.
+- 2026-04-22: Clarified that Phase 1 is not complete until one supported task class reaches a minimal real agent execution path inside the bounded runtime.
+- 2026-04-24: Added the Phase 1 requirement to distinguish platform self-test from external target-repo service evaluation, plus the service-state/evidence baseline needed before later pilot claims.

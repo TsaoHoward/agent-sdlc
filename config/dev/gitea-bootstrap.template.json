@@ -1,0 +1,90 @@
+{
+  "dockerDesktop": {
+    "path": "C:\\Program Files\\Docker\\Docker\\Docker Desktop.exe",
+    "startupTimeoutSeconds": 90
+  },
+  "ports": {
+    "bindAddress": "127.0.0.1",
+    "giteaHttpHost": 43000,
+    "giteaSshHost": 42222,
+    "postgresHost": 45432
+  },
+  "gitea": {
+    "image": "docker.gitea.com/gitea:latest-rootless",
+    "databaseMode": "postgres",
+    "hostName": "localhost",
+    "rootUrl": "http://localhost:43000/",
+    "webhook": {
+      "allowedHostList": "external,private"
+    },
+    "appName": "Agent SDLC Dev Forge",
+    "installLock": true,
+    "disableRegistration": true,
+    "requireSignInView": false,
+    "enableActions": true,
+    "defaultBranch": "main",
+    "userUid": 1000,
+    "userGid": 1000,
+    "admin": {
+      "username": "agent-admin",
+      "passwordEnv": "AGENT_SDLC_GITEA_PASSWORD",
+      "password": "",
+      "email": "agent-admin@example.local",
+      "mustChangePassword": false
+    }
+  },
+  "localRepo": {
+    "ensureOnBootstrap": true,
+    "owner": "howard",
+    "repo": "agent-sdlc",
+    "seedFrom": "."
+  },
+  "controlHost": {
+    "callbackScheme": "http",
+    "callbackHost": "host.docker.internal",
+    "issueCommentWebhook": {
+      "enabled": true,
+      "host": "0.0.0.0",
+      "port": 4010,
+      "route": "/hooks/gitea/issue-comment",
+      "events": [
+        "issue_comment"
+      ],
+      "contentType": "json",
+      "autoStartSession": true
+    },
+    "reviewWebhook": {
+      "enabled": true,
+      "host": "0.0.0.0",
+      "port": 4011,
+      "route": "/hooks/gitea/pull-request-review",
+      "events": [
+        "pull_request_review",
+        "pull_request"
+      ],
+      "contentType": "json"
+    }
+  },
+  "giteaActionsRunner": {
+    "giteaContainer": "agent-sdlc-gitea",
+    "container": "agent-sdlc-gitea-runner",
+    "image": "docker.io/gitea/act_runner:latest",
+    "name": "agent-sdlc-local-runner",
+    "labels": "ubuntu-22.04:docker://node:22-bookworm-slim,ubuntu-latest:docker://node:22-bookworm-slim",
+    "network": "agent-sdlc-gitea-network",
+    "containerNetwork": "",
+    "jobNetwork": "",
+    "dockerInternalInstanceUrl": "http://agent-sdlc-gitea:3000/"
+  },
+  "workerRuntime": {
+    "image": "agent-sdlc-worker-runtime:test",
+    "loopbackGiteaHost": "host.docker.internal"
+  },
+  "postgres": {
+    "image": "postgres:16",
+    "database": "gitea",
+    "user": "gitea",
+    "passwordEnv": "AGENT_SDLC_GITEA_POSTGRES_PASSWORD",
+    "password": ""
+  }
+}

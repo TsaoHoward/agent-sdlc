@@ -1,0 +1,137 @@
+# Test Plan
+
+## Document Metadata
+- Version: 0.1
+- Status: Active
+- Last Updated: 2026-04-29
+- Owner: Project Maintainer
+
+## Purpose
+This document defines the stable local testing scope for the Phase 1 closed-loop implementation.
+
+It answers:
+- what must be tested locally
+- which execution modes matter
+- which default local data and credentials the operator should expect
+- what counts as a useful validation pass
+
+Use `docs/testing/README.md` as the navigation entrypoint for this workflow.
+
+## Goals
+- give maintainers one stable local test plan for the current Phase 1 closed loop
+- make CLI replay, half-live, and full-live validation paths explicit
+- keep test scope aligned to the current roadmap and WBS
+- support repeatable manual observation of intake, runtime, proposal, CI, and review behavior
+- support a delivery-oriented manual acceptance pass for the current P1 slice
+
+## Non-Goals
+- replacing CI as the independent verifier
+- defining a production-grade automated test platform in Phase 1
+- mirroring every individual workflow run or shell session in repository docs
+
+## Scope
+This plan currently covers local validation of the Phase 1 closed loop for:
+- issue-comment intake
+- task normalization and session start
+- runtime workspace preparation
+- config-template-selected agent execution adapter evidence for all supported issue-comment task tokens
+- branch and PR proposal creation
+- CI verification linkage
+- review-follow-up and PR close/reopen synchronization
+- bounded issue-thread feedback for fail-closed intake, stale-forge proposal stops, and no-op agent results
+- explicit separation between platform self-test evidence and external target-repo service-evaluation evidence
+- the first docs-only and bounded-code external target fixture families used for internal-eval service evidence
+- the current P1 manual acceptance package that combines platform regression, provider-backed execution, and external-target checks in one ordered flow
+
+## Related Phase And WBS
+- Related Phase: `docs/roadmap.md` Phase 1
+- Primary WBS: `docs/wbs.md` WBS `3`, `3.1`, `3.2`, `3.3`, `3.4`, `3.5`, `3.6`, `3.7`, `3.9`, `3.10`, `3.11`
+
+## Environment Matrix
+| Environment / Mode | Purpose | Primary Entry Point | Typical Evidence |
+|---|---|---|---|
+| CLI replay | inspect normalization and session handoff without depending on live webhook delivery | `node scripts/task-gateway.js ...`; `node scripts/agent-control.js ...` | task-request JSON, session JSON, runtime artifacts |
+| CLI half-live | exercise real local Gitea proposal and traceability surfaces with direct operator commands | `node scripts/proposal-surface.js ...`; `node scripts/review-surface.js ...` | PR body, traceability JSON, local Actions runs |
+| GUI live | exercise the real local operator workflow through Gitea UI | Gitea web UI at `http://localhost:43000/` | issue/comment history, PR UI, Actions UI, review or close/reopen state |
+| CI-linked validation | confirm independent verifier behavior on the PR path | local Gitea Actions runner plus `.gitea/workflows/phase1-ci.yml` | workflow runs, verification metadata, PR traceability updates |
+| External target evaluation | validate service behavior against a non-platform target repo | first controlled external target repo baseline under WBS `3.10` | non-platform PRs, CI results, task-quality rubric evidence |
+| Manual acceptance | confirm the current P1 slice as one operator-facing delivery package | `docs/phase1-deliverable.md`; `TC-008` | one explicit acceptance conclusion plus linked case evidence |
+
+## Default Local Test Data
+These defaults assume the tracked local bootstrap template or matching generated local config is being used without environment overrides.
+
+| Field | Value | Notes |
+|---|---|---|
+| Gitea UI base URL | `http://localhost:43000/` | default local forge UI |
+| Gitea admin user | `agent-admin` | bootstrap-managed admin account |
+| Gitea admin password | `agent-dev-password` | generated into the ignored Gitea bootstrap local config by default |
+| Working operator user | `howard` | created by `ensure-local-gitea-repo` when missing |
+| Working operator password | `agent-dev-password` | defaults to the local Gitea admin password unless `AGENT_SDLC_LOCAL_GITEA_USER_PASSWORD` overrides it |
+| Default local repo | `howard/agent-sdlc` | ensured during bootstrap |
+| Default branch | `main` | tracked bootstrap default |
+| Issue-comment command | `@agent run code` plus `summary:` | see `docs/policies/task-intake.md` |
+| Issue-comment listener | `http://127.0.0.1:4010/hooks/gitea/issue-comment` | health or local direct-post observation path |
+| Review-follow-up listener | `http://127.0.0.1:4011/hooks/gitea/pull-request-review` | health or local direct-post observation path |
+| Review callback host | `host.docker.internal` | default forge-to-host callback target |
+| Runner container | `agent-sdlc-gitea-runner` | from the Gitea bootstrap local config or template |
+| Gitea bootstrap template | `config/dev/gitea-bootstrap.template.json` | tracked default local-dev bootstrap shape |
+| Gitea bootstrap local config | `config/dev/gitea-bootstrap.json` | generated by `npm run dev:gitea-bootstrap-config` and ignored by Git |
+
+## Entry Criteria
+Before running the current local regression pack:
+- Docker is available and the local daemon is reachable
+- `npm install` has completed at least once in the workspace
+- `powershell -ExecutionPolicy Bypass -File scripts/dev/manage-dev-environment.ps1 -Command up` succeeds
+- `npm run dev:gitea-runner -- ensure-runner` reports an online local runner when CI-linked validation is in scope
+- the default local repo `howard/agent-sdlc` exists
+
+## Exit Criteria
+The current local validation window is considered healthy when:
+- canonical CLI replay procedures still produce stable task and session records
+- proposal and traceability procedures still produce a real PR plus linked metadata
+- the local CI workflow still produces a visible Actions run for the proposal path
+- at least one live GUI-driven follow-up path can refresh durable traceability without manual replay
+- any new or reopened live-gap item is explicitly tracked in `docs/testing/test-dashboard.md` and, when needed, in `docs/issues/issue-dashboard.md`
+- service-quality claims beyond platform regression are not made solely from self-targeted `agent-sdlc` runs
+
+## Canonical Regression Pack
+| Test ID | Title | Mode | Objective |
+|---|---|---|---|
+| `TC-001` | CLI Replay Intake And Session Smoke | CLI replay | verify normalization, task persistence, and direct session start |
+| `TC-002` | CLI Proposal And Traceability Smoke | CLI half-live | verify proposal creation, traceability writeback, and direct review sync entrypoints |
+| `TC-003` | GUI Full Live Issue-Comment Smoke | GUI live | verify the operator-facing happy path from live issue comment through PR, CI, and follow-up review/close behavior |
+| `TC-004` | Agent Execution Adapter Smoke | CLI replay | verify config resolution and provider-enabled session evidence for all currently enabled task classes |
+| `TC-005` | Real AI Connectivity Manual Flow | CLI half-live | provide a repeatable operator-facing runbook for validating real provider connectivity from issue-command intent to PR and CI evidence |
+| `TC-006` | External Target Service-Evaluation Baseline | External target evaluation | verify that at least one non-platform target repo can carry the bounded workflow and produce service-quality evidence distinct from platform regression |
+| `TC-007` | External Target Bounded-Code Evaluation Baseline | External target evaluation | verify that the bounded-code path can be exercised on a non-platform repo with a reusable fixture and explicit edit-boundary rubric |
+| `TC-008` | Phase 1 Manual Deliver Acceptance | Manual acceptance | verify the current P1 slice in the intended operator order and capture one delivery-oriented acceptance outcome |
+
+## Cadence And Triggers
+Run the relevant local regression cases when:
+- `scripts/task-gateway.js`, `scripts/agent-control.js`, `scripts/proposal-surface.js`, or `scripts/review-surface.js` change
+- local bootstrap config or Gitea callback settings change
+- CI workflow files or runner topology change
+- an issue or dashboard item identifies a new closed-loop regression risk
+
+## Evidence Handling
+The current local test plan expects evidence to remain in:
+- `.agent-sdlc/state/`
+- `.agent-sdlc/runtime/`
+- `.agent-sdlc/traceability/`
+- control-host webhook logs under `.agent-sdlc/dev-env/control-host/logs/`
+- Gitea UI and Actions history
+
+The testing dashboard should summarize near-term attention items, while canonical case notes hold the repeatable procedures.
+
+Current interpretation rule:
+- runs against the seeded local `howard/agent-sdlc` repo are still valid platform regression evidence
+- promotion to broader service claims requires external target-repo evidence under ADR-0009
+
+## Change Log
+- 2026-04-21: Initial version.
+- 2026-04-23: Added WBS 3.9 agent execution adapter evidence to the local test scope.
+- 2026-04-23: Expanded `TC-004` scope to include provider-enabled `documentation_update` validation in addition to `bounded_code_change`.
+- 2026-04-23: Expanded `TC-004` scope to include provider-enabled `review_follow_up` and `ci_failure_investigation`, and added `TC-005` as the manual real-AI connectivity runbook.
+- 2026-04-24: Added the external-target evidence distinction and `TC-006` so service-quality claims are not based only on self-targeted platform runs.
+- 2026-04-24: Added `TC-007` for the second external-target fixture family so bounded-code service evaluation can be tracked separately from the first docs-only baseline.
+- 2026-04-24: Added `TC-008` and the delivery-oriented manual acceptance path for the current P1 slice.

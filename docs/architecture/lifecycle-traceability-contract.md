@@ -158,10 +158,13 @@ The recommended PR block format is:
 - Execution Profile: `<execution_profile_id>`
 - Runtime Capability Set: `<runtime_capability_set_id>`
 - Metadata: `.agent-sdlc/traceability/<task_request_id>.json`
+- Verification Metadata: `.agent-sdlc/ci/verification-metadata.json`
 - CI: `pending` or `<ci_run_ref/link>`
+- Review Status: `awaiting CI and human review` or `ready for human review`
 ```
 
 `agent_session_id` should remain visible in the reviewer-facing block so a reviewer can correlate the PR with the session record without opening backend-only storage.
+Phase 1 may refresh this block from CI so reviewers can see the current CI run and whether the proposal is blocked on failing verification without opening backend-only storage.
 
 ## 9. Failure Handling Rule
 If a downstream record cannot link back to its required upstream reference, the system should treat that state as degraded traceability and either:

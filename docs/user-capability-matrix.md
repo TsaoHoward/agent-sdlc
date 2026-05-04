@@ -1,0 +1,157 @@
+# User Capability Matrix
+
+## Document Metadata
+- Version: 0.1
+- Status: Active
+- Last Updated: 2026-04-30
+- Owner: Project Maintainer
+
+## Purpose
+This document is the durable current-state matrix for what a user can ask the system to do, where that request can be made, and how far the implemented Phase 1 workflow actually carries that request today.
+
+It is intentionally tied to:
+- the project vision in `docs/project-overview.md`
+- the closed Phase 1 packaging note in `docs/issues/items/I-001-phase1-minimum-closed-loop-implementation.md`
+- the current Phase 1 plan in `docs/roadmap.md` and `docs/wbs.md`
+
+Use it when you need one place to answer:
+- where `@agent` is currently supported
+- what `@agent run <token>` means right now
+- which parts of the end-to-end lifecycle are automated versus still generic scaffold
+- which manual operator commands exist alongside the live `@agent` path
+- what kind of user this current implementation is actually for right now
+
+If you want a shorter operator-facing explanation in Traditional Chinese, start with `docs/user-guide.zh-TW.md` first and come back here when you need the fuller matrix.
+
+## Linked Planning Context
+- Project vision: `docs/project-overview.md`
+- Phase 1 packaging note: `docs/issues/items/I-001-phase1-minimum-closed-loop-implementation.md`
+- Related roadmap phase: `docs/roadmap.md` Phase 1
+- Related WBS items: `docs/wbs.md` WBS `3.1`, `3.2`, `3.3`, `3.4`, `3.5`, `3.6`, `3.7`, `3.8`, `3.9`, `3.10`, `3.11`
+
+## Status Legend
+- `Implemented`: a user-facing path exists and the documented lifecycle behavior is working in the current repo-owned flow
+- `Implemented Scaffold`: the path is live and traceable end to end, but task-specific execution behavior is still generic rather than deeply specialized
+- `Manual Operator Only`: the capability exists through repo-owned CLI or bootstrap commands, not through a live `@agent` user entrypoint
+- `Not Supported`: the surface or request form is not currently wired into an executable path
+
+## Current User Relationship
+The current implemented path should be understood primarily as a maintainer or operator-facing `Workbench` / `Internal Eval` surface, not yet as a broad end-user production service.
+
+Why:
+- only one live trigger surface exists today
+- task classes remain intentionally bounded
+- the first provider-backed execution path is still opt-in
+- current local validation still relies heavily on the platform repo as the seeded target, which is useful for platform regression but not sufficient by itself as broader service-quality evidence under ADR-0009
+- the first external-target evidence set now exists on `eval/target-docs`, but that is still an `Internal Eval` proof point rather than enough evidence for `Pilot` or `Production`
+
+## Current Service State
+- Overall current state: `Workbench` with the first real `Internal Eval` external-target evidence now captured and the Phase 1 baseline close window completed
+- Not yet justified from current evidence: `Pilot`, `Production`
+
+## Project-Vision Link
+The target top-level experience from `docs/project-overview.md` is:
+
+`issue / comment / label -> task intake -> agent execution -> code proposal -> PR -> CI -> human review / merge`
+
+The current Phase 1 implementation only exposes one live user trigger in that chain:
+- `Gitea issue comment -> @agent run <token>`
+
+This matrix therefore separates:
+- the current live user-facing surface
+- the current manual operator surfaces
+- the source types that are described in architecture or policy but are not yet live
+
+## Location Matrix
+| User Location / Surface | Can the user type `@agent` here? | Current Behavior | Status | Related Docs |
+|---|---|---|---|---|
+| Gitea issue comment | Yes | Newly created issue comments are parsed by the task gateway, normalized into a task request, auto-started when auto-approved, and currently continue into session, proposal PR, CI, and traceability flow | Implemented | `docs/architecture/task-intake-contract.md`, `docs/testing/items/TC-003-gui-full-live-issue-comment-smoke.md` |
+| Gitea issue body | No | No live intake path reads issue bodies for `@agent` commands | Not Supported | `docs/policies/task-intake.md` |
+| Gitea PR comment | No | `pull_request_comment` exists as a planned source family in docs, but it is not currently wired as a live intake path | Not Supported | `docs/architecture/task-intake-contract.md` |
+| Gitea PR review comment | No | Review events are consumed for traceability refresh, not for `@agent` task intake | Not Supported | `docs/environment-bootstrap.md`, `scripts/review-surface.js` |
+| Gitea issue label | No | `issue_label` exists as a future source family in docs, but there is no live label-driven `@agent` path | Not Supported | `docs/architecture/task-intake-contract.md` |
+| Manual CLI replay | Not applicable | Operators can replay file-backed events and advance lifecycle steps with repo-owned CLI commands | Manual Operator Only | `docs/testing/local-test-procedures.md`, `docs/environment-bootstrap.md` |
+| PR close / reopen / review actions | Not applicable | These events can refresh review and traceability state, but they are not `@agent` entrypoints | Implemented | `docs/testing/local-test-procedures.md`, `scripts/review-surface.js` |
+
+## Live `@agent` Intent Matrix
+| User Intent | Command Form | Normalized Task Class | Summary Required | Current Automated Path | Current Practical Result | Status |
+|---|---|---|---|---|---|---|
+| Documentation update | `@agent run docs` | `documentation_update` | No | issue comment -> task request -> session start -> workspace prepare -> optional configured agent execution -> proposal PR -> CI -> reviewable traceability | The request is classified through `documentation-safe` and can now use the opt-in DeepSeek adapter for bounded documentation-only edits; provider-enabled local validation has passed, while default behavior remains scaffold-first unless the operator enables agent execution in ignored project config | Implemented Scaffold |
+| Bounded code change | `@agent run code` + `summary:` | `bounded_code_change` | Yes | issue comment -> task request -> session start -> workspace prepare -> optional configured agent execution -> proposal PR -> CI -> reviewable traceability | This is the main intended Phase 1 path. The request is classified, auto-started, proposed, verified, and surfaced for human review; the first template-backed DeepSeek adapter has now passed provider-enabled local validation but remains opt-in through ignored project config | Implemented Scaffold |
+| Review follow-up | `@agent run review` | `review_follow_up` | No | issue comment -> task request -> session start -> workspace prepare -> optional configured agent execution -> proposal PR -> CI -> reviewable traceability | The request can now use the opt-in DeepSeek adapter for bounded review follow-up edits and has passed provider-enabled local validation, while deeper review-thread-specialized context remains a follow-up improvement | Implemented Scaffold |
+| CI failure investigation | `@agent run ci` + `summary:` | `ci_failure_investigation` | Yes | issue comment -> task request -> session start -> workspace prepare -> optional configured agent execution -> proposal PR -> CI -> reviewable traceability | The request can now use the opt-in DeepSeek adapter for investigation-note outputs with docs-only guardrails and has passed provider-enabled local validation, while deeper CI-log-specialized investigation workflow remains a follow-up improvement | Implemented Scaffold |
+
+## Manual Operator Capability Matrix
+| Operator Capability | Entry Point | What It Is Used For | Status | Related Docs |
+|---|---|---|---|---|
+| Replay issue-comment intake from file | `node scripts/task-gateway.js normalize-gitea-issue-comment --event <path>` | deterministic local intake debugging without live Gitea delivery | Implemented | `docs/testing/items/TC-001-cli-replay-intake-and-session-smoke.md` |
+| Run live issue-comment webhook listener | `node scripts/task-gateway.js serve-configured-gitea-webhook` | local control-host intake endpoint for Gitea issue-comment delivery, configured from template/local bootstrap config | Implemented | `docs/environment-bootstrap.md` |
+| Start a session from a task request | `node scripts/agent-control.js start-session --task-request <path>` | direct session start from a normalized task request | Implemented | `docs/architecture/agent-control-integration-plan.md` |
+| Auto-create proposal during session start | `node scripts/agent-control.js start-session --task-request <path> --auto-create-proposal` | current live issue-comment continuation path for auto-approved requests | Implemented | `docs/testing/local-test-procedures.md` |
+| Create or refresh a proposal PR | `node scripts/proposal-surface.js create-gitea-pr --session <path>` | branch and PR proposal path from a prepared session workspace | Implemented | `docs/testing/items/TC-002-cli-proposal-and-traceability-smoke.md` |
+| Provision or reset an external target fixture | `npm run eval:targets`; `npm run eval:target-docs:provision`; `npm run eval:target-docs:reset`; `npm run eval:target-code-small:provision`; `npm run eval:target-code-small:reset` | seed controlled non-platform repos for service-evaluation evidence without reusing the platform repo as the target under test | Implemented | `docs/testing/items/TC-006-external-target-service-evaluation-baseline.md`, `docs/testing/items/TC-007-external-target-bounded-code-evaluation-baseline.md` |
+| Sync review outcome from a proposal | `node scripts/review-surface.js sync-gitea-pr-review-outcome --proposal <proposal_ref>` | refresh durable review state and PR traceability after review activity | Implemented | `docs/environment-bootstrap.md` |
+| Sync proposal traceability from a proposal | `node scripts/review-surface.js sync-gitea-proposal-traceability --proposal <proposal_ref>` | refresh canonical and session-local traceability copies for proposal/CI convergence or diagnostics | Implemented | `scripts/review-surface.js` |
+| Run review-follow-up webhook listener | `node scripts/review-surface.js serve-configured-gitea-review-webhook` | accept PR review and PR state-change events for automatic traceability refresh, configured from template/local bootstrap config | Implemented | `docs/environment-bootstrap.md` |
+
+## Current End-to-End User Flow
+For the current live Phase 1 `@agent` path, the implemented lifecycle is:
+
+1. A user posts a newly created Gitea issue comment using `@agent run <docs|code|review|ci>`.
+2. The task gateway validates the bounded command contract and resolves task class, execution profile, runtime capability set, and approval state.
+3. A normalized task request is written to `.agent-sdlc/state/task-requests/<task_request_id>.json`.
+4. For auto-approved requests, agent control starts a session and writes `.agent-sdlc/state/agent-sessions/<agent_session_id>.json`.
+5. The worker runtime prepares a session-local workspace under `.agent-sdlc/runtime/workspaces/`.
+6. The proposal surface creates `agent/<task_request_id>` plus a Gitea PR and writes linked traceability metadata.
+7. The PR-triggered CI workflow runs independently and writes verification metadata.
+8. CI completion now syncs reviewer-facing PR traceability plus canonical and session-local traceability copies.
+9. Human review remains the merge gate.
+10. Later review, close, or reopen events can refresh review outcome traceability through the review surface.
+11. When the bounded request is rejected fail-closed, stopped by stale-forge proposal preflight, or finishes as a no-op with zero repo file edits, the issue thread can now receive a bounded operator-facing status comment instead of failing silently.
+
+## Evidence Surfaces By Stage
+| Stage | Durable Evidence |
+|---|---|
+| User trigger accepted | `.agent-sdlc/state/source-events/`, `.agent-sdlc/state/task-requests/` |
+| Session started | `.agent-sdlc/state/agent-sessions/`, `.agent-sdlc/runtime/artifacts/` |
+| Proposal created | Gitea PR UI, `.agent-sdlc/traceability/<task_request_id>.json` |
+| CI verified | Gitea Actions run, `.agent-sdlc/ci/verification-metadata.json`, PR traceability block |
+| Review synced | PR body, root traceability file, session-local traceability copy |
+
+## Current Boundaries And Gaps
+- Only Gitea issue comments are currently live `@agent` entrypoints.
+- The four task tokens currently drive classification, policy, and traceability. The opt-in agent execution adapter now supports all four issue-comment tokens (`bounded_code_change`, `documentation_update`, `review_follow_up`, `ci_failure_investigation`) and has passed provider-enabled local validation for each, but live default behavior remains scaffold-first unless the operator enables agent execution in ignored project config.
+- For the default local seeded `howard/agent-sdlc` repo, proposal creation can still fail closed when local forge `main` lags workspace `HEAD`; current user-facing mitigation is an issue-thread status comment plus the documented reseed command.
+- A completed agent session with zero repo file edits is now treated as a visible no-op rather than silently creating a traceability-only PR, but richer user-facing explanation and retry guidance still deserve follow-up hardening.
+- CI remains an independent verifier and human review remains the merge control point.
+- Operator-facing artifact browsing remains a narrower follow-up outside this matrix's core capability scope.
+- The current local seeded `howard/agent-sdlc` path remains a valid platform-regression route, but broader service-quality claims now require external target-repo evaluation rather than self-targeted platform runs alone.
+- The first external-target evidence set is now `eval/target-docs` issue `#3` / comment `#153` -> task `trq-f77d70ed7f92` -> session `ags-7f12724630cc` -> PR `#4` -> run `#56` (`success`), with bounded edits to `README.md` and `docs/faq.md`.
+- The first bounded-code external-target evidence set is now `eval/target-code-small` issue `#5` / comment `#162` -> task `trq-7d9a75db740f` -> session `ags-b02a30c22316` -> PR `#6` -> run `#59` (`success`), with bounded edits to `src/task-priority.js`; `TC-007` also records two earlier failed retries that are useful for understanding current code-task quality limits.
+
+## Maintenance Rule
+Update this document when any of the following change:
+- supported `@agent` locations
+- supported task tokens or parsing rules
+- automatic versus manual lifecycle boundaries
+- linked evidence surfaces
+- issue, roadmap, or WBS references that describe the current user-facing capability shape
+
+When a change is substantial enough to alter the supported workflow shape, also update:
+- `docs/issues/issue-dashboard.md`
+- `docs/issues/items/I-001-phase1-minimum-closed-loop-implementation.md` or its successor issue note
+- `docs/roadmap.md`
+- `docs/wbs.md`
+
+## Change Log
+- 2026-04-22: Initial version.
+- 2026-04-23: Updated `bounded_code_change` coverage after landing the first opt-in config-selected agent execution adapter slice.
+- 2026-04-23: Updated `bounded_code_change` coverage after provider-enabled DeepSeek validation produced a session-backed local proposal.
+- 2026-04-23: Updated `documentation_update`, `review_follow_up`, and `ci_failure_investigation` coverage after provider-enabled DeepSeek validation produced sessions and local PRs `#25`-`#27`.
+- 2026-04-23: Corrected stale forge-seeded CI failures (`#46`-`#49`) and completed fresh multi-token revalidation with successful runs `#51`-`#54`.
+- 2026-04-24: Added the current user/service-state interpretation and clarified that self-targeted platform runs are still platform-regression evidence rather than sufficient broader service proof by themselves.
+- 2026-04-24: Recorded the first valid external-target internal-eval evidence on `eval/target-docs` after fixing nested-fixture seeding.
+- 2026-04-24: Added the external-target fixture provisioning operator surface and recorded `eval/target-code-small` as the next bounded-code internal-eval baseline.
+- 2026-04-24: Recorded the first valid bounded-code external-target internal-eval evidence on `eval/target-code-small`, alongside two earlier failed retries that exposed behavior-sensitive bounded-code failure modes.
+- 2026-04-29: Linked the new concise Traditional Chinese guide as the lighter-weight entrypoint for current-state explanation.
+- 2026-04-30: Updated the packaging reference after moving `I-001` out of the active dashboard during final Phase 1 close-out.
