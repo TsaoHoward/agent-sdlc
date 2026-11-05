@@ -1,11 +1,17 @@
 [CmdletBinding()]
 param(
-    [ValidateSet("init", "up", "down", "status")]
+    [ValidateSet("init", "up", "down", "status", "upgrade", "backup-list", "restore")]
     [string]$Command = "status",
 
     [string]$ConfigPath,
 
     [string]$GiteaDatabaseMode,
+
+    [string]$GiteaVersion,
+
+    [string]$BackupId,
+
+    [string]$BackupRoot,
 
     [switch]$SkipGitea
 )
@@ -51,6 +57,7 @@ $AgentSessionStateDir = Join-Path $StateRoot "agent-sessions"
 $TraceabilityDir = Join-Path $ProjectStateRoot "traceability"
 $DevEnvRoot = Join-Path $ProjectStateRoot "dev-env"
 $GiteaRoot = Join-Path $DevEnvRoot "gitea"
+$GiteaLifecycleRecoveryPath = Join-Path $GiteaRoot "lifecycle-recovery.json"
 $ControlHostRoot = Join-Path $DevEnvRoot "control-host"
 $ControlHostLogDir = Join-Path $ControlHostRoot "logs"
 $ControlHostServiceDir = Join-Path $ControlHostRoot "services"
@@ -104,6 +111,17 @@ $GiteaImage = if ($env:AGENT_SDLC_GITEA_IMAGE) {
 }
 $GiteaHostName = if ($BootstrapConfig.gitea.hostName) { [string]$BootstrapConfig.gitea.hostName } else { "localhost" }
 $GiteaRootUrl = if ($BootstrapConfig.gitea.rootUrl) { [string]$BootstrapConfig.gitea.rootUrl } else { "http://$GiteaHostName`:$GiteaHttpPort/" }
+$ConfiguredBackupRoot = ""
+if ($BootstrapConfig.gitea.PSObject.Properties["backup"] -and $BootstrapConfig.gitea.backup.PSObject.Properties["root"]) {
+    $ConfiguredBackupRoot = [string]$BootstrapConfig.gitea.backup.root
+}
+$GiteaBackupRoot = if ($BackupRoot) {
+    $BackupRoot
+} elseif ($ConfiguredBackupRoot) {
+    $ConfiguredBackupRoot
+} else {
+    Join-Path $HOME "Backups\agent-sdlc\gitea"
+}
 $GiteaWebhookAllowedHostList = if ($BootstrapConfig.gitea.webhook.allowedHostList) {
     [string]$BootstrapConfig.gitea.webhook.allowedHostList
 } else {
@@ -1129,6 +1147,20 @@ function Show-EnvironmentStatus {
     Write-Host "ENV-006 Secrets: template/local config plus generated local Gitea secrets under $GiteaSecretsPath"
 }
 
+if ($Command -eq "up" -and -not $SkipGitea -and (Test-Path -LiteralPath $GiteaLifecycleRecoveryPath)) {
+    try {
+        if (-not (Test-Path -LiteralPath $GiteaLifecycleRecoveryPath -PathType Leaf)) {
+            throw "recovery marker is not a file"
+        }
+        $recoveryMarker = Get-Content -LiteralPath $GiteaLifecycleRecoveryPath -Raw | ConvertFrom-Json
+        $recoveryBackupId = [string]$recoveryMarker.backupId
+    }
+    catch {
+        throw "A Gitea lifecycle recovery marker is unreadable; automatic bootstrap is blocked until an operator reviews it."
+    }
+    throw "A previous Gitea $($recoveryMarker.operationKind) operation is incomplete. Automatic bootstrap is blocked; use an explicitly confirmed restore. Backup ID: '$recoveryBackupId'."
+}
+
 switch ($Command) {
     "init" {
         Initialize-ProjectState
@@ -1160,6 +1192,40 @@ switch ($Command) {
 
     "status" {
         Show-EnvironmentStatus
+        break
+    }
+
+    { $_ -in @("upgrade", "backup-list", "restore") } {
+        Import-Module (Join-Path $PSScriptRoot "gitea-lifecycle.psm1") -Force
+        $lifecycleContext = @{
+            RepoRoot = $RepoRoot
+            ConfigPath = $ConfigPath
+            LocalConfigPath = $DefaultLocalConfigPath
+            ConfigSource = $ConfigSource
+            GiteaImageEnvironmentOverride = [string]$env:AGENT_SDLC_GITEA_IMAGE
+            BackupRoot = $GiteaBackupRoot
+            GiteaDataDir = $GiteaDataDir
+            GiteaConfigDir = $GiteaConfigDir
+            GiteaPostgresDataDir = $GiteaPostgresDataDir
+            GiteaSecretsPath = $GiteaSecretsPath
+            GiteaBootstrapSummaryPath = $GiteaBootstrapSummaryPath
+            EffectiveBootstrapSettingsPath = $EffectiveBootstrapSettingsPath
+            GiteaContainerName = $GiteaContainerName
+            GiteaPostgresContainerName = $GiteaPostgresContainerName
+            GiteaRunnerContainerName = [string]$BootstrapConfig.giteaActionsRunner.container
+            GiteaNetworkName = $GiteaNetworkName
+            GiteaRootUrl = $GiteaRootUrl
+            GiteaDatabaseMode = $GiteaDatabaseMode
+            GiteaHttpPort = $GiteaHttpPort
+            GiteaSshPort = $GiteaSshPort
+            GiteaPostgresHostPort = $GiteaPostgresHostPort
+            PortBindAddress = $PortBindAddress
+            GiteaPostgresDbName = $GiteaPostgresDbName
+            GiteaPostgresUser = $GiteaPostgresUser
+            GiteaAdminUsername = $GiteaAdminUsername
+            GiteaAdminPassword = $GiteaAdminPassword
+        }
+        Invoke-GiteaLifecycle -Action $Command -Context $lifecycleContext -GiteaVersion $GiteaVersion -BackupId $BackupId
         break
     }
 }

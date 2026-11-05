@@ -3,7 +3,7 @@
 ## Document Metadata
 - Version: 0.1
 - Status: Active
-- Last Updated: 2026-04-30
+- Last Updated: 2026-11-05
 - Owner: Project Maintainer
 - Source Template: docs/templates/test-dashboard.template.md
 
@@ -41,6 +41,7 @@ It does not replace CI run history, forge issue or PR history, roadmap/WBS plann
 | Test ID | Title | Status | Mode | Related Docs / WBS | Next Action | Exit Path |
 |---|---|---|---|---|---|---|
 | TC-001 | CLI Replay Intake And Session Smoke | Ready | CLI replay | `docs/roadmap.md` Phase 1; WBS `3.1`, `3.2`, `3.3` | Re-run when intake or session-start behavior changes and keep the case note current if task/session fields or evidence paths move | Move out after the current validation window once the case no longer needs active dashboard attention; keep the canonical case note as the long-lived procedure |
+| TC-011 | Local Gitea Version Lifecycle Operations | Draft | Windows PowerShell/Pester plus isolated Docker acceptance | `docs/testing/items/TC-011-gitea-version-lifecycle-operations.md`; WBS `3.12` | Run mocked safety tests, then validate topology, capacity, backup, and restore on a disposable Windows Docker boundary; keep live acceptance separately authorized | Move out after isolated CLI verification and separately authorized Windows Host acceptance; keep the canonical case note as the long-lived procedure |
 
 ## Test Items
 
@@ -83,3 +84,5 @@ It does not replace CI run history, forge issue or PR history, roadmap/WBS plann
 - 2026-04-29: Added `TC-010` after a fresh docs-safe run on `README.md` exposed a large-file truncation regression caused by partial context plus full-file rewrite response requirements.
 - 2026-04-30: Moved `TC-010` to ready after landing the fail-closed guardrail plus safe fragment-edit support and verifying both behaviors through deterministic local stubbed execution.
 - 2026-04-30: Archived the passed or deferred Phase 1 close-window cases after live rerun evidence on `PR #44` / run `#71` cleared `TC-010`, leaving `TC-001` as the primary always-ready diagnostic case.
+- 2026-11-05: Added draft TC-011 for the Gitea upgrade/backup/restore CLI and its separate live Windows Host acceptance boundary.
+- 2026-11-05: Updated TC-011 to distinguish the mocked Pester suite from the outstanding Windows Docker-boundary and live acceptance procedures.

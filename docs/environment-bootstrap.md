@@ -35,6 +35,8 @@ powershell -File scripts/dev/manage-dev-environment.ps1 -Command up -GiteaDataba
 powershell -File scripts/dev/manage-dev-environment.ps1 -Command up -SkipGitea
 powershell -File scripts/dev/manage-dev-environment.ps1 -Command status
 powershell -File scripts/dev/manage-dev-environment.ps1 -Command down
+npm run dev:env:backup-list
+npm run test:gitea-lifecycle
 npm run dev:env:init
 npm run dev:env:up
 npm run dev:env:up:sqlite
@@ -69,6 +71,16 @@ Command behavior:
 - `up -SkipGitea` prepares the project-local state surfaces and managed control-host webhook listeners without requiring the local forge container to be available yet
 - `status` reports the current project-local bootstrap state without changing it
 - `down` stops the managed control-host webhook listeners, stops and removes the local Gitea development stack when present, and leaves state directories intact
+- `upgrade`, `backup-list`, and `restore` are native Windows PowerShell lifecycle operations limited to the legacy PostgreSQL-backed Gitea on port `43000`; they do not touch the separate Compose instance on port `46300`
+- `upgrade -GiteaVersion <x.y.z>` requires the ignored local bootstrap config, an explicit fixed version, a supported one-series-at-a-time upgrade step, a quiescent shared Runner, sufficient fixed local disk space, and a typed confirmation; it saves a private checksum-verified backup before recreating only Gitea
+- clear `AGENT_SDLC_GITEA_IMAGE` before upgrade or restore because that process-level override takes precedence over the local config's immutable image pin
+- `backup-list` prints Backup IDs, source versions, sizes, and integrity status without printing sensitive payloads; backups are retained until an operator manages them manually
+- `restore -BackupId <id>` verifies the full backup and matching PostgreSQL/Gitea topology, creates a separate diagnostic backup of the current state, and requires typed confirmation before overwriting the legacy instance
+- lifecycle commands never attempt automatic rollback after the new Gitea image starts; use an explicit restore after reviewing the retained state
+- a failed or interrupted upgrade/restore leaves a recovery marker that blocks bootstrap `up` from starting an image automatically; a successful explicitly confirmed restore clears it
+- configure `gitea.backup.root` in ignored local config or pass `-BackupRoot`; it must be outside the repository and live data paths on a fixed local Windows drive, and its ACL is restricted to the current user, SYSTEM, and local Administrators
+- review the actual source version's official upgrade path and pass only its next supported fixed version using `npm run dev:env:upgrade -- -GiteaVersion $verifiedNextVersion`; repeat for each required release series before reaching a farther target
+- `npm run test:gitea-lifecycle` runs the PowerShell/Pester safety-helper and mocked lifecycle-order checks without accessing Docker; it does not count as live service acceptance
 - `npm run dev:env:*` exposes the same repo-owned local bootstrap entrypoints through the npm command surface so local Gitea startup is discoverable alongside the other Phase 1 operator commands
 - `npm install` installs the selected npm-managed control-plane baseline for platform code
 - `npm run validate:platform` performs syntax validation for the current platform CLI scaffolds
@@ -226,3 +238,4 @@ Starting the containers is no longer the only bootstrap step, but several workfl
 - 2026-04-21: Updated the bootstrap posture after confirming that local Gitea host callbacks need `webhook.ALLOWED_HOST_LIST=external,private`, then validating live PR close/reopen delivery into the bootstrap-managed review listener.
 - 2026-04-24: Linked the new branch/local-forge synchronization policy so seeded local `main` alignment is treated as part of the governed bootstrap workflow.
 - 2026-04-24: Clarified that the default seeded `agent-sdlc` repo remains the platform-regression baseline and that broader service evaluation will need external target repos.
+- 2026-11-05: Added native Windows PowerShell commands and safety boundaries for legacy Gitea upgrade, backup listing, and restore operations.

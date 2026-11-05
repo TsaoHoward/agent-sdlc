@@ -3,7 +3,7 @@
 ## Document Metadata
 - Version: 0.1
 - Status: Draft
-- Last Updated: 2026-04-30
+- Last Updated: 2026-11-05
 - Owner: Project Maintainer
 - Source Template: docs/templates/wbs.template.md
 
@@ -44,6 +44,7 @@
 | 3.9 | Minimal Real Agent Execution | 3 | Phase 1 | one provider-backed bounded execution path for a supported task class |
 | 3.10 | External Target Repo Evaluation Baseline | 3 | Phase 1 | distinct target-repo baseline for service evaluation beyond platform self-test |
 | 3.11 | Service-State And Evaluation Workflow | 3 | Phase 1 | durable workbench/internal-eval/pilot/production model with evidence rules |
+| 3.12 | Local Gitea Version Lifecycle Operations | 3 | Phase 1 | guarded upgrade, backup inventory, and explicit restore workflow for the legacy Windows Host Gitea |
 | 4 | Controlled Expansion | - | Phase 2 | structured expansion without boundary collapse |
 | 4.1 | Additional Intake Paths | 4 | Phase 2 | more adapters |
 | 4.2 | Policy Pack Expansion | 4 | Phase 2 | richer policy definitions |
@@ -308,6 +309,16 @@
 - Status: Done
 - Notes: This item is about governance and current-state clarity, not only about new code. ADR-0009 plus `docs/policies/service-state-and-evaluation.md` now define the evidence rule that self-targeted `agent-sdlc` runs remain valid for bootstrap and regression but cannot by themselves justify pilot or production service claims. The first runnable external-target evidence set now exists, so the policy, testing workflow, and current-state docs are aligned to a real `Workbench` / `Internal Eval` evidence model instead of a purely planned one.
 
+### WBS 3.12 — Local Gitea Version Lifecycle Operations
+- Parent: 3
+- Related Phase: Phase 1 follow-up
+- Description: Extend the existing Windows PowerShell operator entrypoint with guarded upgrade, retained local backup listing, and confirmed restore operations for the legacy Docker Gitea on port 43000.
+- Deliverable: repeatable lifecycle commands, isolated operator-facing verification, and a canonical Windows Host acceptance case
+- Dependencies: 1.5, 3.7
+- Critical-Path-Candidate: No
+- Status: In Progress
+- Notes: Implements issue #3 without changing the separate Compose 46300 environment, PostgreSQL or Runner identity, and without authorizing a live upgrade. Every upgrade requires an explicit fixed version, verifies the legacy container identity and mounts, checks Runner activity and local capacity, then requires a complete checksum-verified backup before recreating only Gitea. Restore requires a Backup ID and confirmation; it preserves the current failed state as a separate diagnostic backup before overwriting. An incomplete operation leaves bootstrap `up` blocked until explicit restore succeeds.
+
 ### WBS 4 — Controlled Expansion
 - Parent:
 - Related Phase: Phase 2
@@ -426,6 +437,7 @@
 | 3.9 | 3.2, 3.3, 3.4, 3.5, 3.6, 3.7, 3.8 | the first real agent execution path depends on working session/runtime/proposal/verification handoffs plus current-state workflow and validation surfaces |
 | 3.10 | 3.4, 3.5, 3.7, 3.8, 3.9 | credible service evaluation needs a working proposal/CI/testing baseline plus at least one real execution path before it can move beyond self-targeted platform runs |
 | 3.11 | 3.7, 3.8, 3.10 | service-state and evidence rules depend on both the testing workflow and the introduction of a distinct target-repo evaluation baseline |
+| 3.12 | 1.5, 3.7 | safe local forge maintenance depends on the environment baseline and repeatable operator-facing validation surfaces |
 | 4 | 3 | expansion should follow first working loop |
 | 4.4 | 3.10, 3.11, 4.2, 4.3 | staged pilot rollout depends on explicit evidence tiers plus policy and observability support |
 | 5 | 4 | governance evolution should follow practical expansion experience |
@@ -504,3 +516,4 @@
 - 2026-04-29: Updated WBS 3.1 and 3.9 after landing bounded issue-thread feedback for malformed/fail-closed live issue-comment results and a no-op stop that avoids creating traceability-only PRs.
 - 2026-04-29: Kept WBS `3` and `3.9` in progress after a fresh docs-safe run exposed a large-file truncation regression in the current agent-execution contract.
 - 2026-04-30: Marked WBS `3` and `3.9` done after the large-file docs-update fix was revalidated through live rerun evidence on `PR #44` / run `#71`.
+- 2026-11-05: Added WBS `3.12` for issue #3 as a bounded Phase 1 operator-maintenance follow-up; live service changes remain separately authorized.

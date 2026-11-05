@@ -3,7 +3,7 @@
 ## Document Metadata
 - Version: 0.1
 - Status: Active
-- Last Updated: 2026-04-30
+- Last Updated: 2026-11-05
 - Owner: Project Maintainer
 - Source Template: docs/templates/issue-dashboard.template.md
 
@@ -45,10 +45,18 @@ It does not replace forge issues, roadmap/WBS planning structure, the decision b
 ## Dashboard
 | Issue ID | Title | Status | Related Docs / WBS | Next Action | Exit Path |
 |---|---|---|---|---|---|
-No active near-term issue items currently need dashboard visibility.
+| #3 | Add safe, repeatable version upgrades for the existing Docker Gitea | In Progress | `docs/issues/items/I-007-gitea-version-lifecycle-operations.md`; WBS `3.12`; TC-011 | Run the mocked Pester safety checks and complete isolated Windows Docker-boundary verification; keep live acceptance pending separate authorization | Move to archive after implementation and authorized Windows Host acceptance are complete; keep any unresolved runtime blocker linked from the canonical test case |
 
 ## Issue Items
-No active issue-item detail currently needs dashboard expansion. Use the archive plus supporting notes for historical context.
+### #3 — Gitea Version Lifecycle Operations
+- Status: `In Progress`
+- Related Docs / WBS: `docs/issues/items/I-007-gitea-version-lifecycle-operations.md`; WBS `3.12`; `docs/testing/items/TC-011-gitea-version-lifecycle-operations.md`
+- Why It Matters: The existing legacy Gitea instance has persistent repositories, Actions, Registry, and shared Runner state. Replacing its image without a verified backup and restore path risks making that state unusable.
+- Current State: The accepted implementation contract separates the legacy Docker instance on port 43000 from Compose port 46300. Upgrade is explicit-version only, backup-first, local-only, retained without automatic deletion, and restore is an explicit destructive operation. No live upgrade is authorized by this implementation work.
+- Next Action: Run the mocked Pester suite and complete the broader isolated Windows Docker-boundary verification; schedule live Windows Host acceptance separately.
+- Exit Path: Archive after implementation and authorized Windows Host acceptance are complete; record any remaining issue as a separate follow-up.
+- Supporting Note: `docs/issues/items/I-007-gitea-version-lifecycle-operations.md`
+- Promotion Check: WBS `3.12` added; no architecture boundary or source-of-truth change is intended, so no ADR is required.
 
 ## Change Log
 - 2026-04-15: Initial version.
@@ -105,3 +113,5 @@ No active issue-item detail currently needs dashboard expansion. Use the archive
 - 2026-04-29: Added I-006 after a fresh provider-backed docs-safe run on `README.md` exposed a large-file truncation regression in the current agent-execution contract.
 - 2026-04-30: Moved I-006 to ready-for-review after landing fail-closed guardrails plus safe fragment-edit support for truncated large files and verifying both behaviors through deterministic local stubbed execution.
 - 2026-04-30: Cleared the last active Phase 1 issue blockers after live rerun evidence (`#41` / comment `#204` -> `trq-763eac216fe1` -> `ags-716c62e3f62c` -> `PR #44` -> run `#71`) confirmed safe large-file docs updates, and moved completed or no-longer-near-term items to the issue archive.
+- 2026-11-05: Added issue #3 as active near-term work and linked it to new WBS `3.12` and TC-011.
+- 2026-11-05: Updated issue #3 handoff to track mocked Pester checks and outstanding isolated Windows Docker validation separately from live acceptance.

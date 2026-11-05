@@ -3,7 +3,7 @@
 ## Document Metadata
 - Version: 0.1
 - Status: Draft
-- Last Updated: 2026-04-24
+- Last Updated: 2026-11-05
 - Owner: Project Maintainer
 - Source Template: docs/templates/roadmap.template.md
 
@@ -176,6 +176,8 @@ Implement the smallest working path from task trigger to independently verified 
 ### Notes
 Keep the first closed loop narrow. Solve one path well before broad expansion.
 
+Phase 1 follow-up maintenance may harden the existing local Gitea operator entrypoint under a dedicated WBS item. This does not change the closed-loop acceptance criteria or authorize changes to the running Windows Host service.
+
 ---
 
 ## Phase 2 — Controlled Expansion
@@ -288,4 +290,5 @@ This phase should only proceed when prior boundaries are understood and defended
 - 2026-04-21: Expanded the Phase 1 deliverables and exit criteria to include a durable local testing workflow with canonical cases and active dashboard tracking.
 - 2026-04-22: Expanded the Phase 1 workflow packaging to include a durable user capability matrix linked to the live `@agent` entrypoints and current lifecycle coverage.
 - 2026-04-22: Clarified that Phase 1 is not complete until one supported task class reaches a minimal real agent execution path inside the bounded runtime.
+- 2026-11-05: Added a traceable Phase 1 follow-up for safe local Gitea version lifecycle operations, separate from live Windows Host upgrade authorization.
 - 2026-04-24: Added the Phase 1 requirement to distinguish platform self-test from external target-repo service evaluation, plus the service-state/evidence baseline needed before later pilot claims.

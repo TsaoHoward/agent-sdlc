@@ -139,16 +139,33 @@ powershell -File scripts/dev/manage-dev-environment.ps1 -Command up
 powershell -File scripts/dev/manage-dev-environment.ps1 -Command up -GiteaDatabaseMode sqlite
 powershell -File scripts/dev/manage-dev-environment.ps1 -Command up -SkipGitea
 powershell -File scripts/dev/manage-dev-environment.ps1 -Command status
+powershell -File scripts/dev/manage-dev-environment.ps1 -Command backup-list
 npm run dev:env:init
 npm run dev:env:up
 npm run dev:env:up:sqlite
 npm run dev:env:up:no-gitea
 npm run dev:env:status
 npm run dev:env:down
+npm run dev:env:backup-list
+npm run test:gitea-lifecycle
 ```
 
 `dev:env:up` now also starts the default task-intake and review-follow-up webhook listeners from template/local config, and the default local Gitea repo bootstrap path now ensures both issue-comment and review-follow-up webhooks are configured against that repo.
 The npm `dev:env:init` and `dev:env:up*` commands ensure the ignored local Gitea bootstrap config before starting; run `npm run dev:gitea-bootstrap-config` once first when using the direct PowerShell `up` command without password environment variables.
+
+The Gitea lifecycle commands run only from native Windows PowerShell and target the legacy PostgreSQL-backed instance on port `43000`. Generate the ignored local config first, clear `AGENT_SDLC_GITEA_IMAGE`, set `gitea.backup.root` to a local fixed-drive path or accept the default under `%USERPROFILE%\Backups\agent-sdlc\gitea`, and review the actual supported source-to-target Gitea upgrade path before using an explicit fixed version. The command creates a checksum-verified backup before replacing only the Gitea container; it does not operate on the separate Compose instance on port `46300`. Restore requires a Backup ID and typed confirmation. Live service maintenance requires separate authorization and the TC-011 manual smoke checks.
+
+If an upgrade or restore stops before its health checks complete, the local bootstrap `up` command stays blocked by a recovery marker until an operator completes an explicit restore. The failed state and Backup IDs remain available for review.
+
+For an upgrade, enter the next supported release series one step at a time:
+
+```powershell
+$verifiedNextVersion = Read-Host "Enter the verified next supported Gitea version"
+npm run dev:env:upgrade -- -GiteaVersion $verifiedNextVersion
+npm run dev:env:backup-list
+$backupId = Read-Host "Enter the Backup ID to restore"
+npm run dev:env:restore -- -BackupId $backupId
+```
 
 Current platform package commands:
 

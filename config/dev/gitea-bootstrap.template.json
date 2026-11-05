@@ -12,6 +12,9 @@
   "gitea": {
     "image": "docker.gitea.com/gitea:latest-rootless",
     "databaseMode": "postgres",
+    "backup": {
+      "root": ""
+    },
     "hostName": "localhost",
     "rootUrl": "http://localhost:43000/",
     "webhook": {
