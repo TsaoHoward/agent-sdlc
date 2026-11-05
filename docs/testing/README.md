@@ -53,6 +53,7 @@ For a fresh local validation pass:
 9. run `TC-007` when you need the first bounded-code service-evaluation case beyond docs-only evidence, starting with `npm run eval:target-code-small:provision` or `npm run eval:target-code-small:reset`
 10. run `TC-008` when you want one delivery-oriented manual acceptance pass that chains the current P1 procedures in their intended order
 11. write any new gap back into `docs/testing/test-dashboard.md`, then update issue or decision docs if the result changes project-level understanding
+12. run `TC-011` when the local Gitea lifecycle operator or backup/restore path changes; use only its GUID-isolated Windows Docker fixture, with live Host acceptance kept separate
 
 The latest reproducible live issue-comment reference is now the 2026-04-24 manual-acceptance rerun on `howard/agent-sdlc#33`, which created task request `trq-08c59229d0a9`, session `ags-e52b3bc208c0`, proposal `PR #34`, and successful UI run `#56`. The latest replay/proposal refresh path in that same walkthrough also reconfirmed `trq-c9b2fa3064fb` -> `ags-796b088fafa1` with updated `PR #1` CI convergence after stale-seed preflight and reseed. Provider-enabled agent execution evidence remains available across all currently enabled issue-comment tokens, and the same walkthrough also refreshed external-target proofs on `eval/target-docs` (`trq-530938b564d7`, `PR #6`, UI run `#3`) and `eval/target-code-small` (`trq-7f9ab84dbce5`, `PR #8`, UI run `#4` after one fail-closed overlong-summary rejection).
 
@@ -102,3 +103,4 @@ See `docs/policies/testing-management.md` for the full governance rule set.
 - 2026-04-24: Recorded the first valid bounded-code external-target evidence set on `eval/target-code-small` after two earlier failed retries exposed behavior-sensitive bounded-code failure modes.
 - 2026-04-24: Added `docs/phase1-deliverable.md` and `TC-008` as the delivery-oriented manual acceptance entrypoint for the current P1 slice.
 - 2026-04-29: Added the concise Traditional Chinese guide to the recommended reading order and recorded the fresh 2026-04-24 manual-acceptance evidence set.
+- 2026-11-05: Added `TC-011` to the execution guidance for local Gitea lifecycle and restore changes.

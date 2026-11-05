@@ -52,8 +52,8 @@ It does not replace forge issues, roadmap/WBS planning structure, the decision b
 - Status: `In Progress`
 - Related Docs / WBS: `docs/issues/items/I-007-gitea-version-lifecycle-operations.md`; WBS `3.12`; `docs/testing/items/TC-011-gitea-version-lifecycle-operations.md`
 - Why It Matters: The existing legacy Gitea instance has persistent repositories, Actions, Registry, and shared Runner state. Replacing its image without a verified backup and restore path risks making that state unusable.
-- Current State: The accepted implementation contract separates the legacy Docker instance on port 43000 from Compose port 46300. Upgrade is explicit-version only, backup-first, local-only, retained without automatic deletion, and restore is an explicit destructive operation. No live upgrade is authorized by this implementation work.
-- Next Action: Run `npm ci`, typecheck, mocked Pester, and the opt-in isolated Docker E2E on Windows; schedule live Windows Host acceptance separately.
+- Current State: The accepted implementation contract separates the legacy Docker instance on port 43000 from Compose port 46300. Upgrade is explicit-version only, backup-first, local-only, retained without automatic deletion, and restore is an explicit destructive operation. The review fixes use a valid `1.26.4` -> `1.27.3` failure path and exact target-database recreation after verifying the archive database name; the fixture also checks post-backup table removal and unrelated-database preservation. No live upgrade is authorized by this implementation work.
+- Next Action: On Windows, run `npm ci`, typecheck, mocked Pester, then the opt-in isolated Docker E2E; this WSL pass could not run PowerShell or Docker E2E and lacked TypeScript dependencies. Schedule live Windows Host acceptance separately.
 - Exit Path: Archive after implementation and authorized Windows Host acceptance are complete; record any remaining issue as a separate follow-up.
 - Supporting Note: `docs/issues/items/I-007-gitea-version-lifecycle-operations.md`
 - Promotion Check: WBS `3.12` added; no architecture boundary or source-of-truth change is intended, so no ADR is required.
@@ -116,3 +116,4 @@ It does not replace forge issues, roadmap/WBS planning structure, the decision b
 - 2026-11-05: Added issue #3 as active near-term work and linked it to new WBS `3.12` and TC-011.
 - 2026-11-05: Updated issue #3 handoff to track mocked Pester checks and outstanding isolated Windows Docker validation separately from live acceptance.
 - 2026-11-05: Recorded the isolated Docker E2E harness, version-path correction, and the remaining Windows Host execution requirement.
+- 2026-11-05: Updated issue #3 handoff with the valid post-start failure path, exact target-database restore checks, and current WSL validation limits.

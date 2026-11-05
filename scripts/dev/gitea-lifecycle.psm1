@@ -256,7 +256,7 @@ function Invoke-GiteaDockerWithInputFile {
     if ($process.ExitCode -ne 0) {
         throw "Docker input operation failed (exit $($process.ExitCode)); output was not accepted. $stderr"
     }
-    $null = $stdoutTask.Result
+    return $stdoutTask.Result.Trim()
 }
 
 function Assert-DockerDesktopReady {
@@ -1271,7 +1271,19 @@ function Invoke-GiteaPostgresRestore {
         [Parameter(Mandatory = $true)][string]$DumpPath
     )
 
-    $restoreCommand = 'PGPASSWORD="$POSTGRES_PASSWORD" pg_restore --clean --if-exists --no-owner --no-acl --username "$POSTGRES_USER" --dbname "$POSTGRES_DB"'
+    $archiveListing = Invoke-GiteaDockerWithInputFile -Arguments @("exec", "-i", $Context.GiteaPostgresContainerName, "pg_restore", "--list") -InputPath $DumpPath
+    $databaseMatch = [regex]::Match([string]$archiveListing, '(?m)^;\s*dbname:\s*(?<name>.*?)\s*$')
+    if (-not $databaseMatch.Success) {
+        throw "The selected PostgreSQL archive does not identify its database; restore is blocked."
+    }
+    $archiveDatabaseName = [string]$databaseMatch.Groups["name"].Value.Trim()
+    if ($archiveDatabaseName -ne [string]$Context.GiteaPostgresDbName) {
+        throw "The selected PostgreSQL archive database name does not match the configured Gitea database; restore is blocked."
+    }
+
+    # --create with --clean drops and recreates only the database recorded in this verified archive.
+    # The connection database is the default administrative database; the PostgreSQL container stays in place.
+    $restoreCommand = 'PGPASSWORD="$POSTGRES_PASSWORD" pg_restore --clean --if-exists --create --exit-on-error --no-owner --no-acl --username "$POSTGRES_USER" --dbname postgres'
     Invoke-GiteaDockerWithInputFile -Arguments @("exec", "-i", $Context.GiteaPostgresContainerName, "sh", "-c", $restoreCommand) -InputPath $DumpPath
 }
 

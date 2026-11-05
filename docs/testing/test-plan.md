@@ -42,10 +42,11 @@ This plan currently covers local validation of the Phase 1 closed loop for:
 - explicit separation between platform self-test evidence and external target-repo service-evaluation evidence
 - the first docs-only and bounded-code external target fixture families used for internal-eval service evidence
 - the current P1 manual acceptance package that combines platform regression, provider-backed execution, and external-target checks in one ordered flow
+- safe local Gitea version lifecycle operations through mocked PowerShell checks and a GUID-isolated Docker fixture, with live Windows Host acceptance tracked separately
 
 ## Related Phase And WBS
 - Related Phase: `docs/roadmap.md` Phase 1
-- Primary WBS: `docs/wbs.md` WBS `3`, `3.1`, `3.2`, `3.3`, `3.4`, `3.5`, `3.6`, `3.7`, `3.9`, `3.10`, `3.11`
+- Primary WBS: `docs/wbs.md` WBS `3`, `3.1`, `3.2`, `3.3`, `3.4`, `3.5`, `3.6`, `3.7`, `3.9`, `3.10`, `3.11`, `3.12`
 
 ## Environment Matrix
 | Environment / Mode | Purpose | Primary Entry Point | Typical Evidence |
@@ -105,12 +106,14 @@ The current local validation window is considered healthy when:
 | `TC-006` | External Target Service-Evaluation Baseline | External target evaluation | verify that at least one non-platform target repo can carry the bounded workflow and produce service-quality evidence distinct from platform regression |
 | `TC-007` | External Target Bounded-Code Evaluation Baseline | External target evaluation | verify that the bounded-code path can be exercised on a non-platform repo with a reusable fixture and explicit edit-boundary rubric |
 | `TC-008` | Phase 1 Manual Deliver Acceptance | Manual acceptance | verify the current P1 slice in the intended operator order and capture one delivery-oriented acceptance outcome |
+| `TC-011` | Local Gitea Version Lifecycle Operations | Windows PowerShell/Pester plus isolated Docker acceptance | verify fail-closed lifecycle operations, exact target-database restore, unrelated-database preservation, and explicit recovery without using live services |
 
 ## Cadence And Triggers
 Run the relevant local regression cases when:
 - `scripts/task-gateway.js`, `scripts/agent-control.js`, `scripts/proposal-surface.js`, or `scripts/review-surface.js` change
 - local bootstrap config or Gitea callback settings change
 - CI workflow files or runner topology change
+- Gitea lifecycle PowerShell or backup/restore behavior changes; run `TC-011` without targeting the live Windows Host services
 - an issue or dashboard item identifies a new closed-loop regression risk
 
 ## Evidence Handling
@@ -135,3 +138,4 @@ Current interpretation rule:
 - 2026-04-24: Added the external-target evidence distinction and `TC-006` so service-quality claims are not based only on self-targeted platform runs.
 - 2026-04-24: Added `TC-007` for the second external-target fixture family so bounded-code service evaluation can be tracked separately from the first docs-only baseline.
 - 2026-04-24: Added `TC-008` and the delivery-oriented manual acceptance path for the current P1 slice.
+- 2026-11-05: Added WBS `3.12` and `TC-011` as a separate local Gitea lifecycle validation path with isolated Windows Docker acceptance.

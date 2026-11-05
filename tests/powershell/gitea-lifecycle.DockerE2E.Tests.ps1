@@ -95,6 +95,21 @@ function Wait-GiteaLifecycleE2EPostgres {
     throw "The isolated PostgreSQL fixture did not become ready."
 }
 
+function Invoke-GiteaLifecycleE2EPsql {
+    param(
+        [Parameter(Mandatory = $true)][string]$ContainerName,
+        [Parameter(Mandatory = $true)][string]$DatabaseName,
+        [Parameter(Mandatory = $true)][string]$Sql
+    )
+
+    $output = Invoke-GiteaLifecycleE2EDocker -Arguments @(
+        "exec", $ContainerName, "psql", "--no-psqlrc", "--set", "ON_ERROR_STOP=1",
+        "--username", "gitea", "--dbname", $DatabaseName,
+        "--tuples-only", "--no-align", "--command", $Sql
+    )
+    return (@($output) -join "`n").Trim()
+}
+
 function Wait-GiteaLifecycleE2EHttp {
     param([string]$Uri)
 
@@ -163,6 +178,7 @@ function Initialize-GiteaLifecycleE2EFixture {
         RunnerName = $runnerName
         RunnerContainerId = $null
         PostgresContainerId = $null
+        UnrelatedDatabaseName = "e2e_unrelated"
         GiteaUrl = $giteaUrl
         AdminUsername = "e2e-admin"
         AdminPassword = $adminPassword
@@ -213,6 +229,8 @@ function Initialize-GiteaLifecycleE2EFixture {
         "-e", "POSTGRES_PASSWORD=$dbPassword", "postgres:16"
     ) | Out-Null
     Wait-GiteaLifecycleE2EPostgres -ContainerName $postgresName
+    Invoke-GiteaLifecycleE2EPsql -ContainerName $postgresName -DatabaseName "postgres" -Sql "CREATE DATABASE e2e_unrelated" | Out-Null
+    Invoke-GiteaLifecycleE2EPsql -ContainerName $postgresName -DatabaseName "e2e_unrelated" -Sql "CREATE TABLE public.restore_sentinel (value text NOT NULL); INSERT INTO public.restore_sentinel (value) VALUES ('preserve-me')" | Out-Null
 
     Invoke-GiteaLifecycleE2EDocker -Arguments @(
         "run", "-d", "--name", $runnerName, "--network", $networkName, "--restart", "unless-stopped",
@@ -356,11 +374,21 @@ Describe "Gitea lifecycle isolated Docker acceptance" -Tag "DockerE2E" {
             param($Context)
             Mock Confirm-GiteaLifecycleOperation {}
             Mock Assert-GiteaApiVersion { throw "simulated-api-version-failure" }
-            { Invoke-GiteaLifecycle -Action upgrade -Context $Context -GiteaVersion "1.26.4" } | Should -Throw "*simulated-api-version-failure*"
+            { Invoke-GiteaLifecycle -Action upgrade -Context $Context -GiteaVersion "1.27.3" } | Should -Throw "*simulated-api-version-failure*"
         }
 
         $recoveryMarker = Join-Path $context.RepoRoot ".agent-sdlc\dev-env\gitea\lifecycle-recovery.json"
         Test-Path -LiteralPath $recoveryMarker -PathType Leaf | Should -BeTrue
+        $marker = Get-Content -LiteralPath $recoveryMarker -Raw | ConvertFrom-Json
+        $script:dockerE2EState.RecoveryBackupId = [string]$marker.backupId
+        $script:dockerE2EState.RecoveryBackupId | Should -Not -BeNullOrEmpty
+        $recoveryBackupPath = Join-Path $script:dockerE2EState.BackupRoot $script:dockerE2EState.RecoveryBackupId
+        $recoveryBackup = InModuleScope gitea-lifecycle -Parameters @{ BackupPath = $recoveryBackupPath } {
+            param($BackupPath)
+            Test-GiteaBackupIntegrity -BackupPath $BackupPath
+        }
+        $recoveryBackup.IsValid | Should -BeTrue
+        [string]$recoveryBackup.Manifest.sourceVersion | Should -Be "1.26.4"
         InModuleScope gitea-lifecycle -Parameters @{ Context = $context } {
             param($Context)
             { Assert-NoPendingGiteaRecovery -Context $Context } | Should -Throw "*blocked*"
@@ -370,14 +398,23 @@ Describe "Gitea lifecycle isolated Docker acceptance" -Tag "DockerE2E" {
         $activeName = Invoke-GiteaLifecycleE2EDocker -Arguments @("inspect", $script:dockerE2EState.GiteaName, "--format", "{{.State.Status}}")
         $activeName | Should -Be "running"
         $version = Invoke-RestMethod -Uri ($script:dockerE2EState.GiteaUrl + "api/v1/version") -Method Get
-        [string]$version.version | Should -Be "1.26.4"
+        [string]$version.version | Should -Be "1.27.3"
+        $headers = @{
+            Authorization = "Basic " + [Convert]::ToBase64String([Text.Encoding]::UTF8.GetBytes("$($script:dockerE2EState.AdminUsername):$($script:dockerE2EState.AdminPassword)"))
+        }
+        $repo = Invoke-RestMethod -Uri ($script:dockerE2EState.GiteaUrl + "api/v1/repos/e2e-admin/lifecycle-e2e-sentinel") -Method Get -Headers $headers
+        [string]$repo.name | Should -Be "lifecycle-e2e-sentinel"
+        $probeCreated = Invoke-GiteaLifecycleE2EPsql -ContainerName $script:dockerE2EState.PostgresName -DatabaseName "gitea" -Sql "CREATE TABLE public.lifecycle_post_backup_probe (id integer PRIMARY KEY)"
+        $probeCreated | Should -Be "CREATE TABLE"
+        $probeState = Invoke-GiteaLifecycleE2EPsql -ContainerName $script:dockerE2EState.PostgresName -DatabaseName "gitea" -Sql "SELECT CASE WHEN to_regclass('public.lifecycle_post_backup_probe') IS NULL THEN 'absent' ELSE 'present' END"
+        $probeState | Should -Be "present"
         $runnerId = Invoke-GiteaLifecycleE2EDocker -Arguments @("inspect", $script:dockerE2EState.RunnerName, "--format", "{{.Id}}")
         $runnerId | Should -Be $script:dockerE2EState.RunnerContainerId
     }
 
-    It "explicitly restores the matching source snapshot" -Skip:(-not $script:dockerE2EEnabled) {
+    It "explicitly restores the pre-failure exact database snapshot and preserves unrelated databases" -Skip:(-not $script:dockerE2EEnabled) {
         $context = $script:dockerE2EState.Context
-        $backupId = $script:dockerE2EState.InitialBackupId
+        $backupId = $script:dockerE2EState.RecoveryBackupId
         $backupId | Should -Not -BeNullOrEmpty
         $recoveryMarker = Join-Path $context.RepoRoot ".agent-sdlc\dev-env\gitea\lifecycle-recovery.json"
         InModuleScope gitea-lifecycle -Parameters @{ Context = $context; SelectedBackupId = $backupId } {
@@ -387,8 +424,12 @@ Describe "Gitea lifecycle isolated Docker acceptance" -Tag "DockerE2E" {
         }
 
         $version = Invoke-RestMethod -Uri ($script:dockerE2EState.GiteaUrl + "api/v1/version") -Method Get
-        [string]$version.version | Should -Be "1.25.5"
+        [string]$version.version | Should -Be "1.26.4"
         Test-Path -LiteralPath $recoveryMarker | Should -BeFalse
+        $probeState = Invoke-GiteaLifecycleE2EPsql -ContainerName $script:dockerE2EState.PostgresName -DatabaseName "gitea" -Sql "SELECT CASE WHEN to_regclass('public.lifecycle_post_backup_probe') IS NULL THEN 'absent' ELSE 'present' END"
+        $probeState | Should -Be "absent"
+        $unrelatedValue = Invoke-GiteaLifecycleE2EPsql -ContainerName $script:dockerE2EState.PostgresName -DatabaseName $script:dockerE2EState.UnrelatedDatabaseName -Sql "SELECT value FROM public.restore_sentinel"
+        $unrelatedValue | Should -Be "preserve-me"
         $runner = Invoke-GiteaLifecycleE2EDocker -Arguments @("inspect", $script:dockerE2EState.RunnerName, "--format", "{{.State.Status}}")
         $runner | Should -Be "running"
         $runnerId = Invoke-GiteaLifecycleE2EDocker -Arguments @("inspect", $script:dockerE2EState.RunnerName, "--format", "{{.Id}}")

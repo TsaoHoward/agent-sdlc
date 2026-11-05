@@ -16,7 +16,7 @@ Verify the operator-facing upgrade, backup-list, and restore commands protect th
 
 ## Scope
 
-Run the automated Pester suite against temporary directories and a mocked Docker/API boundary through the exported lifecycle command. It covers supported version steps, backup path separation, checksum validation, upgrade ordering and health-failure behavior, recovery-marker/image-pin ordering, source-service recovery after stop failure, restore Backup ID and manifest gates, typed-confirmation refusal, and diagnostic-backup/database/data/config/image restoration ordering without opening a Docker connection. The opt-in Docker E2E creates GUID-named Gitea/PostgreSQL/Runner fixtures with isolated bind mounts and publishes only on `127.0.0.2`; it exercises an actual upgrade, backup listing/integrity, a forced post-migration failure, and explicit restore. The E2E snapshots all pre-existing container identities/states and removes only its uniquely named resources. Neither suite has been executed on Windows yet.
+Run the automated Pester suite against temporary directories and a mocked Docker/API boundary through the exported lifecycle command. It covers supported version steps, backup path separation, checksum validation, upgrade ordering and health-failure behavior, recovery-marker/image-pin ordering, source-service recovery after stop failure, restore Backup ID and manifest gates, typed-confirmation refusal, exact PostgreSQL database recreation, and diagnostic-backup retention after restore failure without opening a Docker connection. The opt-in Docker E2E creates GUID-named Gitea/PostgreSQL/Runner fixtures with isolated bind mounts and publishes only on `127.0.0.2`; it upgrades from `1.25.5` to `1.26.4`, checks backup listing/integrity, then starts `1.27.3` and injects a failure after the new version is reachable. It explicitly restores the `1.26.4` pre-failure backup, verifies a table added after that backup disappears, confirms existing repository data remains, and verifies an unrelated database in the same PostgreSQL container is unchanged. The E2E snapshots all pre-existing container identities/states and removes only its uniquely named resources.
 
 Live acceptance for the real 43000 instance is a separate, authorized Windows Host operation. It must also cover API, Git read/write, Registry access, Actions dispatch and Runner execution, Run Attempt visibility, and representative integrations. The local-agent-infra #29 E2E remains a separate result.
 
@@ -34,6 +34,7 @@ Live acceptance for the real 43000 instance is a separate, authorized Windows Ho
 - A temporary legacy-style Gitea and PostgreSQL container description with bind-mounted data/config, port 43000, and an isolated Runner.
 - Corrupt/missing manifest, changed checksum, insufficient-space, and active-job fixtures.
 - Backup set containing database dump, data/config trees, sensitive bootstrap payload, private runtime topology, and a manifest.
+- A second database with a sentinel row plus a table created in the Gitea database after the selected backup, to prove database scope and exact restoration.
 
 ## Steps
 
@@ -42,10 +43,10 @@ Live acceptance for the real 43000 instance is a separate, authorized Windows Ho
 3. Run `upgrade` without a version, with a floating tag, an unsupported version jump, an unexpected port/mount/network, or active Runner jobs; confirm each stops before service mutation.
 4. Force insufficient backup space and confirm no older backup is removed and no container is stopped/recreated.
 5. Set `$env:AGENT_SDLC_GITEA_DOCKER_E2E = "1"` and run `npm run test:gitea-lifecycle:docker-e2e`; confirm it uses only GUID-named fixtures, an isolated network and bind mounts, and the `.2` loopback endpoints.
-6. Confirm the E2E upgrades 1.25.5 to 1.26.4, validates the retained backup and backup-list output, then forces a post-migration API-version check failure. Verify the marker remains, the original fixture Runner stays stopped, and no automatic rollback occurs.
-7. Confirm the E2E explicitly restores the selected 1.25.5 backup, passes HTTP/API checks, clears the marker, resumes the same fixture Runner, and leaves every pre-existing container identity/state unchanged.
+6. Confirm the E2E upgrades `1.25.5` to `1.26.4`, validates the retained backup and backup-list output, then requests the valid next step `1.27.3`. The test injects an API-version-check failure after startup; verify the new API reports `1.27.3`, the marker identifies the retained `1.26.4` backup, the fixture Runner stays stopped, and no automatic rollback occurs.
+7. After the failed upgrade backup has been captured, create `public.lifecycle_post_backup_probe` in the fixture Gitea database. Explicitly restore the marker's `1.26.4` Backup ID. Verify the API reports `1.26.4`, the probe table is absent, the pre-existing sentinel repository remains, the separate `e2e_unrelated` database still contains its sentinel row, the marker is cleared, and the same fixture Runner and PostgreSQL container IDs remain in place.
 8. Attempt restore with a missing ID, corrupt checksum, or incorrect typed confirmation; confirm live data is unchanged.
-9. Confirm a valid restore; verify a separate diagnostic snapshot is retained first, then verify the selected database/files/settings/Image/topology are restored as one unit. Confirm the Runner keeps its original container and registration.
+9. Confirm a valid restore creates a separate diagnostic snapshot first, then recreates only the database whose name is recorded in the selected archive. Verify files/settings/Image/topology are restored as a unit, the PostgreSQL container and unrelated databases remain unchanged, and the Runner keeps its original container and registration.
 10. If separately authorized, perform the manual Windows Host acceptance sequence and record all smoke evidence before treating the service upgrade as accepted.
 
 ## Expected Results
@@ -54,7 +55,9 @@ Live acceptance for the real 43000 instance is a separate, authorized Windows Ho
 - The new Gitea container is not created until a complete, integrity-verified backup exists.
 - Backup storage is outside all live Gitea/PostgreSQL writable mounts, has a restrictive Windows ACL, and no command silently deletes a prior backup.
 - Restore requires a valid Backup ID, intact manifest/checksums, and a typed confirmation naming that ID and the overwritten instance.
+- Restore validates that the archive's embedded database name matches the configured Gitea database, then uses `pg_restore --clean --create` to recreate that database from the backup point. It does not recreate the PostgreSQL container or touch another database.
 - Restore preserves the overwritten failed state separately and never starts an old Image against the upgraded database.
+- If database restore fails, the diagnostic backup and recovery marker remain and automatic bootstrap stays blocked.
 - An incomplete lifecycle operation blocks automatic bootstrap startup until an explicit restore completes successfully.
 - PostgreSQL and Runner container identities/storage are preserved; Compose 46300 and unrelated services are untouched.
 - No live acceptance is reported from the isolated simulation.
@@ -71,10 +74,11 @@ Live acceptance for the real 43000 instance is a separate, authorized Windows Ho
 
 ## Current Execution Result
 
-- Passed in WSL: `npm run validate:platform`.
+- Passed in this WSL pass: `npm run validate:platform`, `git diff --check`, and `package.json` JSON parsing.
 - Not executed: Pester; `npm run test:gitea-lifecycle` exits 127 because `powershell` is not installed in WSL.
-- Not executed: Typecheck; `npm run typecheck` exits 1 because `node_modules/typescript/bin/tsc` is absent. `npm ci` could not fetch `@types/node` because `registry.npmjs.org` returned `EAI_AGAIN`; the offline cache is incomplete and read-only.
-- Not executed: Docker E2E; Docker CLI access is denied by the WSL Docker socket permission on `/var/run/docker.sock`.
+- Not completed: Typecheck; `npm run typecheck` exits 1 because `node_modules/typescript/bin/tsc` is absent. The earlier `npm ci` attempt could not fetch `@types/node` because `registry.npmjs.org` returned `EAI_AGAIN`; it was not retried in this pass.
+- Not executed: Docker E2E; `npm run test:gitea-lifecycle:docker-e2e` exits 127 because `powershell` is not installed. Separately, `docker info` is denied access to `/var/run/docker.sock` in WSL.
+- No PowerShell/Pester, TypeScript, or Docker E2E result is marked passed.
 - No live Gitea, PostgreSQL, Runner, or Compose service was operated.
 
 ## Cleanup
@@ -85,3 +89,4 @@ Use disposable test directories/containers only. Do not delete backup fixtures a
 - 2026-11-05: Initial version from issue #3 implementation contract.
 - 2026-11-05: Added exported lifecycle-command coverage for restore identity, integrity, confirmation, diagnostic snapshot, and ordered matching-state restoration gates.
 - 2026-11-05: Added unexecuted Windows Docker E2E coverage and recorded the WSL PowerShell, Docker socket, and npm dependency-install limitations.
+- 2026-11-05: Fixed the isolated failure path to use the valid `1.26.4` to `1.27.3` step and added exact database recreation plus post-backup-table and unrelated-database assertions; Windows execution remains pending.

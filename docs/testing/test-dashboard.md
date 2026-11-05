@@ -41,7 +41,7 @@ It does not replace CI run history, forge issue or PR history, roadmap/WBS plann
 | Test ID | Title | Status | Mode | Related Docs / WBS | Next Action | Exit Path |
 |---|---|---|---|---|---|---|
 | TC-001 | CLI Replay Intake And Session Smoke | Ready | CLI replay | `docs/roadmap.md` Phase 1; WBS `3.1`, `3.2`, `3.3` | Re-run when intake or session-start behavior changes and keep the case note current if task/session fields or evidence paths move | Move out after the current validation window once the case no longer needs active dashboard attention; keep the canonical case note as the long-lived procedure |
-| TC-011 | Local Gitea Version Lifecycle Operations | In Progress | Windows PowerShell/Pester plus isolated Docker acceptance | `docs/testing/items/TC-011-gitea-version-lifecycle-operations.md`; WBS `3.12` | Run `npm ci`, typecheck, mocked Pester, and opt-in GUID-isolated Docker E2E on Windows; leave live acceptance separately authorized | Move out after isolated CLI verification and separately authorized Windows Host acceptance; keep the canonical case note as the long-lived procedure |
+| TC-011 | Local Gitea Version Lifecycle Operations | In Progress | Windows PowerShell/Pester plus isolated Docker acceptance | `docs/testing/items/TC-011-gitea-version-lifecycle-operations.md`; WBS `3.12` | On Windows, run `npm ci`, typecheck, mocked Pester, then GUID-isolated Docker E2E for `1.26.4` -> `1.27.3` failure, explicit restore, removal of a post-backup table, and preservation of an unrelated database; keep live acceptance separate | Move out after isolated CLI verification and separately authorized Windows Host acceptance; keep the canonical case note as the long-lived procedure |
 
 ## Test Items
 
@@ -87,3 +87,4 @@ It does not replace CI run history, forge issue or PR history, roadmap/WBS plann
 - 2026-11-05: Added draft TC-011 for the Gitea upgrade/backup/restore CLI and its separate live Windows Host acceptance boundary.
 - 2026-11-05: Updated TC-011 to distinguish the mocked Pester suite from the outstanding Windows Docker-boundary and live acceptance procedures.
 - 2026-11-05: Added the opt-in isolated Docker E2E and recorded that Windows execution remains outstanding because WSL lacks PowerShell, Docker daemon access, and installed npm dependencies.
+- 2026-11-05: Corrected the Docker E2E to exercise a valid next-version failure and exact database restore, including post-backup table removal and unrelated-database preservation; Windows execution remains outstanding.

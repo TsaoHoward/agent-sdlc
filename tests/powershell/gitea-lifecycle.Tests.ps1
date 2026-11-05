@@ -382,5 +382,70 @@ Describe "Gitea lifecycle operator restore command" {
             $script:restoreActions.IndexOf("operation-record") | Should -BeLessThan $script:restoreActions.IndexOf("clear-recovery-marker")
             $script:restoreActions | Should -Contain "clear-recovery-marker"
         }
+
+        It "retains the recovery marker and diagnostic backup when PostgreSQL restore fails" {
+            Mock Get-GiteaBackupById { return $script:selectedBackup }
+            Mock Invoke-GiteaPostgresRestore { throw "simulated-postgres-restore-failure" }
+
+            { Invoke-GiteaLifecycle -Action restore -Context $script:restoreContext -BackupId "20261105T000000Z-0123456789abcdef0123456789abcdef" } | Should -Throw "simulated-postgres-restore-failure"
+
+            $script:restoreActions | Should -Contain "backup-pre-restore-diagnostic"
+            $script:restoreActions | Should -Contain "set-recovery-marker"
+            $script:restoreActions | Should -Not -Contain "clear-recovery-marker"
+            $script:restoreActions | Should -Not -Contain "create-gitea:$($script:restoreRuntime.imageReference)"
+        }
+    }
+}
+
+Describe "Gitea PostgreSQL exact-state restore" {
+    InModuleScope gitea-lifecycle {
+        BeforeEach {
+            $script:postgresRestoreInputCalls = [System.Collections.Generic.List[object]]::new()
+            Mock Invoke-GiteaDockerWithInputFile {
+                param($Arguments, $InputPath)
+                $script:postgresRestoreInputCalls.Add([pscustomobject]@{
+                    Arguments = @($Arguments)
+                    InputPath = $InputPath
+                })
+                if (@($Arguments) -contains "--list") {
+                    return ";     dbname: gitea`n;     TOC Entries: 123"
+                }
+                return ""
+            }
+        }
+
+        It "recreates only the database named by the selected archive in the existing PostgreSQL container" {
+            $context = @{
+                GiteaPostgresContainerName = "fixture-postgres"
+                GiteaPostgresDbName = "gitea"
+            }
+
+            Invoke-GiteaPostgresRestore -Context $context -DumpPath "C:\isolated-backups\fixture\payload\postgres.dump"
+
+            $script:postgresRestoreInputCalls.Count | Should -Be 2
+            ($script:postgresRestoreInputCalls[0].Arguments -join " ") | Should -Be "exec -i fixture-postgres pg_restore --list"
+            $script:postgresRestoreInputCalls[0].InputPath | Should -Be "C:\isolated-backups\fixture\payload\postgres.dump"
+            $restoreCommand = [string]$script:postgresRestoreInputCalls[1].Arguments[-1]
+            $restoreCommand | Should -Match 'pg_restore --clean --if-exists --create --exit-on-error'
+            $restoreCommand | Should -Match '--username "\$POSTGRES_USER" --dbname postgres'
+            $restoreCommand | Should -Not -Match '--dbname "\$POSTGRES_DB"'
+            $script:postgresRestoreInputCalls[1].Arguments[2] | Should -Be "fixture-postgres"
+            $script:postgresRestoreInputCalls[1].InputPath | Should -Be "C:\isolated-backups\fixture\payload\postgres.dump"
+        }
+
+        It "refuses an archive whose embedded database name differs from the configured Gitea database" {
+            Mock Invoke-GiteaDockerWithInputFile {
+                param($Arguments, $InputPath)
+                return ";     dbname: unrelated_database`n;     TOC Entries: 123"
+            }
+            $context = @{
+                GiteaPostgresContainerName = "fixture-postgres"
+                GiteaPostgresDbName = "gitea"
+            }
+
+            { Invoke-GiteaPostgresRestore -Context $context -DumpPath "C:\isolated-backups\fixture\payload\postgres.dump" } | Should -Throw "*database name*does not match*"
+
+            Should -Invoke Invoke-GiteaDockerWithInputFile -Times 1 -ParameterFilter { @($Arguments) -contains "--list" }
+        }
     }
 }
