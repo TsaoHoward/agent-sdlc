@@ -16,7 +16,7 @@ Verify the operator-facing upgrade, backup-list, and restore commands protect th
 
 ## Scope
 
-Run the automated Pester suite against temporary directories and mocked Docker/API calls. It covers supported version steps, backup path separation, checksum validation, backup-before-recreation ordering, and health-failure behavior without opening a Docker connection. Full topology, capacity, no-active-job, restore, and isolated disposable-container integration checks remain outstanding on a Windows test host.
+Run the automated Pester suite against temporary directories and a mocked Docker/API boundary through the exported lifecycle command. It covers supported version steps, backup path separation, checksum validation, upgrade ordering and health-failure behavior, restore Backup ID and manifest gates, typed-confirmation refusal, and diagnostic-backup/database/data/config/image restoration ordering without opening a Docker connection. Full topology, capacity, no-active-job, backup-list, and isolated disposable-container integration checks remain outstanding on a Windows test host.
 
 Live acceptance for the real 43000 instance is a separate, authorized Windows Host operation. It must also cover API, Git read/write, Registry access, Actions dispatch and Runner execution, Run Attempt visibility, and representative integrations. The local-agent-infra #29 E2E remains a separate result.
 
@@ -73,3 +73,4 @@ Use disposable test directories/containers only. Do not delete backup fixtures a
 
 ## Change Log
 - 2026-11-05: Initial version from issue #3 implementation contract.
+- 2026-11-05: Added exported lifecycle-command coverage for restore identity, integrity, confirmation, diagnostic snapshot, and ordered matching-state restoration gates.

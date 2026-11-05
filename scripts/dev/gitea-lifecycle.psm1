@@ -66,9 +66,8 @@ function Assert-SafeBackupRoot {
         throw "Gitea backups must use a local Windows drive path; UNC and relative locations are not allowed."
     }
     Assert-NoReparsePathAncestors -Path $backupRoot
-    if ((Get-FullPath -Path $Context.RepoRoot).Equals($backupRoot, [StringComparison]::OrdinalIgnoreCase) -or
-        (Test-PathContains -Parent $Context.RepoRoot -Child $backupRoot)) {
-        throw "The Gitea backup root must be outside the Git repository."
+    if (Test-PathsOverlap -First $backupRoot -Second $Context.RepoRoot) {
+        throw "The Gitea backup root must not overlap the Git repository."
     }
 
     foreach ($livePath in @($Context.GiteaDataDir, $Context.GiteaConfigDir, $Context.GiteaPostgresDataDir)) {
