@@ -317,7 +317,7 @@
 - Dependencies: 1.5, 3.7
 - Critical-Path-Candidate: No
 - Status: In Progress
-- Notes: Implements issue #3 without changing the separate Compose 46300 environment, PostgreSQL or Runner identity, and without authorizing a live upgrade. Every upgrade requires an explicit fixed version, verifies the legacy container identity and mounts, checks Runner activity and local capacity, then requires a complete checksum-verified backup before recreating only Gitea. Restore requires a Backup ID and confirmation; it preserves the current failed state as a separate diagnostic backup before overwriting. An incomplete operation leaves bootstrap `up` blocked until explicit restore succeeds.
+- Notes: Implements issue #3 without changing the separate Compose 46300 environment, PostgreSQL or Runner identity, and without authorizing a live upgrade. Every upgrade requires an explicit fixed version, verifies the legacy container identity and mounts, checks Runner activity and local capacity, then requires a complete checksum-verified backup before recreating only Gitea. Restore requires a Backup ID and confirmation; it preserves the current failed state as a separate diagnostic backup before overwriting. An incomplete operation leaves bootstrap `up` blocked until explicit restore succeeds. Official guidance plus release notes support the candidate sequence 1.25.5 -> 1.26.4 -> 1.27.3 -> 28.3.0; the final direct jump is inferred from the documented next-series rule and the dropped `1.` version prefix, so the live operator must review breaking changes. Mocked Pester and isolated Docker E2E procedures now cover marker/image-pin ordering, service-stop recovery, upgrade, backup-list, post-migration failure, restore, and existing-container isolation. These Windows checks have not run in WSL; WBS remains In Progress until Windows evidence is captured.
 
 ### WBS 4 — Controlled Expansion
 - Parent:
@@ -517,3 +517,4 @@
 - 2026-04-29: Kept WBS `3` and `3.9` in progress after a fresh docs-safe run exposed a large-file truncation regression in the current agent-execution contract.
 - 2026-04-30: Marked WBS `3` and `3.9` done after the large-file docs-update fix was revalidated through live rerun evidence on `PR #44` / run `#71`.
 - 2026-11-05: Added WBS `3.12` for issue #3 as a bounded Phase 1 operator-maintenance follow-up; live service changes remain separately authorized.
+- 2026-11-05: Updated WBS `3.12` with the verified Gitea 28.x upgrade-series path and the outstanding Windows execution gate for TC-011.

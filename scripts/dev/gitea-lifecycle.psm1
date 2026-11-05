@@ -634,10 +634,13 @@ function Assert-SupportedGiteaVersionStep {
         throw "The target Gitea version must be newer than the current version."
     }
 
-    $sameSeries = $target.Major -eq $current.Major -and $target.Minor -eq $current.Minor
-    $nextMinor = $target.Major -eq $current.Major -and $target.Minor -eq ($current.Minor + 1)
-    $versioningBoundary = $current.Major -eq 1 -and $current.Minor -eq 27 -and $target.Major -eq 28 -and $target.Minor -eq 0
-    if (-not ($sameSeries -or $nextMinor -or $versioningBoundary)) {
+    # Gitea 28.x dropped the historical "1." prefix. The 28.x releases are
+    # maintenance releases of the same series, and follow 1.27.x directly.
+    $legacySameSeries = $current.Major -eq 1 -and $target.Major -eq 1 -and $target.Minor -eq $current.Minor
+    $legacyNextSeries = $current.Major -eq 1 -and $target.Major -eq 1 -and $target.Minor -eq ($current.Minor + 1)
+    $enterVersion28Series = $current.Major -eq 1 -and $current.Minor -eq 27 -and $target.Major -eq 28
+    $withinVersion28Series = $current.Major -eq 28 -and $target.Major -eq 28
+    if (-not ($legacySameSeries -or $legacyNextSeries -or $enterVersion28Series -or $withinVersion28Series)) {
         throw "The requested version is not the same Gitea series or its immediately following release series. Upgrade through each intermediate series and verify its release guidance."
     }
 }
@@ -1477,6 +1480,25 @@ function Set-GiteaBootstrapImagePin {
     }
 }
 
+function Resume-GiteaUpgradeSource {
+    param(
+        [hashtable]$Context,
+        [bool]$RunnerWasRunning
+    )
+
+    $source = Get-GiteaContainerInfo -Name $Context.GiteaContainerName
+    if (-not $source) {
+        throw "The unchanged source Gitea container '$($Context.GiteaContainerName)' is missing."
+    }
+    if ([string]$source.State.Status -ne "running") {
+        [void](Invoke-GiteaDocker -Arguments @("start", $Context.GiteaContainerName))
+    }
+    Wait-GiteaHealthy -Context $Context -TimeoutSeconds 120
+    if ($RunnerWasRunning) {
+        Start-GiteaRunner -Name $Context.GiteaRunnerContainerName
+    }
+}
+
 function Invoke-GiteaUpgrade {
     param(
         [hashtable]$Context,
@@ -1514,25 +1536,28 @@ function Invoke-GiteaUpgrade {
 
     # Close the window for new work before stopping Gitea. Any queued or active run blocks the snapshot.
     Assert-NoActiveGiteaActions -Context $Context
-    Stop-GiteaRunner -Name $Context.GiteaRunnerContainerName
     try {
+        Stop-GiteaRunner -Name $Context.GiteaRunnerContainerName
         Assert-NoActiveGiteaActions -Context $Context
+        [void](Invoke-GiteaDocker -Arguments @("stop", "--time", "60", $Context.GiteaContainerName))
     }
     catch {
-        if ($runnerWasRunning) { Start-GiteaRunner -Name $Context.GiteaRunnerContainerName }
+        try {
+            Resume-GiteaUpgradeSource -Context $Context -RunnerWasRunning $runnerWasRunning
+        }
+        catch {
+            throw "The upgrade stopped before backup or data migration, but the unchanged source service could not be resumed. Inspect Gitea and Runner container state."
+        }
         throw
     }
 
-    [void](Invoke-GiteaDocker -Arguments @("stop", "--time", "60", $Context.GiteaContainerName))
     try {
         $backup = New-GiteaBackupSet -Context $Context -Kind upgrade -GiteaContainer $gitea -PostgresContainer $postgres -SourceVersion $sourceVersion -RunnerWasRunning $runnerWasRunning -Capacity $capacity
     }
     catch {
         # No new Image has started, so the unchanged source container is safe to resume.
         try {
-            [void](Invoke-GiteaDocker -Arguments @("start", $Context.GiteaContainerName))
-            Wait-GiteaHealthy -Context $Context -TimeoutSeconds 120
-            if ($runnerWasRunning) { Start-GiteaRunner -Name $Context.GiteaRunnerContainerName }
+            Resume-GiteaUpgradeSource -Context $Context -RunnerWasRunning $runnerWasRunning
         }
         catch {
             throw "Backup creation failed before upgrade. The source data was not migrated; Gitea or Runner could not be resumed automatically. Inspect the incomplete backup and container state."
@@ -1541,17 +1566,14 @@ function Invoke-GiteaUpgrade {
     }
 
     try {
-        Set-GiteaBootstrapImagePin -Context $Context -ImageReference $targetImage
         Set-GiteaLifecycleRecoveryMarker -Context $Context -OperationKind upgrade -BackupId $backup.BackupId
     }
     catch {
         try {
-            [void](Invoke-GiteaDocker -Arguments @("start", $Context.GiteaContainerName))
-            Wait-GiteaHealthy -Context $Context -TimeoutSeconds 120
-            if ($runnerWasRunning) { Start-GiteaRunner -Name $Context.GiteaRunnerContainerName }
+            Resume-GiteaUpgradeSource -Context $Context -RunnerWasRunning $runnerWasRunning
         }
         catch {
-            throw "The backup is valid, but the fixed image pin or recovery marker could not be written and the unchanged source service could not be resumed. Inspect Backup ID '$($backup.BackupId)' and container state."
+            throw "The backup is valid, but the recovery marker could not be written and the unchanged source service could not be resumed. Inspect Backup ID '$($backup.BackupId)' and container state."
         }
         throw
     }
@@ -1563,10 +1585,25 @@ function Invoke-GiteaUpgrade {
         New-GiteaContainerFromRuntime -Context $Context -Runtime $runtime -ImageReference $targetImage
         Wait-GiteaHealthy -Context $Context
         Assert-GiteaApiVersion -Context $Context -ExpectedVersion $GiteaVersion
-        if ($runnerWasRunning) { Start-GiteaRunner -Name $Context.GiteaRunnerContainerName }
     }
     catch {
         throw "Gitea upgrade did not pass its startup/version health checks. Backup '$($backup.BackupId)' and the stopped source container '$oldContainerName' are retained; no automatic rollback was attempted. $($_.Exception.Message)"
+    }
+
+    try {
+        # Keep the bootstrap image unchanged until the migrated service proves healthy.
+        Set-GiteaBootstrapImagePin -Context $Context -ImageReference $targetImage
+    }
+    catch {
+        throw "Gitea passed startup/version health checks, but the bootstrap image pin could not be updated. Recovery marker and backup '$($backup.BackupId)' are retained; the Runner remains stopped."
+    }
+    if ($runnerWasRunning) {
+        try {
+            Start-GiteaRunner -Name $Context.GiteaRunnerContainerName
+        }
+        catch {
+            throw "Gitea passed startup/version health checks, but the original Runner could not be resumed. Recovery marker and backup '$($backup.BackupId)' are retained."
+        }
     }
 
     $record = @{

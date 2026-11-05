@@ -63,14 +63,46 @@ Describe "Gitea lifecycle safety helpers" {
             { Assert-SupportedGiteaVersionStep -CurrentVersion "1.25.5" -TargetVersion "1.27.0" } | Should -Throw
         }
 
-        It "accepts the Gitea 1.27 to 28.0 versioning boundary" {
-            { Assert-SupportedGiteaVersionStep -CurrentVersion "1.27.9" -TargetVersion "28.0.0" } | Should -Not -Throw
+        It "accepts the Gitea 1.27 to 28.x versioning boundary and direct 28-series maintenance updates" {
+            { Assert-SupportedGiteaVersionStep -CurrentVersion "1.27.9" -TargetVersion "28.3.0" } | Should -Not -Throw
+            { Assert-SupportedGiteaVersionStep -CurrentVersion "28.0.0" -TargetVersion "28.3.0" } | Should -Not -Throw
+            { Assert-SupportedGiteaVersionStep -CurrentVersion "28.2.0" -TargetVersion "28.3.0" } | Should -Not -Throw
         }
 
         It "rejects floating, same-or-older, and unverified multi-series targets" {
             { Assert-SupportedGiteaVersionStep -CurrentVersion "1.25.5" -TargetVersion "latest" } | Should -Throw
             { Assert-SupportedGiteaVersionStep -CurrentVersion "1.25.5" -TargetVersion "1.25.5" } | Should -Throw
             { Assert-SupportedGiteaVersionStep -CurrentVersion "1.25.5" -TargetVersion "28.3.0" } | Should -Throw
+        }
+
+        It "fails closed on insufficient backup capacity before stopping services" {
+            Mock Assert-BackupCapacity { throw "insufficient-space" }
+
+            { Invoke-GiteaLifecycle -Action upgrade -Context $script:upgradeContext -GiteaVersion "1.26.0" } | Should -Throw "insufficient-space"
+
+            $script:lifecycleActions | Should -Not -Contain "stop-runner"
+            $script:lifecycleActions | Should -Not -Contain "backup"
+            $script:lifecycleActions | Should -Not -Contain "pin-image"
+            $script:lifecycleActions | Should -Not -Contain "create-gitea"
+        }
+
+        It "resumes the original Runner when new Actions work is detected after it stops" {
+            $script:actionsCheckCount = 0
+            Mock Assert-NoActiveGiteaActions {
+                $script:actionsCheckCount += 1
+                if ($script:actionsCheckCount -eq 3) { throw "active-run-detected" }
+            }
+            Mock Get-GiteaContainerInfo {
+                return [pscustomobject]@{ State = [pscustomobject]@{ Status = "running" } }
+            }
+
+            { Invoke-GiteaLifecycle -Action upgrade -Context $script:upgradeContext -GiteaVersion "1.26.0" } | Should -Throw "active-run-detected"
+
+            $script:lifecycleActions | Should -Contain "stop-runner"
+            $script:lifecycleActions | Should -Contain "health"
+            $script:lifecycleActions | Should -Contain "start-runner"
+            $script:lifecycleActions | Should -Not -Contain "backup"
+            $script:lifecycleActions | Should -Not -Contain "create-gitea"
         }
 
         It "rejects backup roots inside the repository or overlapping live data" {
@@ -126,7 +158,52 @@ Describe "Gitea lifecycle safety helpers" {
             $script:lifecycleActions | Should -Contain "set-recovery-marker"
             $script:lifecycleActions | Should -Contain "clear-recovery-marker"
             $script:lifecycleActions | Should -Contain "start-runner"
+            $script:lifecycleActions.IndexOf("set-recovery-marker") | Should -BeLessThan $script:lifecycleActions.IndexOf("pin-image")
+            $script:lifecycleActions.IndexOf("api-version") | Should -BeLessThan $script:lifecycleActions.IndexOf("pin-image")
             $script:lifecycleActions | Should -Not -Contain "docker start agent-sdlc-gitea"
+        }
+
+        It "does not change the bootstrap image when the recovery marker cannot be written" {
+            Mock Get-GiteaContainerInfo {
+                return [pscustomobject]@{
+                    State = [pscustomobject]@{ Status = "running" }
+                }
+            }
+            Mock Set-GiteaLifecycleRecoveryMarker { throw "marker-write-failed" }
+
+            { Invoke-GiteaLifecycle -Action upgrade -Context $script:upgradeContext -GiteaVersion "1.26.0" } | Should -Throw "marker-write-failed"
+
+            $script:lifecycleActions | Should -Contain "backup"
+            $script:lifecycleActions | Should -Contain "start-runner"
+            $script:lifecycleActions | Should -Not -Contain "pin-image"
+            $script:lifecycleActions | Should -Not -Contain "create-gitea"
+        }
+
+        It "resumes the unchanged source service and original Runner when stopping Gitea fails" {
+            $script:sourceContainerStopped = $false
+            Mock Get-GiteaContainerInfo {
+                $status = if ($script:sourceContainerStopped) { "exited" } else { "running" }
+                return [pscustomobject]@{ State = [pscustomobject]@{ Status = $status } }
+            }
+            Mock Invoke-GiteaDocker {
+                param($Arguments, $AllowFailure)
+                $command = "docker $($Arguments -join ' ')"
+                $script:lifecycleActions.Add($command)
+                if ($command -eq "docker stop --time 60 agent-sdlc-gitea") {
+                    $script:sourceContainerStopped = $true
+                    throw "simulated-stop-failure"
+                }
+                return [pscustomobject]@{ ExitCode = 0; StdOut = ""; StdErr = "" }
+            }
+
+            { Invoke-GiteaLifecycle -Action upgrade -Context $script:upgradeContext -GiteaVersion "1.26.0" } | Should -Throw "simulated-stop-failure"
+
+            $script:lifecycleActions | Should -Contain "docker start agent-sdlc-gitea"
+            $script:lifecycleActions | Should -Contain "health"
+            $script:lifecycleActions | Should -Contain "start-runner"
+            $script:lifecycleActions | Should -Not -Contain "backup"
+            $script:lifecycleActions | Should -Not -Contain "pin-image"
+            $script:lifecycleActions | Should -Not -Contain "create-gitea"
         }
 
         It "retains the backup and does not automatically roll back after a health failure" {

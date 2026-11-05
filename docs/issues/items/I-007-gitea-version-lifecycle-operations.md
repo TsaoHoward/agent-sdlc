@@ -21,7 +21,7 @@ The instance owns persistent repositories, Actions data, Registry packages, and 
 
 The latest GitHub spec requires explicit fixed-version upgrades, exact legacy-container and bind-mount checks, Runner quiescence, local capacity checks, a retained checksum-verified backup before container recreation, and a manually confirmed restore by Backup ID. Backups remain on the Windows Host and are never automatically rotated or deleted. A failed upgrade is left in place for diagnosis; restore first saves the current failed state as a separate diagnostic backup. An incomplete operation leaves a recovery marker that blocks bootstrap `up` until explicit restore succeeds.
 
-The issue identifies Gitea 28.3.0-rootless as a candidate. Official release and Docker tag availability have been checked; the operator must still verify the supported upgrade path from the actual running version before live maintenance. No live upgrade is authorized by this implementation request.
+The issue identifies Gitea 28.3.0-rootless as a candidate. Official upgrade guidance supports upgrading directly to the latest release in the next series after a full backup. Gitea 28.0.0 documents that the historical `1.` prefix was dropped, and 28.3.0 is the third maintenance release of the 28 series. Based on that rule, the candidate path from the issue's 1.25.5 baseline is 1.26.4 -> 1.27.3 -> 28.3.0; skipping 28.0.0 is an inference from the documented next-series rule and the new version naming, not a published Gitea-specific migration matrix. Review each release changelog and confirm the actual source version before any separately authorized live maintenance. No live upgrade is authorized by this implementation request.
 
 ## Dependencies And Constraints
 
@@ -40,9 +40,10 @@ Archive after implementation review and authorized Windows Host acceptance are c
 
 ## Next Actions
 
-- Run the mocked Pester suite and complete the broader isolated Windows Docker-boundary verification.
+- Run `npm ci`, typecheck, mocked Pester, and the opt-in isolated Docker E2E on Windows; WSL has no PowerShell, Docker daemon access, or installable npm dependencies in this environment.
 - Before live maintenance, verify actual container topology, disk capacity, source version, official upgrade path, and representative smoke checks on Windows.
 
 ## Change Log
 - 2026-11-05: Initial version from issue #3 and its latest authoritative spec comment.
 - 2026-11-05: Added the guarded lifecycle entrypoint and mocked Pester coverage; native Windows integration and live acceptance remain outstanding.
+- 2026-11-05: Added the isolated Docker E2E harness, corrected the 28.x upgrade-series handling from official Gitea guidance, and recorded that Windows execution is still required.

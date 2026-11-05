@@ -155,6 +155,19 @@ The npm `dev:env:init` and `dev:env:up*` commands ensure the ignored local Gitea
 
 The Gitea lifecycle commands run only from native Windows PowerShell and target the legacy PostgreSQL-backed instance on port `43000`. Generate the ignored local config first, clear `AGENT_SDLC_GITEA_IMAGE`, set `gitea.backup.root` to a local fixed-drive path or accept the default under `%USERPROFILE%\Backups\agent-sdlc\gitea`, and review the actual supported source-to-target Gitea upgrade path before using an explicit fixed version. The command creates a checksum-verified backup before replacing only the Gitea container; it does not operate on the separate Compose instance on port `46300`. Restore requires a Backup ID and typed confirmation. Live service maintenance requires separate authorization and the TC-011 manual smoke checks.
 
+Run the lifecycle checks from native Windows PowerShell with Node.js 22+, npm, Pester 5, and Docker Desktop:
+
+```powershell
+npm ci
+npm run typecheck
+npm run test:gitea-lifecycle
+$env:AGENT_SDLC_GITEA_DOCKER_E2E = "1"
+npm run test:gitea-lifecycle:docker-e2e
+Remove-Item Env:AGENT_SDLC_GITEA_DOCKER_E2E
+```
+
+The Docker E2E creates only GUID-named disposable fixtures, uses separate bind mounts and a private network, and binds to `127.0.0.2` so the existing `127.0.0.1:43000` service is outside its target. It checks pre-existing container identities and states before cleanup. It uses an inert fixture Runner and does not validate real Actions dispatch or Runner execution.
+
 If an upgrade or restore stops before its health checks complete, the local bootstrap `up` command stays blocked by a recovery marker until an operator completes an explicit restore. The failed state and Backup IDs remain available for review.
 
 For an upgrade, enter the next supported release series one step at a time:
