@@ -66,6 +66,7 @@ Live acceptance for the real 43000 instance is a separate, authorized Windows Ho
 ## Evidence To Capture
 
 - sanitized command output and exit status
+- when a Docker operation fails, record its named fixture stage, Docker subcommand, and sanitized stderr; confirm no database/admin password or complete credential-bearing argument is present
 - container action order from the test Docker boundary
 - Backup IDs, manifest/checksum validation results, byte sizes, and free-space readings
 - source/target image digests and container mount/port/network identity
@@ -77,7 +78,10 @@ Live acceptance for the real 43000 instance is a separate, authorized Windows Ho
 - Windows Host report: `npm ci`, `npm run typecheck`, and mocked Pester unit tests (19/19) passed. The opt-in Docker E2E ran under Pester 6.2.0 and all three cases failed. The first reported `No modules named 'gitea-lifecycle' are currently loaded`; the next two failed because the fixture had not initialized and its Backup ID was empty.
 - Root cause: the test selected cases with `$script:dockerE2EEnabled` set at file scope during Discovery, then reused that Discovery-only value in Run's `BeforeAll`. With Pester 6's isolated Discovery/Run phases, Run skipped fixture initialization and module loading. The E2E now applies opt-in only to `Describe` selection, rechecks the environment in Run, dot-sources its helper file and imports the lifecycle module before fixture initialization. Initialization errors are rethrown as explicit fixture failures.
 - Cleanup now registers exact fixture container IDs and verifies the run label or GUID network plus expected mounts before removing them. It verifies the owned network ID/label and a run-specific temp-directory ownership marker before cleanup; unverified resources and fixture data are preserved.
-- The post-fix Windows Pester/Docker E2E rerun is pending. No post-fix Docker E2E pass is claimed.
+- Docker CLI failures during fixture setup and teardown now report the operation stage, Docker subcommand, exit code, and bounded stderr after redacting credential assignments and known password values. No separate fixture initialization logic defect was confirmed by code inspection; the prior Run-phase setup issue is already fixed.
+- The Windows operator confirmed the failed E2E left no fixture containers, network, or temporary directory behind.
+- This pass added Pester cases for stage/subcommand selection and credential redaction, but did not run them: launching `powershell.exe` through WSL failed with `UtilBindVsockAnyPort:307: socket failed 1`. Pester and Docker E2E were not executed in this pass.
+- The post-fix Windows Pester/Docker E2E rerun remains pending. No post-fix Docker E2E pass is claimed.
 - This WSL workspace has Windows PowerShell/Pester installed through Windows interop, but Pester cannot resolve the Linux workspace current directory (`Directory.GetParent` reports an unsupported path format); no post-fix Pester result is claimed.
 - Passed in this WSL pass: `npm run validate:platform`, `git diff --check`, and `package.json` JSON parsing.
 - Not executed in WSL: Pester; `npm run test:gitea-lifecycle` exits 127 because `powershell` is not installed in WSL.
@@ -97,3 +101,4 @@ Use disposable test directories/containers only. Do not delete backup fixtures a
 - 2026-11-05: Fixed the isolated failure path to use the valid `1.26.4` to `1.27.3` step and added exact database recreation plus post-backup-table and unrelated-database assertions; Windows execution remains pending.
 - 2026-11-06: Recorded the Windows Host Discovery failure and corrected test-module loading and TestDrive timing; post-fix Windows Pester rerun remains pending.
 - 2026-11-06: Recorded Windows Pester 6.2.0 results (three Docker E2E failures; unit suite 19/19 passed), moved fixture setup/helpers into Run, and tightened ownership-verified cleanup; post-fix E2E remains pending.
+- 2026-11-06: Added stage/subcommand and credential-redacted Docker stderr diagnostics; code inspection found no additional confirmed fixture initialization defect, and Windows E2E acceptance remains pending.

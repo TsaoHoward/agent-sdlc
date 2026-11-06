@@ -1,14 +1,151 @@
+function Get-GiteaLifecycleE2EDockerSubcommand {
+    param([Parameter(Mandatory = $true)][string[]]$Arguments)
+
+    if ($Arguments.Count -eq 0) { return "docker operation" }
+    switch ($Arguments[0]) {
+        "network" {
+            if ($Arguments.Count -gt 1 -and $Arguments[1] -in @("create", "inspect", "rm", "ls")) {
+                return "docker network $($Arguments[1])"
+            }
+            return "docker network"
+        }
+        { $_ -in @("exec", "info", "inspect", "pull", "ps", "rm", "run") } { return "docker $($Arguments[0])" }
+        default { return "docker operation" }
+    }
+}
+
+function Get-GiteaLifecycleE2EDockerStage {
+    param([Parameter(Mandatory = $true)][string[]]$Arguments)
+
+    if ($Arguments.Count -eq 0) { return "run the isolated Docker fixture operation" }
+    switch ($Arguments[0]) {
+        "info" { return "validate the Docker Desktop engine" }
+        "pull" { return "pull a disposable fixture image" }
+        "network" {
+            if ($Arguments.Count -gt 1) {
+                switch ($Arguments[1]) {
+                    "create" { return "create the isolated fixture network" }
+                    "inspect" { return "verify the isolated fixture network" }
+                    "rm" { return "remove the verified fixture network" }
+                    "ls" { return "check for a pre-existing fixture network" }
+                }
+            }
+            return "manage the isolated fixture network"
+        }
+        "run" {
+            $nameIndex = [Array]::IndexOf($Arguments, "--name")
+            if ($nameIndex -ge 0 -and $nameIndex + 1 -lt $Arguments.Count) {
+                $fixtureName = [string]$Arguments[$nameIndex + 1]
+                if ($fixtureName -match "-db$") { return "start the disposable PostgreSQL fixture" }
+                if ($fixtureName -match "-runner$") { return "start the inert disposable Runner fixture" }
+                if ($fixtureName -match "-gitea(?:-|$)") { return "start the disposable Gitea fixture" }
+            }
+            return "start a disposable fixture container"
+        }
+        "exec" {
+            if ($Arguments -contains "pg_isready") { return "check disposable PostgreSQL readiness" }
+            if ($Arguments -contains "psql") { return "prepare or inspect the disposable fixture database" }
+            if ($Arguments -contains "gitea") { return "configure the disposable Gitea fixture" }
+            return "run a command in a disposable fixture container"
+        }
+        "ps" { return "inspect the existing Docker container snapshot" }
+        "inspect" { return "inspect a fixture or existing container" }
+        "rm" { return "remove a verified fixture container" }
+        default { return "run the isolated Docker fixture operation" }
+    }
+}
+
+function Protect-GiteaLifecycleE2EDockerStderr {
+    param(
+        [AllowEmptyString()][string]$Text,
+        [string[]]$Arguments
+    )
+
+    $sanitized = [string]$Text
+    $secrets = [System.Collections.Generic.List[string]]::new()
+    $sensitiveFlag = $false
+    foreach ($argument in $Arguments) {
+        $value = [string]$argument
+        if ($sensitiveFlag -and $value) { $secrets.Add($value) }
+        $sensitiveFlag = $value -match "^--?(?:password|passwd|token|secret|credential|authorization|auth)$"
+
+        if ($value -match "(?i)^[^=]*(?:password|passwd|token|secret|credential|authorization|auth|private[_-]?key|access[_-]?key)[^=]*=(.*)$") {
+            $assignedSecret = [string]$Matches[1]
+            if ($assignedSecret) {
+                $secrets.Add($assignedSecret.Trim([char[]]@('"', "'")))
+            }
+        }
+    }
+
+    $state = $script:dockerE2EState
+    if ($state -and $state.AdminPassword) { $secrets.Add([string]$state.AdminPassword) }
+    if ($state -and $state.Context -and $state.Context.GiteaAdminPassword) {
+        $secrets.Add([string]$state.Context.GiteaAdminPassword)
+    }
+
+    foreach ($secret in @($secrets | Where-Object { $_ } | Sort-Object -Unique | Sort-Object Length -Descending)) {
+        $sanitized = [Regex]::Replace($sanitized, [Regex]::Escape($secret), "[REDACTED]", [System.Text.RegularExpressions.RegexOptions]::IgnoreCase)
+    }
+
+    $sanitized = [Regex]::Replace(
+        $sanitized,
+        '(?im)(\b[A-Z0-9_.-]*(?:password|passwd|token|secret|credential|authorization|auth|private[_-]?key|access[_-]?key)[A-Z0-9_.-]*\s*[=:]\s*)(?:"[^"]*"|''[^'']*''|[^\s,;]+)',
+        '$1[REDACTED]'
+    )
+    $sanitized = [Regex]::Replace(
+        $sanitized,
+        '(?i)(--?(?:password|passwd|token|secret|credential|authorization|auth)(?:=|\s+))(?:"[^"]*"|''[^'']*''|[^\s,;]+)',
+        '$1[REDACTED]'
+    )
+    $sanitized = [Regex]::Replace($sanitized, '(?i)\b(Basic\s+|Bearer\s+)[A-Za-z0-9._~+/-]+=*', '$1[REDACTED]')
+    $sanitized = [Regex]::Replace($sanitized, '(?i)(https?://[^:/\s@]+:)[^@\s]+(@)', '$1[REDACTED]$2').Trim()
+
+    if (-not $sanitized) { return "(no stderr captured)" }
+    if ($sanitized.Length -gt 4000) {
+        return $sanitized.Substring(0, 4000) + "`n[stderr truncated]"
+    }
+    return $sanitized
+}
+
 function Invoke-GiteaLifecycleE2EDocker {
     param(
         [Parameter(Mandatory = $true)][string[]]$Arguments,
+        [string]$Stage,
         [switch]$AllowFailure
     )
 
-    $output = @(& docker @Arguments 2>$null)
-    $exitCode = $LASTEXITCODE
+    $dockerSubcommand = Get-GiteaLifecycleE2EDockerSubcommand -Arguments $Arguments
+    if (-not $Stage) { $Stage = Get-GiteaLifecycleE2EDockerStage -Arguments $Arguments }
+    $stderrPath = $null
+    $processFailedToStart = $false
+    $exitCode = 1
+    try {
+        $stderrPath = [System.IO.Path]::GetTempFileName()
+        $global:LASTEXITCODE = 0
+        $output = @(& docker @Arguments 2> $stderrPath)
+        if ($null -ne $LASTEXITCODE) { $exitCode = [int]$LASTEXITCODE }
+    }
+    catch {
+        # Do not include PowerShell's invocation error because it can render the full argument list.
+        $processFailedToStart = $true
+        $output = @()
+    }
+    finally {
+        $stderrText = ""
+        if ($stderrPath -and (Test-Path -LiteralPath $stderrPath -PathType Leaf)) {
+            try { $stderrText = [System.IO.File]::ReadAllText($stderrPath) } catch { $stderrText = "" }
+            try { [System.IO.File]::WriteAllText($stderrPath, "") } catch { }
+            Remove-Item -LiteralPath $stderrPath -Force -ErrorAction SilentlyContinue
+        }
+    }
+
     $script:dockerE2ELastExitCode = $exitCode
     if ($exitCode -ne 0 -and -not $AllowFailure) {
-        throw "Docker E2E operation failed with exit code $exitCode."
+        $safeStderr = Protect-GiteaLifecycleE2EDockerStderr -Text $stderrText -Arguments $Arguments
+        if ($processFailedToStart -and $safeStderr -eq "(no stderr captured)") {
+            $safeStderr = "Docker CLI could not be started."
+        }
+        throw "Docker E2E stage '$Stage' failed: '$dockerSubcommand' exited with code $exitCode. stderr: $safeStderr"
     }
     return @($output | ForEach-Object { [string]$_ })
 }
@@ -179,7 +316,7 @@ function Wait-GiteaLifecycleE2EPostgres {
     param([string]$ContainerName)
 
     for ($attempt = 0; $attempt -lt 60; $attempt++) {
-        $result = Invoke-GiteaLifecycleE2EDocker -Arguments @("exec", $ContainerName, "pg_isready", "-U", "gitea", "-d", "gitea") -AllowFailure
+        $result = Invoke-GiteaLifecycleE2EDocker -Arguments @("exec", $ContainerName, "pg_isready", "-U", "gitea", "-d", "gitea") -Stage "wait for disposable PostgreSQL readiness" -AllowFailure
         if ($script:dockerE2ELastExitCode -eq 0 -and (@($result) -join "`n") -match "accepting connections") { return }
         Start-Sleep -Seconds 2
     }
@@ -193,7 +330,7 @@ function Invoke-GiteaLifecycleE2EPsql {
         [Parameter(Mandatory = $true)][string]$Sql
     )
 
-    $output = Invoke-GiteaLifecycleE2EDocker -Arguments @(
+    $output = Invoke-GiteaLifecycleE2EDocker -Stage "run SQL against the disposable fixture database" -Arguments @(
         "exec", $ContainerName, "psql", "--no-psqlrc", "--set", "ON_ERROR_STOP=1",
         "--username", "gitea", "--dbname", $DatabaseName,
         "--tuples-only", "--no-align", "--command", $Sql
@@ -329,14 +466,14 @@ function Initialize-GiteaLifecycleE2EFixture {
             GiteaAdminPassword = $adminPassword
     }
 
-    Invoke-GiteaLifecycleE2EDocker -Arguments @("pull", "postgres:16") | Out-Null
-    Invoke-GiteaLifecycleE2EDocker -Arguments @("pull", "alpine:3.20") | Out-Null
-    Invoke-GiteaLifecycleE2EDocker -Arguments @("pull", $imageTag) | Out-Null
-    $networkId = [string]((Invoke-GiteaLifecycleE2EDocker -Arguments @("network", "create", "--label", "agent-sdlc.lifecycle-e2e.run-id=$runId", $networkName) | Select-Object -First 1)).Trim()
+    Invoke-GiteaLifecycleE2EDocker -Arguments @("pull", "postgres:16") -Stage "pull disposable PostgreSQL fixture image" | Out-Null
+    Invoke-GiteaLifecycleE2EDocker -Arguments @("pull", "alpine:3.20") -Stage "pull inert Runner fixture image" | Out-Null
+    Invoke-GiteaLifecycleE2EDocker -Arguments @("pull", $imageTag) -Stage "pull disposable Gitea fixture image" | Out-Null
+    $networkId = [string]((Invoke-GiteaLifecycleE2EDocker -Arguments @("network", "create", "--label", "agent-sdlc.lifecycle-e2e.run-id=$runId", $networkName) -Stage "create isolated fixture network" | Select-Object -First 1)).Trim()
     $script:dockerE2EState.NetworkCreated = $true
     $script:dockerE2EState.NetworkId = $networkId
 
-    Invoke-GiteaLifecycleE2EDocker -Arguments @(
+    Invoke-GiteaLifecycleE2EDocker -Stage "start disposable PostgreSQL fixture" -Arguments @(
         "run", "-d", "--name", $postgresName, "--network", $networkName, "--network-alias", "db",
         "--restart", "unless-stopped", "--label", "agent-sdlc.lifecycle-e2e.run-id=$runId",
         "--mount", "type=bind,source=$postgresPath,target=/var/lib/postgresql/data",
@@ -347,14 +484,14 @@ function Initialize-GiteaLifecycleE2EFixture {
     Invoke-GiteaLifecycleE2EPsql -ContainerName $postgresName -DatabaseName "postgres" -Sql "CREATE DATABASE e2e_unrelated" | Out-Null
     Invoke-GiteaLifecycleE2EPsql -ContainerName $postgresName -DatabaseName "e2e_unrelated" -Sql "CREATE TABLE public.restore_sentinel (value text NOT NULL); INSERT INTO public.restore_sentinel (value) VALUES ('preserve-me')" | Out-Null
 
-    Invoke-GiteaLifecycleE2EDocker -Arguments @(
+    Invoke-GiteaLifecycleE2EDocker -Stage "start inert disposable Runner fixture" -Arguments @(
         "run", "-d", "--name", $runnerName, "--network", $networkName, "--restart", "unless-stopped",
         "--label", "agent-sdlc.lifecycle-e2e.run-id=$runId", "--entrypoint", "sh", "alpine:3.20", "-c", "sleep infinity"
     ) | Out-Null
     $script:dockerE2EState.RunnerContainerId = Invoke-GiteaLifecycleE2EDocker -Arguments @("inspect", $runnerName, "--format", "{{.Id}}")
     $script:dockerE2EState.PostgresContainerId = Invoke-GiteaLifecycleE2EDocker -Arguments @("inspect", $postgresName, "--format", "{{.Id}}")
 
-    Invoke-GiteaLifecycleE2EDocker -Arguments @(
+    Invoke-GiteaLifecycleE2EDocker -Stage "start disposable Gitea fixture" -Arguments @(
         "run", "-d", "--name", $giteaName, "--network", $networkName, "--restart", "unless-stopped",
         "--label", "agent-sdlc.lifecycle-e2e.run-id=$runId",
         "--mount", "type=bind,source=$dataPath,target=/var/lib/gitea",
@@ -368,7 +505,7 @@ function Initialize-GiteaLifecycleE2EFixture {
     ) | Out-Null
 
     Wait-GiteaLifecycleE2EHttp -Uri ($giteaUrl + "api/v1/version")
-    Invoke-GiteaLifecycleE2EDocker -Arguments @(
+    Invoke-GiteaLifecycleE2EDocker -Stage "create disposable Gitea administrator" -Arguments @(
         "exec", $giteaName, "gitea", "admin", "user", "create", "--username", "e2e-admin",
         "--password", $adminPassword, "--email", "e2e-admin@example.invalid", "--admin", "--must-change-password=false"
     ) | Out-Null
@@ -398,7 +535,7 @@ function Remove-GiteaLifecycleE2EFixture {
             if ([string]$container.Id -ne [string]$expected.id -or [string]$kind -ne [string]$expected.kind) {
                 throw "A fixture container no longer matches its recorded test-owned identity; refusing to remove it."
             }
-            Invoke-GiteaLifecycleE2EDocker -Arguments @("rm", "-f", [string]$expected.id) | Out-Null
+            Invoke-GiteaLifecycleE2EDocker -Arguments @("rm", "-f", [string]$expected.id) -Stage "remove verified disposable fixture container" | Out-Null
             $state.OwnedContainers.Remove([string]$containerId)
         }
 
@@ -413,7 +550,7 @@ function Remove-GiteaLifecycleE2EFixture {
             if ($attachedIds.Count -gt 0) {
                 throw "The isolated Docker E2E network has attached containers without a confirmed test-owned identity; refusing network and data cleanup."
             }
-            Invoke-GiteaLifecycleE2EDocker -Arguments @("network", "rm", [string]$network.Id) | Out-Null
+            Invoke-GiteaLifecycleE2EDocker -Arguments @("network", "rm", [string]$network.Id) -Stage "remove verified isolated fixture network" | Out-Null
             $state.NetworkCreated = $false
             $state.NetworkId = $null
         }

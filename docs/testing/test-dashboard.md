@@ -41,7 +41,7 @@ It does not replace CI run history, forge issue or PR history, roadmap/WBS plann
 | Test ID | Title | Status | Mode | Related Docs / WBS | Next Action | Exit Path |
 |---|---|---|---|---|---|---|
 | TC-001 | CLI Replay Intake And Session Smoke | Ready | CLI replay | `docs/roadmap.md` Phase 1; WBS `3.1`, `3.2`, `3.3` | Re-run when intake or session-start behavior changes and keep the case note current if task/session fields or evidence paths move | Move out after the current validation window once the case no longer needs active dashboard attention; keep the canonical case note as the long-lived procedure |
-| TC-011 | Local Gitea Version Lifecycle Operations | In Progress | Windows PowerShell/Pester plus isolated Docker acceptance | `docs/testing/items/TC-011-gitea-version-lifecycle-operations.md`; WBS `3.12` | Windows reports npm ci, typecheck, and mocked Pester 19/19 passed; all three Docker E2E cases failed under Pester 6.2.0 from Run-phase fixture/module setup. Rerun the GUID-isolated E2E after the Run-phase fix and record the result; keep live acceptance separate | Move out after isolated CLI verification and separately authorized Windows Host acceptance; keep the canonical case note as the long-lived procedure |
+| TC-011 | Local Gitea Version Lifecycle Operations | In Progress | Windows PowerShell/Pester plus isolated Docker acceptance | `docs/testing/items/TC-011-gitea-version-lifecycle-operations.md`; WBS `3.12` | Docker failures now identify stage/subcommand and include credential-redacted stderr; rerun the GUID-isolated E2E on Windows and record the result; keep live acceptance separate | Move out after isolated CLI verification and separately authorized Windows Host acceptance; keep the canonical case note as the long-lived procedure |
 
 ## Test Items
 
@@ -90,3 +90,4 @@ It does not replace CI run history, forge issue or PR history, roadmap/WBS plann
 - 2026-11-05: Corrected the Docker E2E to exercise a valid next-version failure and exact database restore, including post-backup table removal and unrelated-database preservation; Windows execution remains outstanding.
 - 2026-11-06: Recorded the Windows Pester Discovery failure, fixed module import timing and deferred TestDrive access to Run, and requested a Windows Pester rerun; the isolated Docker E2E remains pending.
 - 2026-11-06: Recorded Windows Pester 6.2.0 Docker E2E failures, moved helper/module/fixture initialization into Run, and tightened verified-resource cleanup; the post-fix E2E remains pending.
+- 2026-11-06: Added Docker stage/subcommand and credential-redacted stderr diagnostics; Windows isolated E2E rerun remains pending.

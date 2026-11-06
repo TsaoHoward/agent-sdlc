@@ -3,6 +3,37 @@ BeforeDiscovery {
     Import-Module (Resolve-Path $modulePath) -Force
 }
 
+Describe "Gitea lifecycle isolated Docker failure diagnostics" {
+    BeforeAll {
+        . (Join-Path $PSScriptRoot "gitea-lifecycle.DockerE2E.Helpers.ps1")
+    }
+
+    It "identifies the failing fixture stage and Docker subcommand without exposing arguments" {
+        $arguments = @("run", "-d", "--name", "agent-sdlc-life-e2e-fixture-db", "-e", "POSTGRES_PASSWORD=fixture-db-secret", "postgres:16")
+
+        Get-GiteaLifecycleE2EDockerStage -Arguments $arguments | Should -Be "start the disposable PostgreSQL fixture"
+        Get-GiteaLifecycleE2EDockerSubcommand -Arguments $arguments | Should -Be "docker run"
+    }
+
+    It "redacts database and administrator credentials from Docker stderr" {
+        $script:dockerE2EState = $null
+        $dbPassword = "fixture-db-secret-keep-private"
+        $adminPassword = "fixture-admin-secret-keep-private"
+        $dbArguments = @("run", "-e", "POSTGRES_PASSWORD=$dbPassword", "postgres:16")
+        $dbStderr = "failed POSTGRES_PASSWORD=$dbPassword; raw value: $dbPassword"
+        $adminArguments = @("exec", "fixture-gitea", "gitea", "admin", "user", "create", "--password", $adminPassword)
+        $adminStderr = "docker echoed --password $adminPassword; raw value: $adminPassword"
+
+        $sanitizedDbStderr = Protect-GiteaLifecycleE2EDockerStderr -Text $dbStderr -Arguments $dbArguments
+        $sanitizedAdminStderr = Protect-GiteaLifecycleE2EDockerStderr -Text $adminStderr -Arguments $adminArguments
+
+        $sanitizedDbStderr | Should -Not -Match ([Regex]::Escape($dbPassword))
+        $sanitizedDbStderr | Should -Match 'POSTGRES_PASSWORD=\[REDACTED\]'
+        $sanitizedAdminStderr | Should -Not -Match ([Regex]::Escape($adminPassword))
+        $sanitizedAdminStderr | Should -Match '--password \[REDACTED\]'
+    }
+}
+
 Describe "Gitea lifecycle safety helpers" {
     InModuleScope gitea-lifecycle {
         BeforeAll {
