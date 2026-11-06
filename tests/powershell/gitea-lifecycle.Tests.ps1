@@ -1045,8 +1045,8 @@ Describe "Gitea lifecycle backup long paths on real NTFS" -Tag "WindowsLongPath"
                         [StringComparison]::OrdinalIgnoreCase
                     ) | Should -BeTrue
                     (Get-LongPathLeaf -Path $resolvedRoot) | Should -Be "agent-sdlc-gitea-long-path-$RunId"
-                    ((Get-LongPathItem -Path $resolvedRoot).Attributes -band [System.IO.FileAttributes]::ReparsePoint) |
-                        Should -Be ([System.IO.FileAttributes]::Normal)
+                    (((Get-LongPathItem -Path $resolvedRoot).Attributes -band [System.IO.FileAttributes]::ReparsePoint) -eq 0) |
+                        Should -BeTrue
 
                     if (Test-LongPath -Path $MarkerPath -PathType Leaf) {
                         if (-not $markerWriteCompleted) {
