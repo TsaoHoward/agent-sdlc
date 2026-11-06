@@ -738,3 +738,128 @@ Describe "Gitea PostgreSQL exact-state restore" {
         }
     }
 }
+
+Describe "Gitea backup ACL on real NTFS" -Tag "WindowsAcl" {
+    It "restricts real backup directories and files from non-elevated Windows PowerShell" {
+        if ([Environment]::OSVersion.Platform -ne [PlatformID]::Win32NT) {
+            Set-ItResult -Skipped -Because "This ACL integration check requires Windows NTFS."
+            return
+        }
+
+        $identity = [System.Security.Principal.WindowsIdentity]::GetCurrent()
+        $principal = [System.Security.Principal.WindowsPrincipal]::new($identity)
+        $administratorsSid = [System.Security.Principal.SecurityIdentifier]::new("S-1-5-32-544")
+        if ($principal.IsInRole($administratorsSid)) {
+            Set-ItResult -Skipped -Because "Run this ACL check from non-elevated Windows PowerShell."
+            return
+        }
+
+        $whoamiPath = Join-Path $env:WINDIR "System32\whoami.exe"
+        $privilegeOutput = @(& $whoamiPath /priv 2>$null)
+        if ($LASTEXITCODE -ne 0) {
+            throw "Could not inspect the Windows token privileges for the NTFS ACL test."
+        }
+        $securityPrivilege = @($privilegeOutput | Where-Object { $_ -match '^\s*SeSecurityPrivilege\s+' })
+        if (@($securityPrivilege | Where-Object { $_ -match '\bEnabled\b' }).Count -gt 0) {
+            throw "The NTFS ACL test requires SeSecurityPrivilege to be absent or disabled."
+        }
+
+        $tempParent = [System.IO.Path]::GetFullPath([System.IO.Path]::GetTempPath()).TrimEnd(
+            [System.IO.Path]::DirectorySeparatorChar,
+            [System.IO.Path]::AltDirectorySeparatorChar
+        )
+        $runId = [Guid]::NewGuid().ToString("N")
+        $fixtureRoot = Join-Path $tempParent "agent-sdlc-gitea-acl-$runId"
+        $backupRoot = Join-Path $fixtureRoot "backup-root"
+        $markerPath = Join-Path $fixtureRoot ".agent-sdlc-acl-test-owner"
+        $sections = [System.Security.AccessControl.AccessControlSections]::Access -bor
+            [System.Security.AccessControl.AccessControlSections]::Owner
+        $currentSid = $identity.User
+        $expectedSidValues = @($currentSid.Value, "S-1-5-18", "S-1-5-32-544")
+        $expectedDirectoryInheritance = [System.Security.AccessControl.InheritanceFlags]::ContainerInherit -bor
+            [System.Security.AccessControl.InheritanceFlags]::ObjectInherit
+        $markerValue = "agent-sdlc-gitea-acl-test:$runId"
+
+        try {
+            $drive = [System.IO.DriveInfo]::new([System.IO.Path]::GetPathRoot($fixtureRoot))
+            $drive.DriveFormat | Should -Be "NTFS"
+
+            New-Item -ItemType Directory -Path $fixtureRoot -ErrorAction Stop | Out-Null
+            [System.IO.File]::WriteAllText($markerPath, $markerValue, [System.Text.UTF8Encoding]::new($false))
+
+            $context = @{
+                BackupRoot = $backupRoot
+                RepoRoot = Join-Path $fixtureRoot "repo"
+                GiteaDataDir = Join-Path $fixtureRoot "live-data"
+                GiteaConfigDir = Join-Path $fixtureRoot "live-config"
+                GiteaPostgresDataDir = Join-Path $fixtureRoot "live-postgres"
+            }
+            Invoke-GiteaLifecycle -Action backup-list -Context $context
+
+            $rootAcl = [System.IO.Directory]::GetAccessControl($backupRoot, $sections)
+            $rootAcl.GetOwner([System.Security.Principal.SecurityIdentifier]).Value | Should -Be $currentSid.Value
+            $rootAcl.AreAccessRulesProtected | Should -BeTrue
+            $rootRules = @($rootAcl.GetAccessRules($true, $true, [System.Security.Principal.SecurityIdentifier]))
+            $rootRules.Count | Should -Be 3
+            (@($rootRules | ForEach-Object { $_.IdentityReference.Value } | Sort-Object) -join ",") |
+                Should -Be (@($expectedSidValues | Sort-Object) -join ",")
+            foreach ($rule in $rootRules) {
+                $rule.IsInherited | Should -BeFalse
+                $rule.AccessControlType | Should -Be ([System.Security.AccessControl.AccessControlType]::Allow)
+                [int]$rule.FileSystemRights | Should -Be ([int][System.Security.AccessControl.FileSystemRights]::FullControl)
+                $rule.InheritanceFlags | Should -Be $expectedDirectoryInheritance
+                $rule.PropagationFlags | Should -Be ([System.Security.AccessControl.PropagationFlags]::None)
+            }
+
+            $childDirectory = Join-Path $backupRoot "inherited-child"
+            New-Item -ItemType Directory -Path $childDirectory -ErrorAction Stop | Out-Null
+            $childAcl = [System.IO.Directory]::GetAccessControl($childDirectory, $sections)
+            $childAcl.AreAccessRulesProtected | Should -BeFalse
+            $childRules = @($childAcl.GetAccessRules($true, $true, [System.Security.Principal.SecurityIdentifier]))
+            $childRules.Count | Should -Be 3
+            (@($childRules | ForEach-Object { $_.IdentityReference.Value } | Sort-Object) -join ",") |
+                Should -Be (@($expectedSidValues | Sort-Object) -join ",")
+            foreach ($rule in $childRules) {
+                $rule.IsInherited | Should -BeTrue
+                $rule.AccessControlType | Should -Be ([System.Security.AccessControl.AccessControlType]::Allow)
+                [int]$rule.FileSystemRights | Should -Be ([int][System.Security.AccessControl.FileSystemRights]::FullControl)
+            }
+
+            $effectiveAccessFile = Join-Path $childDirectory "effective-access.txt"
+            [System.IO.File]::WriteAllText($effectiveAccessFile, "write-check", [System.Text.UTF8Encoding]::new($false))
+            [System.IO.File]::ReadAllText($effectiveAccessFile) | Should -Be "write-check"
+
+            $privateFile = Join-Path $backupRoot "private-test.dat"
+            [System.IO.File]::WriteAllText($privateFile, "private", [System.Text.UTF8Encoding]::new($false))
+            InModuleScope gitea-lifecycle -Parameters @{ Path = $privateFile } {
+                param($Path)
+                Set-RestrictedBackupAcl -Path $Path
+            }
+            $privateAcl = [System.IO.File]::GetAccessControl($privateFile, $sections)
+            $privateAcl.GetOwner([System.Security.Principal.SecurityIdentifier]).Value | Should -Be $currentSid.Value
+            $privateAcl.AreAccessRulesProtected | Should -BeTrue
+            $privateRules = @($privateAcl.GetAccessRules($true, $true, [System.Security.Principal.SecurityIdentifier]))
+            $privateRules.Count | Should -Be 3
+            (@($privateRules | ForEach-Object { $_.IdentityReference.Value } | Sort-Object) -join ",") |
+                Should -Be (@($expectedSidValues | Sort-Object) -join ",")
+            foreach ($rule in $privateRules) {
+                $rule.IsInherited | Should -BeFalse
+                $rule.AccessControlType | Should -Be ([System.Security.AccessControl.AccessControlType]::Allow)
+                [int]$rule.FileSystemRights | Should -Be ([int][System.Security.AccessControl.FileSystemRights]::FullControl)
+                $rule.InheritanceFlags | Should -Be ([System.Security.AccessControl.InheritanceFlags]::None)
+            }
+            [System.IO.File]::WriteAllText($privateFile, "updated", [System.Text.UTF8Encoding]::new($false))
+            [System.IO.File]::ReadAllText($privateFile) | Should -Be "updated"
+        }
+        finally {
+            if (Test-Path -LiteralPath $markerPath -PathType Leaf) {
+                $resolvedFixtureRoot = [System.IO.Path]::GetFullPath($fixtureRoot)
+                $tempPrefix = $tempParent + [System.IO.Path]::DirectorySeparatorChar
+                $resolvedFixtureRoot.StartsWith($tempPrefix, [StringComparison]::OrdinalIgnoreCase) | Should -BeTrue
+                [System.IO.Path]::GetFileName($resolvedFixtureRoot) | Should -Be "agent-sdlc-gitea-acl-$runId"
+                [System.IO.File]::ReadAllText($markerPath) | Should -Be $markerValue
+                Remove-Item -LiteralPath $resolvedFixtureRoot -Recurse -Force -ErrorAction Stop
+            }
+        }
+    }
+}

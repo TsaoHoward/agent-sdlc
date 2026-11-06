@@ -79,21 +79,103 @@ function Assert-SafeBackupRoot {
     return $backupRoot
 }
 
+function Get-BackupObjectSecurity {
+    param([Parameter(Mandatory = $true)][string]$Path)
+
+    $sections = [System.Security.AccessControl.AccessControlSections]::Access -bor
+        [System.Security.AccessControl.AccessControlSections]::Owner
+    $item = Get-Item -LiteralPath $Path -Force -ErrorAction Stop
+    if ($item.PSIsContainer) {
+        return [System.IO.Directory]::GetAccessControl($Path, $sections)
+    }
+    return [System.IO.File]::GetAccessControl($Path, $sections)
+}
+
+function Assert-RestrictedBackupAcl {
+    param(
+        [Parameter(Mandatory = $true)][string]$Path,
+        [Parameter(Mandatory = $true)][System.Security.Principal.SecurityIdentifier]$OwnerSid,
+        [Parameter(Mandatory = $true)][bool]$IsDirectory
+    )
+
+    $security = Get-BackupObjectSecurity -Path $Path
+    $securityIdentifierType = [System.Security.Principal.SecurityIdentifier]
+    $actualOwner = $security.GetOwner($securityIdentifierType)
+    if (-not $actualOwner -or $actualOwner.Value -ne $OwnerSid.Value) {
+        throw "The Gitea backup object '$Path' is not owned by the current user; refusing to accept its ACL."
+    }
+    if (-not $security.AreAccessRulesProtected) {
+        throw "The Gitea backup object '$Path' still inherits access rules; refusing to accept its ACL."
+    }
+
+    $expectedSids = @(
+        $OwnerSid.Value,
+        "S-1-5-18",
+        "S-1-5-32-544"
+    )
+    $expectedSidSet = @{}
+    foreach ($sid in $expectedSids) { $expectedSidSet[$sid] = $true }
+    $expectedInheritance = [System.Security.AccessControl.InheritanceFlags]::None
+    if ($IsDirectory) {
+        $expectedInheritance = [System.Security.AccessControl.InheritanceFlags]::ContainerInherit -bor
+            [System.Security.AccessControl.InheritanceFlags]::ObjectInherit
+    }
+
+    $rules = @($security.GetAccessRules($true, $true, $securityIdentifierType))
+    if ($rules.Count -ne $expectedSids.Count) {
+        throw "The Gitea backup object '$Path' has an unexpected number of access rules; refusing to accept its ACL."
+    }
+
+    $actualSids = @{}
+    foreach ($rule in $rules) {
+        $sid = $rule.IdentityReference.Value
+        if (-not $expectedSidSet.ContainsKey($sid) -or $actualSids.ContainsKey($sid)) {
+            throw "The Gitea backup object '$Path' contains an unexpected or duplicate access rule; refusing to accept its ACL."
+        }
+        if ($rule.IsInherited -or
+            $rule.AccessControlType -ne [System.Security.AccessControl.AccessControlType]::Allow -or
+            [int]$rule.FileSystemRights -ne [int][System.Security.AccessControl.FileSystemRights]::FullControl -or
+            $rule.InheritanceFlags -ne $expectedInheritance -or
+            $rule.PropagationFlags -ne [System.Security.AccessControl.PropagationFlags]::None) {
+            throw "The Gitea backup object '$Path' does not have the required explicit full-control rule for '$sid'."
+        }
+        $actualSids[$sid] = $true
+    }
+
+    foreach ($sid in $expectedSids) {
+        if (-not $actualSids.ContainsKey($sid)) {
+            throw "The Gitea backup object '$Path' is missing the required access rule for '$sid'."
+        }
+    }
+}
+
 function Set-RestrictedBackupAcl {
     param([Parameter(Mandatory = $true)][string]$Path)
 
-    $acl = Get-Acl -LiteralPath $Path
-    $acl.SetAccessRuleProtection($true, $false)
-    foreach ($rule in @($acl.Access)) {
-        [void]$acl.RemoveAccessRuleSpecific($rule)
+    $currentUserSid = [System.Security.Principal.WindowsIdentity]::GetCurrent().User
+    $item = Get-Item -LiteralPath $Path -Force -ErrorAction Stop
+    $isDirectory = [bool]$item.PSIsContainer
+    $security = Get-BackupObjectSecurity -Path $Path
+    $existingOwner = $security.GetOwner([System.Security.Principal.SecurityIdentifier])
+    if (-not $existingOwner -or $existingOwner.Value -ne $currentUserSid.Value) {
+        throw "The Gitea backup object '$Path' is not owned by the current user; refusing to change its DACL."
     }
 
+    if ($isDirectory) {
+        $security = [System.Security.AccessControl.DirectorySecurity]::new()
+    }
+    else {
+        $security = [System.Security.AccessControl.FileSecurity]::new()
+    }
+    $security.SetAccessRuleProtection($true, $false)
+
     $inheritanceFlags = [System.Security.AccessControl.InheritanceFlags]::None
-    if ((Get-Item -LiteralPath $Path).PSIsContainer) {
-        $inheritanceFlags = [System.Security.AccessControl.InheritanceFlags]::ContainerInherit -bor [System.Security.AccessControl.InheritanceFlags]::ObjectInherit
+    if ($isDirectory) {
+        $inheritanceFlags = [System.Security.AccessControl.InheritanceFlags]::ContainerInherit -bor
+            [System.Security.AccessControl.InheritanceFlags]::ObjectInherit
     }
     $identities = @(
-        [System.Security.Principal.WindowsIdentity]::GetCurrent().User,
+        $currentUserSid,
         [System.Security.Principal.SecurityIdentifier]::new("S-1-5-18"),
         [System.Security.Principal.SecurityIdentifier]::new("S-1-5-32-544")
     )
@@ -105,11 +187,21 @@ function Set-RestrictedBackupAcl {
             [System.Security.AccessControl.PropagationFlags]::None,
             [System.Security.AccessControl.AccessControlType]::Allow
         )
-        [void]$acl.AddAccessRule($rule)
+        [void]$security.AddAccessRule($rule)
     }
 
-    $acl.SetOwner([System.Security.Principal.WindowsIdentity]::GetCurrent().User)
-    Set-Acl -LiteralPath $Path -AclObject $acl
+    # PowerShell Set-Acl first persists AccessControlSections.All, including Audit;
+    # its PrivilegeNotHeldException fallback excludes Audit only in limited cases.
+    # FileSystemSecurity persists only sections modified on this new descriptor, so
+    # changing access rules here writes the DACL without requesting the SACL.
+    if ($isDirectory) {
+        ([System.IO.DirectoryInfo]::new($Path)).SetAccessControl($security)
+    }
+    else {
+        ([System.IO.FileInfo]::new($Path)).SetAccessControl($security)
+    }
+
+    Assert-RestrictedBackupAcl -Path $Path -OwnerSid $currentUserSid -IsDirectory $isDirectory
 }
 
 function Ensure-BackupRoot {
