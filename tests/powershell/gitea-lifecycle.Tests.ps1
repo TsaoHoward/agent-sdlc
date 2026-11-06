@@ -8,6 +8,11 @@ Describe "Gitea lifecycle isolated Docker failure diagnostics" {
         . (Join-Path $PSScriptRoot "gitea-lifecycle.DockerE2E.Helpers.ps1")
     }
 
+    BeforeEach {
+        $script:dockerE2EState = @{}
+        $script:dockerE2ELastExitCode = 0
+    }
+
     It "identifies the failing fixture stage and Docker subcommand without exposing arguments" {
         $arguments = @("run", "-d", "--name", "agent-sdlc-life-e2e-fixture-db", "-e", "POSTGRES_PASSWORD=fixture-db-secret", "postgres:16")
 
@@ -21,16 +26,111 @@ Describe "Gitea lifecycle isolated Docker failure diagnostics" {
         $adminPassword = "fixture-admin-secret-keep-private"
         $dbArguments = @("run", "-e", "POSTGRES_PASSWORD=$dbPassword", "postgres:16")
         $dbStderr = "failed POSTGRES_PASSWORD=$dbPassword; raw value: $dbPassword"
+        $tcpArguments = @("exec", "-e", "PGPASSWORD=$dbPassword", "fixture-db", "psql")
+        $tcpStderr = "failed PGPASSWORD=$dbPassword; raw value: $dbPassword"
         $adminArguments = @("exec", "fixture-gitea", "gitea", "admin", "user", "create", "--password", $adminPassword)
         $adminStderr = "docker echoed --password $adminPassword; raw value: $adminPassword"
 
         $sanitizedDbStderr = Protect-GiteaLifecycleE2EDockerStderr -Text $dbStderr -Arguments $dbArguments
+        $sanitizedTcpStderr = Protect-GiteaLifecycleE2EDockerStderr -Text $tcpStderr -Arguments $tcpArguments
         $sanitizedAdminStderr = Protect-GiteaLifecycleE2EDockerStderr -Text $adminStderr -Arguments $adminArguments
 
         $sanitizedDbStderr | Should -Not -Match ([Regex]::Escape($dbPassword))
         $sanitizedDbStderr | Should -Match 'POSTGRES_PASSWORD=\[REDACTED\]'
+        $sanitizedTcpStderr | Should -Not -Match ([Regex]::Escape($dbPassword))
+        $sanitizedTcpStderr | Should -Match 'PGPASSWORD=\[REDACTED\]'
         $sanitizedAdminStderr | Should -Not -Match ([Regex]::Escape($adminPassword))
         $sanitizedAdminStderr | Should -Match '--password \[REDACTED\]'
+    }
+
+    It "waits for loopback TCP and an authenticated SQL query before fixture initialization continues" {
+        $script:postgresTcpAttempts = 0
+        $script:postgresSqlAttempts = 0
+        $script:postgresReadinessArguments = [System.Collections.Generic.List[object]]::new()
+        $script:postgresSqlArguments = [System.Collections.Generic.List[object]]::new()
+        $script:dockerE2EState = @{ DatabasePassword = "fixture-db-secret" }
+
+        Mock Invoke-GiteaLifecycleE2EDocker {
+            param($Arguments, $Stage, $AllowFailure)
+
+            if ($Arguments -contains "pg_isready") {
+                $script:postgresReadinessArguments.Add(@($Arguments))
+                if ($Arguments -contains "-h") {
+                    $script:postgresTcpAttempts += 1
+                    if ($script:postgresTcpAttempts -eq 1) {
+                        $script:dockerE2ELastExitCode = 2
+                        return @("127.0.0.1:5432 - no response")
+                    }
+                    $script:dockerE2ELastExitCode = 0
+                    return @("127.0.0.1:5432 - accepting connections")
+                }
+
+                # Model the official image's initialization server: its Unix socket responds
+                # even though the final TCP listener has not started yet.
+                $script:dockerE2ELastExitCode = 0
+                return @("/var/run/postgresql:5432 - accepting connections")
+            }
+
+            if ($Arguments -contains "psql") {
+                $script:postgresSqlArguments.Add(@($Arguments))
+                $script:postgresSqlAttempts += 1
+                if ($script:postgresTcpAttempts -lt 2) {
+                    throw "SQL readiness ran before loopback TCP became ready."
+                }
+                if ($script:postgresSqlAttempts -eq 1) {
+                    $script:dockerE2ELastExitCode = 2
+                    return @()
+                }
+                $script:dockerE2ELastExitCode = 0
+                return @("1")
+            }
+
+            throw "Unexpected Docker readiness command."
+        }
+        Mock Start-Sleep {}
+
+        Wait-GiteaLifecycleE2EPostgres -ContainerName "fixture-postgres" -DatabasePassword "fixture-db-secret"
+
+        $script:postgresTcpAttempts | Should -Be 3
+        $script:postgresSqlAttempts | Should -Be 2
+        foreach ($arguments in $script:postgresReadinessArguments) {
+            $arguments | Should -Contain "-h"
+            $arguments | Should -Contain "127.0.0.1"
+        }
+        foreach ($arguments in $script:postgresSqlArguments) {
+            $arguments | Should -Contain "PGPASSWORD=fixture-db-secret"
+            $arguments | Should -Contain "PGCONNECT_TIMEOUT=1"
+            $arguments | Should -Contain "127.0.0.1"
+            $arguments | Should -Contain "SELECT 1"
+        }
+    }
+
+    It "fails after a bounded number of TCP and SQL readiness attempts" {
+        $script:postgresTcpAttempts = 0
+        $script:postgresSqlAttempts = 0
+        $script:dockerE2EState = @{ DatabasePassword = "fixture-db-secret" }
+
+        Mock Invoke-GiteaLifecycleE2EDocker {
+            param($Arguments, $Stage, $AllowFailure)
+
+            if ($Arguments -contains "pg_isready") {
+                $script:postgresTcpAttempts += 1
+                $script:dockerE2ELastExitCode = 0
+                return @("127.0.0.1:5432 - accepting connections")
+            }
+            if ($Arguments -contains "psql") {
+                $script:postgresSqlAttempts += 1
+                $script:dockerE2ELastExitCode = 2
+                return @()
+            }
+            throw "Unexpected Docker readiness command."
+        }
+        Mock Start-Sleep {}
+
+        { Wait-GiteaLifecycleE2EPostgres -ContainerName "fixture-postgres" -DatabasePassword "fixture-db-secret" } | Should -Throw "*TCP and SQL connections*"
+
+        $script:postgresTcpAttempts | Should -Be 60
+        $script:postgresSqlAttempts | Should -Be 60
     }
 }
 

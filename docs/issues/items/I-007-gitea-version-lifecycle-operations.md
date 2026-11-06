@@ -40,7 +40,7 @@ Archive after implementation review and authorized Windows Host acceptance are c
 
 ## Next Actions
 
-- Windows Host reports `npm ci`, typecheck, and mocked Pester unit tests (19/19) passed. Under Pester 6.2.0, all three Docker E2E cases then failed because Run skipped fixture/module setup. The Run-phase setup and ownership-verified cleanup fixes are in place. Docker CLI failures now identify the fixture stage and subcommand and include bounded, credential-redacted stderr. Code inspection found no additional confirmed fixture initialization defect. Rerun the post-fix opt-in Docker E2E on Windows and record its actual result; no E2E pass is claimed. This WSL pass could not run Pester or Docker E2E because native PowerShell is unavailable.
+- Windows Host reports `npm ci`, typecheck, and mocked Pester unit tests (19/19) passed. Under Pester 6.2.0, all three Docker E2E cases then failed because Run skipped fixture/module setup. The Run-phase setup and ownership-verified cleanup fixes are in place. Docker CLI failures now identify the fixture stage and subcommand and include bounded, credential-redacted stderr. Follow-up code inspection confirmed the suspected readiness race: the official Postgres image's initialization server is socket-only, and the old `pg_isready` call used the default Unix socket. The fixture now waits for loopback TCP and an authenticated SQL query with a bounded retry. New Pester regression cases cover the false positive and retries. Rerun those Pester cases and the post-fix opt-in Docker E2E on Windows and record actual results; no new Pester or E2E pass is claimed. This WSL pass could not run Pester because Pester 6.2.0 cannot resolve the WSL workspace path through Windows interop; Docker E2E also remains unavailable here.
 - Before live maintenance, verify actual container topology, disk capacity, source version, official upgrade path, and representative smoke checks on Windows.
 
 ## Change Log
@@ -51,3 +51,4 @@ Archive after implementation review and authorized Windows Host acceptance are c
 - 2026-11-06: Recorded Windows `npm ci`/typecheck success and the Pester Discovery failure; corrected test setup ordering and left Pester/Docker E2E reruns pending.
 - 2026-11-06: Recorded Windows Pester 6.2.0 Docker E2E failures and the Run-phase setup/ownership cleanup fix; post-fix E2E rerun remains pending.
 - 2026-11-06: Added stage/subcommand and credential-redacted Docker stderr diagnostics; post-fix Windows Docker E2E acceptance remains pending.
+- 2026-11-06: Confirmed the socket-only PostgreSQL initialization readiness race and changed fixture gating to loopback TCP plus authenticated SQL; added bounded-retry regression tests and left Windows verification pending.

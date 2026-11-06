@@ -313,28 +313,66 @@ function New-GiteaLifecycleE2ETestPassword {
 }
 
 function Wait-GiteaLifecycleE2EPostgres {
-    param([string]$ContainerName)
+    param(
+        [Parameter(Mandatory = $true)][string]$ContainerName,
+        [Parameter(Mandatory = $true)][string]$DatabasePassword
+    )
+
+    if ([string]::IsNullOrWhiteSpace($DatabasePassword)) {
+        throw "A fixture database password is required to verify PostgreSQL readiness."
+    }
 
     for ($attempt = 0; $attempt -lt 60; $attempt++) {
-        $result = Invoke-GiteaLifecycleE2EDocker -Arguments @("exec", $ContainerName, "pg_isready", "-U", "gitea", "-d", "gitea") -Stage "wait for disposable PostgreSQL readiness" -AllowFailure
-        if ($script:dockerE2ELastExitCode -eq 0 -and (@($result) -join "`n") -match "accepting connections") { return }
-        Start-Sleep -Seconds 2
+        $result = Invoke-GiteaLifecycleE2EDocker -Arguments @(
+            "exec", $ContainerName, "pg_isready", "-h", "127.0.0.1", "-p", "5432",
+            "-U", "gitea", "-d", "gitea", "-t", "1"
+        ) -Stage "wait for disposable PostgreSQL TCP readiness" -AllowFailure
+
+        if ($script:dockerE2ELastExitCode -eq 0 -and (@($result) -join "`n") -match "accepting connections") {
+            $sqlResult = Invoke-GiteaLifecycleE2EPsql -ContainerName $ContainerName `
+                -DatabaseName "gitea" `
+                -Sql "SELECT 1" `
+                -ServerAddress "127.0.0.1" `
+                -Password $DatabasePassword `
+                -AllowFailure
+            if ($script:dockerE2ELastExitCode -eq 0 -and (@($sqlResult) -join "`n").Trim() -eq "1") { return }
+        }
+
+        if ($attempt -lt 59) { Start-Sleep -Seconds 2 }
     }
-    throw "The isolated PostgreSQL fixture did not become ready."
+    throw "The isolated PostgreSQL fixture did not become ready for TCP and SQL connections."
 }
 
 function Invoke-GiteaLifecycleE2EPsql {
     param(
         [Parameter(Mandatory = $true)][string]$ContainerName,
         [Parameter(Mandatory = $true)][string]$DatabaseName,
-        [Parameter(Mandatory = $true)][string]$Sql
+        [Parameter(Mandatory = $true)][string]$Sql,
+        [string]$ServerAddress,
+        [string]$Password,
+        [switch]$AllowFailure
     )
 
-    $output = Invoke-GiteaLifecycleE2EDocker -Stage "run SQL against the disposable fixture database" -Arguments @(
-        "exec", $ContainerName, "psql", "--no-psqlrc", "--set", "ON_ERROR_STOP=1",
+    $arguments = @("exec")
+    if ($ServerAddress) {
+        if ([string]::IsNullOrWhiteSpace($Password)) {
+            throw "A password is required for a TCP connection to the disposable PostgreSQL fixture."
+        }
+        $arguments += @("-e", "PGPASSWORD=$Password", "-e", "PGCONNECT_TIMEOUT=1")
+    }
+    $arguments += @($ContainerName, "psql", "--no-psqlrc", "--no-password", "--set", "ON_ERROR_STOP=1")
+    if ($ServerAddress) { $arguments += @("--host", $ServerAddress, "--port", "5432") }
+    $arguments += @(
         "--username", "gitea", "--dbname", $DatabaseName,
         "--tuples-only", "--no-align", "--command", $Sql
     )
+
+    if ($AllowFailure) {
+        $output = Invoke-GiteaLifecycleE2EDocker -Stage "run SQL against the disposable fixture database" -Arguments $arguments -AllowFailure
+    }
+    else {
+        $output = Invoke-GiteaLifecycleE2EDocker -Stage "run SQL against the disposable fixture database" -Arguments $arguments
+    }
     return (@($output) -join "`n").Trim()
 }
 
@@ -480,7 +518,7 @@ function Initialize-GiteaLifecycleE2EFixture {
         "-p", "127.0.0.2:45432:5432", "-e", "POSTGRES_DB=gitea", "-e", "POSTGRES_USER=gitea",
         "-e", "POSTGRES_PASSWORD=$dbPassword", "postgres:16"
     ) | Out-Null
-    Wait-GiteaLifecycleE2EPostgres -ContainerName $postgresName
+    Wait-GiteaLifecycleE2EPostgres -ContainerName $postgresName -DatabasePassword $dbPassword
     Invoke-GiteaLifecycleE2EPsql -ContainerName $postgresName -DatabaseName "postgres" -Sql "CREATE DATABASE e2e_unrelated" | Out-Null
     Invoke-GiteaLifecycleE2EPsql -ContainerName $postgresName -DatabaseName "e2e_unrelated" -Sql "CREATE TABLE public.restore_sentinel (value text NOT NULL); INSERT INTO public.restore_sentinel (value) VALUES ('preserve-me')" | Out-Null
 
