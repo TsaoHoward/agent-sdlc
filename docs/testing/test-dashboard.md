@@ -41,7 +41,7 @@ It does not replace CI run history, forge issue or PR history, roadmap/WBS plann
 | Test ID | Title | Status | Mode | Related Docs / WBS | Next Action | Exit Path |
 |---|---|---|---|---|---|---|
 | TC-001 | CLI Replay Intake And Session Smoke | Ready | CLI replay | `docs/roadmap.md` Phase 1; WBS `3.1`, `3.2`, `3.3` | Re-run when intake or session-start behavior changes and keep the case note current if task/session fields or evidence paths move | Move out after the current validation window once the case no longer needs active dashboard attention; keep the canonical case note as the long-lived procedure |
-| TC-011 | Local Gitea Version Lifecycle Operations | In Progress | Windows PowerShell/Pester plus isolated Docker acceptance | `docs/testing/items/TC-011-gitea-version-lifecycle-operations.md`; WBS `3.12` | Run the tagged real-NTFS ACL test from non-elevated Windows PowerShell, then rerun full Pester and the GUID-isolated E2E with its real Actions preflight; keep live acceptance separate | Move out after isolated CLI verification and separately authorized Windows Host acceptance; keep the canonical case note as the long-lived procedure |
+| TC-011 | Local Gitea Version Lifecycle Operations | In Progress | Windows PowerShell/Pester plus isolated Docker acceptance | `docs/testing/items/TC-011-gitea-version-lifecycle-operations.md`; WBS `3.12` | Run the tagged real-NTFS long-path regression and full Pester, then rerun GUID-isolated Docker E2E; record the Copy-Item control diagnostics and keep live acceptance separate | Move out after isolated CLI verification and separately authorized Windows Host acceptance; keep the canonical case note as the long-lived procedure |
 
 ## Test Items
 
@@ -94,3 +94,4 @@ It does not replace CI run history, forge issue or PR history, roadmap/WBS plann
 - 2026-11-06: Recorded the confirmed socket-only PostgreSQL initialization readiness race, added TCP/SQL readiness checks and bounded-retry regressions; Windows Pester and isolated E2E reruns remain pending.
 - 2026-11-06: Recorded the Windows 23/23 Pester and fixture-initialization report plus the Actions preflight E2E failure; moved preflight to Gitea's paginated instance-wide admin endpoint and added contract-shaped tests. Windows post-fix Pester and real-API isolated E2E remain pending.
 - 2026-11-06: Recorded the Windows 32/32 Pester report and the real fixture E2E failure at backup ACL setup; added a tagged non-elevated real-NTFS ACL test and kept post-fix Windows Pester/E2E pending.
+- 2026-11-06: Recorded Windows Pester 33/33, NTFS ACL 1/1, and fixture progress through Actions preflight and backup ACL; tracked the subsequent 268-character `Copy-Item` failure and added pending long-path regression coverage.

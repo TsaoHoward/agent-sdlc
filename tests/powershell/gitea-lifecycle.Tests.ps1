@@ -908,3 +908,165 @@ Describe "Gitea backup ACL on real NTFS" -Tag "WindowsAcl" {
         }
     }
 }
+
+Describe "Gitea lifecycle backup long paths on real NTFS" -Tag "WindowsLongPath" {
+    It "copies, checksums, validates, restores and safely cleans files beyond MAX_PATH" {
+        if ([Environment]::OSVersion.Platform -ne [PlatformID]::Win32NT) {
+            Set-ItResult -Skipped -Because "This long-path regression check requires Windows NTFS."
+            return
+        }
+
+        $identity = [System.Security.Principal.WindowsIdentity]::GetCurrent()
+        $principal = [System.Security.Principal.WindowsPrincipal]::new($identity)
+        $administratorsSid = [System.Security.Principal.SecurityIdentifier]::new("S-1-5-32-544")
+        if ($principal.IsInRole($administratorsSid)) {
+            Set-ItResult -Skipped -Because "Run this long-path regression check from non-elevated Windows PowerShell."
+            return
+        }
+
+        $tempParent = [System.IO.Path]::GetFullPath([System.IO.Path]::GetTempPath()).TrimEnd('\', '/')
+        $runId = [Guid]::NewGuid().ToString("N")
+        $fixtureRoot = Join-Path $tempParent "agent-sdlc-gitea-long-path-$runId"
+        $markerPath = Join-Path $fixtureRoot ".agent-sdlc-long-path-owner"
+        $markerValue = "agent-sdlc-gitea-long-path-test:$runId"
+        $drive = [System.IO.DriveInfo]::new([System.IO.Path]::GetPathRoot($fixtureRoot))
+        $drive.DriveFormat | Should -Be "NTFS"
+
+        InModuleScope gitea-lifecycle -Parameters @{
+            FixtureRoot = $fixtureRoot
+            TempParent = $tempParent
+            RunId = $runId
+            MarkerPath = $markerPath
+            MarkerValue = $markerValue
+            CurrentUserSid = $identity.User.Value
+        } {
+            param($FixtureRoot, $TempParent, $RunId, $MarkerPath, $MarkerValue, $CurrentUserSid)
+
+            $fixtureRootCreated = $false
+            $markerWriteCompleted = $false
+            try {
+                New-LongPathDirectory -Path $FixtureRoot
+                $fixtureRootCreated = $true
+                Write-LongPathText -Path $MarkerPath -Text $MarkerValue
+                $markerWriteCompleted = $true
+
+                $sourceRoot = Join-Path $FixtureRoot "live-source"
+                $backupPath = Join-Path $FixtureRoot ("backup-root-{0}-{1}" -f ("b" * 140), $RunId)
+                $backupDataPath = Join-Path $backupPath "payload\gitea-data"
+                $restoreRoot = Join-Path $FixtureRoot ("restored-live-root-{0}" -f ("r" * 72))
+                $restoreDataPath = Join-Path $restoreRoot "gitea-data"
+                $segmentOne = "repository-" + ("a" * 39)
+                $segmentTwo = "objects-" + ("c" * 42)
+                $fileName = "pack-" + ("d" * 31) + ".pack"
+                $relativeObjectPath = Join-Path (Join-Path $segmentOne $segmentTwo) $fileName
+                $sourceFile = Join-Path $sourceRoot $relativeObjectPath
+                $targetFile = Join-Path $backupDataPath $relativeObjectPath
+                $targetParent = Get-LongPathParent -Path $targetFile
+                $payloadText = "real-NTFS-long-path-payload:$RunId"
+
+                New-LongPathDirectory -Path (Get-LongPathParent -Path $sourceFile)
+                New-LongPathDirectory -Path $backupPath
+                Set-RestrictedBackupAcl -Path $backupPath
+                New-LongPathDirectory -Path $targetParent
+                Write-LongPathText -Path $sourceFile -Text $payloadText
+
+                $sourceExistsBefore = Test-LongPath -Path $sourceFile -PathType Leaf
+                $destinationParentExistsBefore = Test-LongPath -Path $targetParent -PathType Container
+                $sourceExistsBefore | Should -BeTrue
+                $destinationParentExistsBefore | Should -BeTrue
+                $sourceFile.Length | Should -BeLessThan 260
+                $targetFile.Length | Should -BeGreaterThan 260
+                (Join-Path $backupPath "manifest.json").Length | Should -BeGreaterThan 260
+
+                $legacyCopyOutcome = "succeeded"
+                try {
+                    Copy-Item -LiteralPath $sourceFile -Destination $targetFile -ErrorAction Stop
+                }
+                catch {
+                    $legacyCopyOutcome = $_.Exception.GetBaseException().GetType().FullName
+                }
+                $sourceExistsAfter = Test-LongPath -Path $sourceFile -PathType Leaf
+                $destinationParentExistsAfter = Test-LongPath -Path $targetParent -PathType Container
+                Write-Host ("Long-path diagnostic: sourceBefore={0}; parentBefore={1}; sourceAfter={2}; parentAfter={3}; targetCharacters={4}; unprefixedCopyItem={5}" -f `
+                    $sourceExistsBefore,
+                    $destinationParentExistsBefore,
+                    $sourceExistsAfter,
+                    $destinationParentExistsAfter,
+                    $targetFile.Length,
+                    $legacyCopyOutcome)
+                $sourceExistsAfter | Should -BeTrue
+                $destinationParentExistsAfter | Should -BeTrue
+                if (Test-LongPath -Path $targetFile -PathType Leaf) {
+                    Remove-LongPathEntry -Path $targetFile
+                }
+
+                Copy-DirectoryTree -Source $sourceRoot -Destination $backupDataPath
+                $expectedBytes = [System.Text.UTF8Encoding]::new($false).GetBytes($payloadText)
+                $sha256 = [System.Security.Cryptography.SHA256]::Create()
+                try {
+                    $expectedHash = [System.BitConverter]::ToString($sha256.ComputeHash($expectedBytes)).Replace('-', '').ToLowerInvariant()
+                }
+                finally {
+                    $sha256.Dispose()
+                }
+                $entries = @(Get-BackupFileEntries -BackupPath $backupPath)
+                $entries.Count | Should -Be 1
+                $entries[0].path | Should -Be ("payload/gitea-data/" + ($relativeObjectPath -replace '\\', '/'))
+                $entries[0].sizeBytes | Should -Be $expectedBytes.Length
+                $entries[0].sha256 | Should -Be $expectedHash
+
+                Save-BackupJson -Path (Join-Path $backupPath "manifest.json") -Value @{
+                    schemaVersion = 1
+                    backupId = Get-LongPathLeaf -Path $backupPath
+                    files = $entries
+                }
+                $validation = Test-GiteaBackupIntegrity -BackupPath $backupPath
+                $validation.IsValid | Should -BeTrue
+                $validation.Reason | Should -Be "valid"
+
+                New-LongPathDirectory -Path $restoreDataPath
+                $staleFile = Join-Path $restoreDataPath "stale-before-restore.txt"
+                Write-LongPathText -Path $staleFile -Text "must be removed"
+                Replace-GiteaDataTree -BackupSource $backupDataPath -LiveDestination $restoreDataPath
+                (Test-LongPath -Path $staleFile) | Should -BeFalse
+
+                $restoredFile = Join-Path $restoreDataPath $relativeObjectPath
+                (Test-LongPath -Path $restoredFile -PathType Leaf) | Should -BeTrue
+                (Read-LongPathText -Path $restoredFile) | Should -Be $payloadText
+                (Get-LongPathSha256 -Path $restoredFile) | Should -Be $expectedHash
+                $restoredFile.Length | Should -BeGreaterThan 260
+            }
+            finally {
+                if ($fixtureRootCreated -and (Test-LongPath -Path $FixtureRoot -PathType Container)) {
+                    $resolvedRoot = Get-FullPath -Path $FixtureRoot
+                    $expectedParent = Get-FullPath -Path $TempParent
+                    (Get-LongPathParent -Path $resolvedRoot).Equals(
+                        $expectedParent,
+                        [StringComparison]::OrdinalIgnoreCase
+                    ) | Should -BeTrue
+                    (Get-LongPathLeaf -Path $resolvedRoot) | Should -Be "agent-sdlc-gitea-long-path-$RunId"
+                    ((Get-LongPathItem -Path $resolvedRoot).Attributes -band [System.IO.FileAttributes]::ReparsePoint) |
+                        Should -Be ([System.IO.FileAttributes]::Normal)
+
+                    if (Test-LongPath -Path $MarkerPath -PathType Leaf) {
+                        if (-not $markerWriteCompleted) {
+                            throw "Refusing long-path fixture cleanup because its ownership marker was not fully written."
+                        }
+                        (Read-LongPathText -Path $MarkerPath) | Should -Be $MarkerValue
+                        $ownerAcl = [System.IO.Directory]::GetAccessControl(
+                            (ConvertTo-ExtendedLengthPath -Path $resolvedRoot),
+                            [System.Security.AccessControl.AccessControlSections]::Owner
+                        )
+                        $ownerAcl.GetOwner([System.Security.Principal.SecurityIdentifier]).Value | Should -Be $CurrentUserSid
+                        Remove-LongPathTree -Path $resolvedRoot
+                    }
+                    else {
+                        @(Get-LongPathDirectoryEntries -Path $resolvedRoot).Count | Should -Be 0
+                        [System.IO.Directory]::Delete((ConvertTo-ExtendedLengthPath -Path $resolvedRoot), $false)
+                    }
+                    (Test-LongPath -Path $resolvedRoot) | Should -BeFalse
+                }
+            }
+        }
+    }
+}

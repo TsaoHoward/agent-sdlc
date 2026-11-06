@@ -148,6 +148,7 @@ npm run dev:env:status
 npm run dev:env:down
 npm run dev:env:backup-list
 npm run test:gitea-lifecycle:acl
+npm run test:gitea-lifecycle:long-path
 npm run test:gitea-lifecycle
 ```
 
@@ -162,6 +163,7 @@ Run the lifecycle checks from native Windows PowerShell with Node.js 22+, npm, P
 npm ci
 npm run typecheck
 npm run test:gitea-lifecycle:acl
+npm run test:gitea-lifecycle:long-path
 npm run test:gitea-lifecycle
 $env:AGENT_SDLC_GITEA_DOCKER_E2E = "1"
 npm run test:gitea-lifecycle:docker-e2e
@@ -169,6 +171,8 @@ Remove-Item Env:AGENT_SDLC_GITEA_DOCKER_E2E
 ```
 
 The NTFS ACL check must run from non-elevated Windows PowerShell. It creates a GUID-named directory under the Windows temp directory, exercises the real NTFS DACL through the operator backup-list command, and checks ownership, inheritance and effective access rules. Cleanup verifies the exact temp path and owner; it checks the marker before recursive removal, or removes an empty directory if setup failed before marker creation. It does not use the configured or formal backup directory.
+
+The long-path check also runs from non-elevated Windows PowerShell and uses only a GUID-owned NTFS temp tree. It creates a backup object whose destination path exceeds 260 characters, records whether unprefixed `Copy-Item` fails while the source and destination parent still exist, then checks extended-path copy, SHA256 manifest generation/validation, restore replacement, content equality, and ownership-verified cleanup. It does not change Windows long-path policy or use the configured backup directory.
 
 The Docker E2E creates only GUID-named disposable fixtures, uses separate bind mounts and a private network, and binds to `127.0.0.2` so the existing `127.0.0.1:43000` service is outside its target. It checks pre-existing container identities and states before cleanup. It uses an inert fixture Runner and does not validate real Actions dispatch or Runner execution.
 

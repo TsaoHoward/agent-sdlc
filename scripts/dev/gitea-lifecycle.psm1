@@ -9,12 +9,337 @@ function Assert-NativeWindowsHost {
 
 function Get-FullPath {
     param([Parameter(Mandatory = $true)][string]$Path)
+
+    $normalized = $Path.Replace('/', '\')
+    if ($normalized.StartsWith('\\?\UNC\', [StringComparison]::OrdinalIgnoreCase)) {
+        $normalized = '\\' + $normalized.Substring(8)
+    }
+    elseif ($normalized.StartsWith('\\?\', [StringComparison]::OrdinalIgnoreCase)) {
+        $extendedPath = $normalized.Substring(4)
+        if ($extendedPath -notmatch '^[A-Za-z]:\\') {
+            throw "Only extended-length drive and UNC paths are supported for Gitea lifecycle file operations."
+        }
+        $normalized = $extendedPath
+    }
+
+    if ($normalized -match '^([A-Za-z]):\\') {
+        $rootPath = $Matches[1].ToUpperInvariant() + ':\'
+        $segments = [System.Collections.Generic.List[string]]::new()
+        foreach ($segment in $normalized.Substring(3).Split([char[]]@('\'))) {
+            if (-not $segment -or $segment -eq '.') { continue }
+            if ($segment -eq '..') {
+                if ($segments.Count -gt 0) { $segments.RemoveAt($segments.Count - 1) }
+                continue
+            }
+            if ($segment -match '[<>:"|?*\x00-\x1f]') {
+                throw "The path contains a character that is invalid in a Windows file name."
+            }
+            if ($segment.EndsWith('.') -or $segment.EndsWith(' ')) {
+                throw "The path contains a Windows path segment with a trailing dot or space."
+            }
+            $segments.Add($segment)
+        }
+        if ($segments.Count -eq 0) { return $rootPath }
+        return $rootPath + ($segments -join '\')
+    }
+
+    if ($normalized.StartsWith('\\')) {
+        if ($normalized.StartsWith('\\.\', [StringComparison]::OrdinalIgnoreCase)) {
+            throw "Device namespace paths are not supported for Gitea lifecycle file operations."
+        }
+        $uncSegments = @($normalized.Substring(2).Split([char[]]@('\')))
+        if ($uncSegments.Count -lt 2 -or -not $uncSegments[0] -or -not $uncSegments[1]) {
+            throw "The UNC path does not include both a server and share name."
+        }
+        $uncRoot = '\\' + $uncSegments[0] + '\' + $uncSegments[1]
+        $segments = [System.Collections.Generic.List[string]]::new()
+        foreach ($segment in $uncSegments | Select-Object -Skip 2) {
+            if (-not $segment -or $segment -eq '.') { continue }
+            if ($segment -eq '..') {
+                if ($segments.Count -gt 0) { $segments.RemoveAt($segments.Count - 1) }
+                continue
+            }
+            if ($segment -match '[<>:"|?*\x00-\x1f]') {
+                throw "The path contains a character that is invalid in a Windows file name."
+            }
+            if ($segment.EndsWith('.') -or $segment.EndsWith(' ')) {
+                throw "The path contains a Windows path segment with a trailing dot or space."
+            }
+            $segments.Add($segment)
+        }
+        if ($segments.Count -eq 0) { return $uncRoot }
+        return $uncRoot + '\' + ($segments -join '\')
+    }
+
     $fullPath = [System.IO.Path]::GetFullPath($Path)
     $rootPath = [System.IO.Path]::GetPathRoot($fullPath)
-    if ($fullPath.Equals($rootPath, [StringComparison]::OrdinalIgnoreCase)) {
-        return $fullPath
-    }
+    if ($fullPath.Equals($rootPath, [StringComparison]::OrdinalIgnoreCase)) { return $fullPath }
     return $fullPath.TrimEnd([System.IO.Path]::DirectorySeparatorChar, [System.IO.Path]::AltDirectorySeparatorChar)
+}
+
+function Get-LongPathParent {
+    param([Parameter(Mandatory = $true)][string]$Path)
+
+    $fullPath = Get-FullPath -Path $Path
+    if ($fullPath -match '^[A-Za-z]:\\$') { return $fullPath }
+    if ($fullPath -match '^\\\\[^\\]+\\[^\\]+$') { return $fullPath }
+    $separator = $fullPath.LastIndexOf('\')
+    if ($separator -lt 0) { return $null }
+    if ($separator -eq 2) { return $fullPath.Substring(0, 3) }
+    return $fullPath.Substring(0, $separator)
+}
+
+function Get-LongPathLeaf {
+    param([Parameter(Mandatory = $true)][string]$Path)
+
+    $fullPath = Get-FullPath -Path $Path
+    $separator = $fullPath.LastIndexOf('\')
+    if ($separator -lt 0) { return $fullPath }
+    return $fullPath.Substring($separator + 1)
+}
+
+function ConvertTo-ExtendedLengthPath {
+    param([Parameter(Mandatory = $true)][string]$Path)
+
+    $fullPath = Get-FullPath -Path $Path
+    if ($fullPath -match '^[A-Za-z]:\\') { return '\\?\' + $fullPath }
+    if ($fullPath.StartsWith('\\')) { return '\\?\UNC\' + $fullPath.Substring(2) }
+    throw "Long-path file operations require an absolute drive or UNC path."
+}
+
+function ConvertFrom-ExtendedLengthPath {
+    param([Parameter(Mandatory = $true)][string]$Path)
+
+    if ($Path.StartsWith('\\?\UNC\', [StringComparison]::OrdinalIgnoreCase)) {
+        return '\\' + $Path.Substring(8)
+    }
+    if ($Path.StartsWith('\\?\', [StringComparison]::OrdinalIgnoreCase)) {
+        return $Path.Substring(4)
+    }
+    return $Path
+}
+
+function Test-LongPath {
+    param(
+        [Parameter(Mandatory = $true)][string]$Path,
+        [ValidateSet('Any', 'Container', 'Leaf')][string]$PathType = 'Any'
+    )
+
+    try {
+        $attributes = [System.IO.File]::GetAttributes((ConvertTo-ExtendedLengthPath -Path $Path))
+    }
+    catch [System.IO.FileNotFoundException] { return $false }
+    catch [System.IO.DirectoryNotFoundException] { return $false }
+
+    $isContainer = (($attributes -band [System.IO.FileAttributes]::Directory) -ne 0)
+    if ($PathType -eq 'Container') { return $isContainer }
+    if ($PathType -eq 'Leaf') { return -not $isContainer }
+    return $true
+}
+
+function Get-LongPathItem {
+    param([Parameter(Mandatory = $true)][string]$Path)
+
+    $extendedPath = ConvertTo-ExtendedLengthPath -Path $Path
+    $attributes = [System.IO.File]::GetAttributes($extendedPath)
+    $isContainer = (($attributes -band [System.IO.FileAttributes]::Directory) -ne 0)
+    $length = [long]0
+    if (-not $isContainer) { $length = [long]([System.IO.FileInfo]::new($extendedPath).Length) }
+    $fullPath = ConvertFrom-ExtendedLengthPath -Path $extendedPath
+    $separator = $fullPath.LastIndexOf('\')
+    $name = if ($separator -ge 0) { $fullPath.Substring($separator + 1) } else { $fullPath }
+    return [pscustomobject]@{
+        FullName = $fullPath
+        Name = $name
+        Attributes = $attributes
+        PSIsContainer = $isContainer
+        Length = $length
+    }
+}
+
+function Get-LongPathDirectoryEntries {
+    param([Parameter(Mandatory = $true)][string]$Path)
+
+    $entries = [System.Collections.Generic.List[object]]::new()
+    $extendedDirectory = ConvertTo-ExtendedLengthPath -Path $Path
+    foreach ($extendedEntry in [System.IO.Directory]::EnumerateFileSystemEntries($extendedDirectory)) {
+        $entryPath = ConvertFrom-ExtendedLengthPath -Path $extendedEntry
+        $entries.Add((Get-LongPathItem -Path $entryPath))
+    }
+    return $entries.ToArray()
+}
+
+function Get-LongPathTreeEntries {
+    param([Parameter(Mandatory = $true)][string]$Path)
+
+    $entries = [System.Collections.Generic.List[object]]::new()
+    $pending = [System.Collections.Generic.Stack[string]]::new()
+    $pending.Push((Get-FullPath -Path $Path))
+    while ($pending.Count -gt 0) {
+        $directory = $pending.Pop()
+        foreach ($entry in @(Get-LongPathDirectoryEntries -Path $directory)) {
+            $entries.Add($entry)
+            if ($entry.PSIsContainer -and
+                (($entry.Attributes -band [System.IO.FileAttributes]::ReparsePoint) -eq 0)) {
+                $pending.Push($entry.FullName)
+            }
+        }
+    }
+    return $entries.ToArray()
+}
+
+function New-LongPathDirectory {
+    param([Parameter(Mandatory = $true)][string]$Path)
+
+    [void][System.IO.Directory]::CreateDirectory((ConvertTo-ExtendedLengthPath -Path $Path))
+}
+
+function Remove-LongPathEntry {
+    param([Parameter(Mandatory = $true)][string]$Path)
+
+    $item = Get-LongPathItem -Path $Path
+    if (($item.Attributes -band [System.IO.FileAttributes]::ReparsePoint) -ne 0) {
+        throw "Refusing to remove reparse point '$Path'."
+    }
+    $extendedPath = ConvertTo-ExtendedLengthPath -Path $Path
+    if ($item.PSIsContainer) {
+        foreach ($child in @(Get-LongPathDirectoryEntries -Path $Path)) {
+            Remove-LongPathEntry -Path $child.FullName
+        }
+        [System.IO.File]::SetAttributes($extendedPath, [System.IO.FileAttributes]::Normal)
+        [System.IO.Directory]::Delete($extendedPath, $false)
+    }
+    else {
+        [System.IO.File]::SetAttributes($extendedPath, [System.IO.FileAttributes]::Normal)
+        [System.IO.File]::Delete($extendedPath)
+    }
+}
+
+function Remove-LongPathTree {
+    param([Parameter(Mandatory = $true)][string]$Path)
+
+    $item = Get-LongPathItem -Path $Path
+    if (($item.Attributes -band [System.IO.FileAttributes]::ReparsePoint) -ne 0) {
+        throw "Refusing to remove reparse point '$Path'."
+    }
+    foreach ($entry in @(Get-LongPathTreeEntries -Path $Path)) {
+        if (($entry.Attributes -band [System.IO.FileAttributes]::ReparsePoint) -ne 0) {
+            throw "Refusing to remove a tree containing reparse point '$($entry.FullName)'."
+        }
+    }
+    Remove-LongPathEntry -Path $Path
+}
+
+function Copy-LongPathFile {
+    param(
+        [Parameter(Mandatory = $true)][string]$Source,
+        [Parameter(Mandatory = $true)][string]$Destination,
+        [switch]$Force
+    )
+
+    $sourceItem = Get-LongPathItem -Path $Source
+    if ($sourceItem.PSIsContainer -or
+        (($sourceItem.Attributes -band [System.IO.FileAttributes]::ReparsePoint) -ne 0)) {
+        throw "Copy source '$Source' is not a regular file; refusing a redirected or ambiguous copy."
+    }
+    $destinationExtended = ConvertTo-ExtendedLengthPath -Path $Destination
+    if (Test-LongPath -Path $Destination) {
+        $destinationItem = Get-LongPathItem -Path $Destination
+        if ($destinationItem.PSIsContainer -or
+            (($destinationItem.Attributes -band [System.IO.FileAttributes]::ReparsePoint) -ne 0)) {
+            throw "Copy destination '$Destination' is not a regular file."
+        }
+        if (-not $Force) { throw "Copy destination '$Destination' already exists." }
+        [System.IO.File]::SetAttributes($destinationExtended, [System.IO.FileAttributes]::Normal)
+        [System.IO.File]::Delete($destinationExtended)
+    }
+
+    $sourceStream = $null
+    $destinationStream = $null
+    try {
+        $sourceStream = [System.IO.FileStream]::new(
+            (ConvertTo-ExtendedLengthPath -Path $Source),
+            [System.IO.FileMode]::Open,
+            [System.IO.FileAccess]::Read,
+            [System.IO.FileShare]::Read
+        )
+        $destinationStream = [System.IO.FileStream]::new(
+            $destinationExtended,
+            [System.IO.FileMode]::CreateNew,
+            [System.IO.FileAccess]::Write,
+            [System.IO.FileShare]::None
+        )
+        $sourceStream.CopyTo($destinationStream)
+        $destinationStream.Flush($true)
+    }
+    finally {
+        if ($destinationStream) { $destinationStream.Dispose() }
+        if ($sourceStream) { $sourceStream.Dispose() }
+    }
+}
+
+function Move-LongPathFile {
+    param(
+        [Parameter(Mandatory = $true)][string]$Source,
+        [Parameter(Mandatory = $true)][string]$Destination,
+        [switch]$Force
+    )
+
+    $sourceItem = Get-LongPathItem -Path $Source
+    if ($sourceItem.PSIsContainer -or
+        (($sourceItem.Attributes -band [System.IO.FileAttributes]::ReparsePoint) -ne 0)) {
+        throw "Move source '$Source' is not a regular file."
+    }
+    $sourceExtended = ConvertTo-ExtendedLengthPath -Path $Source
+    $destinationExtended = ConvertTo-ExtendedLengthPath -Path $Destination
+    if (Test-LongPath -Path $Destination) {
+        $destinationItem = Get-LongPathItem -Path $Destination
+        if ($destinationItem.PSIsContainer -or
+            (($destinationItem.Attributes -band [System.IO.FileAttributes]::ReparsePoint) -ne 0)) {
+            throw "Move destination '$Destination' is not a regular file."
+        }
+        if (-not $Force) { throw "Move destination '$Destination' already exists." }
+        [System.IO.File]::Replace($sourceExtended, $destinationExtended, $null)
+        return
+    }
+    [System.IO.File]::Move($sourceExtended, $destinationExtended)
+}
+
+function Read-LongPathText {
+    param([Parameter(Mandatory = $true)][string]$Path)
+    return [System.IO.File]::ReadAllText((ConvertTo-ExtendedLengthPath -Path $Path))
+}
+
+function Write-LongPathText {
+    param(
+        [Parameter(Mandatory = $true)][string]$Path,
+        [Parameter(Mandatory = $true)][string]$Text
+    )
+    [System.IO.File]::WriteAllText(
+        (ConvertTo-ExtendedLengthPath -Path $Path),
+        $Text,
+        [System.Text.UTF8Encoding]::new($false)
+    )
+}
+
+function Get-LongPathSha256 {
+    param([Parameter(Mandatory = $true)][string]$Path)
+
+    $stream = $null
+    $algorithm = [System.Security.Cryptography.SHA256]::Create()
+    try {
+        $stream = [System.IO.FileStream]::new(
+            (ConvertTo-ExtendedLengthPath -Path $Path),
+            [System.IO.FileMode]::Open,
+            [System.IO.FileAccess]::Read,
+            [System.IO.FileShare]::Read
+        )
+        return [System.BitConverter]::ToString($algorithm.ComputeHash($stream)).Replace('-', '').ToLowerInvariant()
+    }
+    finally {
+        if ($stream) { $stream.Dispose() }
+        $algorithm.Dispose()
+    }
 }
 
 function Test-PathContains {
@@ -42,15 +367,17 @@ function Assert-NoReparsePathAncestors {
 
     $current = Get-FullPath -Path $Path
     while ($current) {
-        if (Test-Path -LiteralPath $current) {
-            $item = Get-Item -LiteralPath $current -Force
+        if (Test-LongPath -Path $current) {
+            $item = Get-LongPathItem -Path $current
             if (($item.Attributes -band [IO.FileAttributes]::ReparsePoint) -ne 0) {
                 throw "The configured backup path crosses a reparse point at '$current'; local backup storage must resolve directly to disk."
             }
         }
-        $parent = [System.IO.Directory]::GetParent($current)
-        if (-not $parent) { break }
-        $current = $parent.FullName
+        if ($current -match '^[A-Za-z]:\\$') { break }
+        $separator = $current.LastIndexOf('\')
+        if ($separator -lt 2) { break }
+        if ($separator -eq 2) { $current = $current.Substring(0, 3) }
+        else { $current = $current.Substring(0, $separator) }
     }
 }
 
@@ -84,11 +411,11 @@ function Get-BackupObjectSecurity {
 
     $sections = [System.Security.AccessControl.AccessControlSections]::Access -bor
         [System.Security.AccessControl.AccessControlSections]::Owner
-    $item = Get-Item -LiteralPath $Path -Force -ErrorAction Stop
+    $item = Get-LongPathItem -Path $Path
     if ($item.PSIsContainer) {
-        return [System.IO.Directory]::GetAccessControl($Path, $sections)
+        return [System.IO.Directory]::GetAccessControl((ConvertTo-ExtendedLengthPath -Path $Path), $sections)
     }
-    return [System.IO.File]::GetAccessControl($Path, $sections)
+    return [System.IO.File]::GetAccessControl((ConvertTo-ExtendedLengthPath -Path $Path), $sections)
 }
 
 function Assert-RestrictedBackupAcl {
@@ -153,7 +480,7 @@ function Set-RestrictedBackupAcl {
     param([Parameter(Mandatory = $true)][string]$Path)
 
     $currentUserSid = [System.Security.Principal.WindowsIdentity]::GetCurrent().User
-    $item = Get-Item -LiteralPath $Path -Force -ErrorAction Stop
+    $item = Get-LongPathItem -Path $Path
     $isDirectory = [bool]$item.PSIsContainer
     $security = Get-BackupObjectSecurity -Path $Path
     $existingOwner = $security.GetOwner([System.Security.Principal.SecurityIdentifier])
@@ -195,10 +522,10 @@ function Set-RestrictedBackupAcl {
     # FileSystemSecurity persists only sections modified on this new descriptor, so
     # changing access rules here writes the DACL without requesting the SACL.
     if ($isDirectory) {
-        ([System.IO.DirectoryInfo]::new($Path)).SetAccessControl($security)
+        ([System.IO.DirectoryInfo]::new((ConvertTo-ExtendedLengthPath -Path $Path))).SetAccessControl($security)
     }
     else {
-        ([System.IO.FileInfo]::new($Path)).SetAccessControl($security)
+        ([System.IO.FileInfo]::new((ConvertTo-ExtendedLengthPath -Path $Path))).SetAccessControl($security)
     }
 
     Assert-RestrictedBackupAcl -Path $Path -OwnerSid $currentUserSid -IsDirectory $isDirectory
@@ -208,12 +535,12 @@ function Ensure-BackupRoot {
     param([hashtable]$Context)
 
     $backupRoot = Assert-SafeBackupRoot -Context $Context
-    if (-not (Test-Path -LiteralPath $backupRoot -PathType Container)) {
-        New-Item -ItemType Directory -Path $backupRoot -Force | Out-Null
+    if (-not (Test-LongPath -Path $backupRoot -PathType Container)) {
+        New-LongPathDirectory -Path $backupRoot
     }
 
-    $resolvedRoot = (Resolve-Path -LiteralPath $backupRoot).Path
-    if ((Get-FullPath -Path $resolvedRoot) -ne $backupRoot) {
+    Assert-NoReparsePathAncestors -Path $backupRoot
+    if ((Get-FullPath -Path $backupRoot) -ne $backupRoot) {
         throw "The resolved Gitea backup root differs from the configured path; refusing a redirected backup location."
     }
 
@@ -296,7 +623,7 @@ function Invoke-GiteaDockerToFile {
     $process.StartInfo = $startInfo
     [void]$process.Start()
     $stderrTask = $process.StandardError.ReadToEndAsync()
-    $output = [System.IO.File]::Open($OutputPath, [System.IO.FileMode]::CreateNew, [System.IO.FileAccess]::Write, [System.IO.FileShare]::None)
+    $output = [System.IO.File]::Open((ConvertTo-ExtendedLengthPath -Path $OutputPath), [System.IO.FileMode]::CreateNew, [System.IO.FileAccess]::Write, [System.IO.FileShare]::None)
     try {
         $process.StandardOutput.BaseStream.CopyTo($output)
     }
@@ -335,7 +662,7 @@ function Invoke-GiteaDockerWithInputFile {
     [void]$process.Start()
     $stdoutTask = $process.StandardOutput.ReadToEndAsync()
     $stderrTask = $process.StandardError.ReadToEndAsync()
-    $inputStream = [System.IO.File]::OpenRead($InputPath)
+    $inputStream = [System.IO.File]::OpenRead((ConvertTo-ExtendedLengthPath -Path $InputPath))
     try {
         $inputStream.CopyTo($process.StandardInput.BaseStream)
     }
@@ -747,14 +1074,14 @@ function Get-ImageDigestReference {
 function Get-DirectoryBytes {
     param([Parameter(Mandatory = $true)][string]$Path)
 
-    if (-not (Test-Path -LiteralPath $Path -PathType Container)) {
+    if (-not (Test-LongPath -Path $Path -PathType Container)) {
         throw "Required live data directory '$Path' is missing."
     }
-    if (((Get-Item -LiteralPath $Path -Force).Attributes -band [IO.FileAttributes]::ReparsePoint) -ne 0) {
+    if (((Get-LongPathItem -Path $Path).Attributes -band [IO.FileAttributes]::ReparsePoint) -ne 0) {
         throw "Live data directory '$Path' is a reparse point; refusing a capacity estimate over redirected data."
     }
     $sum = [long]0
-    foreach ($item in Get-ChildItem -LiteralPath $Path -Recurse -Force) {
+    foreach ($item in @(Get-LongPathTreeEntries -Path $Path)) {
         if (($item.Attributes -band [IO.FileAttributes]::ReparsePoint) -ne 0) {
             throw "Live data contains a reparse point at '$($item.FullName)'; refusing a capacity estimate over redirected data."
         }
@@ -804,7 +1131,7 @@ function Save-BackupJson {
     )
 
     $json = ConvertTo-Json -InputObject $Value -Depth 100
-    [System.IO.File]::WriteAllText($Path, $json, [System.Text.UTF8Encoding]::new($false))
+    Write-LongPathText -Path $Path -Text $json
 }
 
 function Copy-DirectoryTree {
@@ -813,17 +1140,23 @@ function Copy-DirectoryTree {
         [Parameter(Mandatory = $true)][string]$Destination
     )
 
-    if (-not (Test-Path -LiteralPath $Source -PathType Container)) {
+    if (-not (Test-LongPath -Path $Source -PathType Container)) {
         throw "Required Gitea data directory '$Source' is missing."
     }
-    if (((Get-Item -LiteralPath $Source -Force).Attributes -band [IO.FileAttributes]::ReparsePoint) -ne 0) {
+    if (((Get-LongPathItem -Path $Source).Attributes -band [IO.FileAttributes]::ReparsePoint) -ne 0) {
         throw "Backup source directory '$Source' is a reparse point; refusing an ambiguous snapshot."
     }
-    if (-not (Test-Path -LiteralPath $Destination -PathType Container)) {
-        New-Item -ItemType Directory -Path $Destination -Force | Out-Null
+    if (Test-LongPath -Path $Destination) {
+        if (-not (Test-LongPath -Path $Destination -PathType Container) -or
+            (((Get-LongPathItem -Path $Destination).Attributes -band [IO.FileAttributes]::ReparsePoint) -ne 0)) {
+            throw "Backup destination '$Destination' is not a regular directory."
+        }
+    }
+    else {
+        New-LongPathDirectory -Path $Destination
     }
 
-    foreach ($item in Get-ChildItem -LiteralPath $Source -Force) {
+    foreach ($item in @(Get-LongPathDirectoryEntries -Path $Source)) {
         if (($item.Attributes -band [IO.FileAttributes]::ReparsePoint) -ne 0) {
             throw "Backup source contains a reparse point at '$($item.FullName)'; refusing an ambiguous snapshot."
         }
@@ -832,7 +1165,7 @@ function Copy-DirectoryTree {
             Copy-DirectoryTree -Source $item.FullName -Destination $target
         }
         else {
-            Copy-Item -LiteralPath $item.FullName -Destination $target
+            Copy-LongPathFile -Source $item.FullName -Destination $target
         }
     }
 }
@@ -972,12 +1305,17 @@ function Get-BackupFileEntries {
 
     $entries = @()
     $manifestPath = Join-Path $BackupPath "manifest.json"
-    foreach ($file in Get-ChildItem -LiteralPath $BackupPath -File -Recurse -Force | Where-Object { -not $_.FullName.Equals($manifestPath, [StringComparison]::OrdinalIgnoreCase) }) {
-        $relativePath = $file.FullName.Substring($BackupPath.Length).TrimStart('\', '/') -replace '\\', '/'
+    $backupRoot = (Get-FullPath -Path $BackupPath).TrimEnd('\', '/')
+    foreach ($file in @(Get-LongPathTreeEntries -Path $backupRoot)) {
+        if (($file.Attributes -band [System.IO.FileAttributes]::ReparsePoint) -ne 0) {
+            throw "Backup contains a reparse point at '$($file.FullName)'; refusing to checksum redirected content."
+        }
+        if ($file.PSIsContainer -or $file.FullName.Equals($manifestPath, [StringComparison]::OrdinalIgnoreCase)) { continue }
+        $relativePath = $file.FullName.Substring($backupRoot.Length).TrimStart('\', '/') -replace '\\', '/'
         $entries += @{
             path = $relativePath
             sizeBytes = [long]$file.Length
-            sha256 = (Get-FileHash -LiteralPath $file.FullName -Algorithm SHA256).Hash.ToLowerInvariant()
+            sha256 = Get-LongPathSha256 -Path $file.FullName
         }
     }
     return $entries
@@ -987,38 +1325,41 @@ function Test-GiteaBackupIntegrity {
     param([Parameter(Mandatory = $true)][string]$BackupPath)
 
     $manifestPath = Join-Path $BackupPath "manifest.json"
-    if (-not (Test-Path -LiteralPath $manifestPath -PathType Leaf)) {
+    if (-not (Test-LongPath -Path $manifestPath -PathType Leaf)) {
         return [pscustomobject]@{ IsValid = $false; Reason = "manifest-missing"; Manifest = $null }
     }
     try {
-        if (((Get-Item -LiteralPath $BackupPath -Force).Attributes -band [IO.FileAttributes]::ReparsePoint) -ne 0 -or
-            ((Get-Item -LiteralPath $manifestPath -Force).Attributes -band [IO.FileAttributes]::ReparsePoint) -ne 0) {
+        if (((Get-LongPathItem -Path $BackupPath).Attributes -band [IO.FileAttributes]::ReparsePoint) -ne 0 -or
+            ((Get-LongPathItem -Path $manifestPath).Attributes -band [IO.FileAttributes]::ReparsePoint) -ne 0) {
             return [pscustomobject]@{ IsValid = $false; Reason = "reparse-point-found"; Manifest = $null }
         }
-        foreach ($item in Get-ChildItem -LiteralPath $BackupPath -Recurse -Force) {
+        foreach ($item in @(Get-LongPathTreeEntries -Path $BackupPath)) {
             if (($item.Attributes -band [IO.FileAttributes]::ReparsePoint) -ne 0) {
                 return [pscustomobject]@{ IsValid = $false; Reason = "reparse-point-found"; Manifest = $null }
             }
         }
-        $manifest = Get-Content -LiteralPath $manifestPath -Raw | ConvertFrom-Json
-        if ([int]$manifest.schemaVersion -ne 1 -or [string]$manifest.backupId -ne (Split-Path -Leaf $BackupPath)) {
+        $manifest = Read-LongPathText -Path $manifestPath | ConvertFrom-Json
+        if ([int]$manifest.schemaVersion -ne 1 -or [string]$manifest.backupId -ne (Get-LongPathLeaf -Path $BackupPath)) {
             return [pscustomobject]@{ IsValid = $false; Reason = "manifest-identity-invalid"; Manifest = $manifest }
         }
 
-        $rootPrefix = (Get-FullPath -Path $BackupPath) + [System.IO.Path]::DirectorySeparatorChar
+        $rootPrefix = (Get-FullPath -Path $BackupPath).TrimEnd('\', '/') + '\'
         $listedPaths = @()
         foreach ($entry in @($manifest.files)) {
             $relative = [string]$entry.path
-            if (-not $relative -or [System.IO.Path]::IsPathRooted($relative) -or $relative -match '(^|/)\.\.(/|$)') {
+            $segments = $relative.Split([char[]]@('/'))
+            if (-not $relative -or $relative.StartsWith('/') -or $relative.Contains('\') -or
+                $relative -match '^[A-Za-z]:' -or $relative -match '[<>:"|?*\x00-\x1f]' -or
+                @($segments | Where-Object { -not $_ -or $_ -eq '.' -or $_ -eq '..' }).Count -gt 0) {
                 return [pscustomobject]@{ IsValid = $false; Reason = "manifest-path-invalid"; Manifest = $manifest }
             }
-            $fullPath = [System.IO.Path]::GetFullPath((Join-Path $BackupPath ($relative -replace '/', '\')))
+            $fullPath = Get-FullPath -Path (Join-Path $BackupPath ($relative -replace '/', '\'))
             if (-not $fullPath.StartsWith($rootPrefix, [StringComparison]::OrdinalIgnoreCase) -or
-                -not (Test-Path -LiteralPath $fullPath -PathType Leaf)) {
+                -not (Test-LongPath -Path $fullPath -PathType Leaf)) {
                 return [pscustomobject]@{ IsValid = $false; Reason = "backup-file-missing"; Manifest = $manifest }
             }
-            $hash = (Get-FileHash -LiteralPath $fullPath -Algorithm SHA256).Hash.ToLowerInvariant()
-            if ($hash -ne [string]$entry.sha256 -or (Get-Item -LiteralPath $fullPath).Length -ne [long]$entry.sizeBytes) {
+            $hash = Get-LongPathSha256 -Path $fullPath
+            if ($hash -ne [string]$entry.sha256 -or (Get-LongPathItem -Path $fullPath).Length -ne [long]$entry.sizeBytes) {
                 return [pscustomobject]@{ IsValid = $false; Reason = "checksum-mismatch"; Manifest = $manifest }
             }
             $listedPaths += $relative
@@ -1050,7 +1391,7 @@ function New-GiteaBackupSet {
     $backupRoot = Ensure-BackupRoot -Context $Context
     $backupId = "{0}-{1}" -f [DateTime]::UtcNow.ToString("yyyyMMddTHHmmssZ"), [Guid]::NewGuid().ToString("N")
     $backupPath = Join-Path $backupRoot $backupId
-    New-Item -ItemType Directory -Path $backupPath | Out-Null
+    New-LongPathDirectory -Path $backupPath
     Set-RestrictedBackupAcl -Path $backupPath
 
     $payloadPath = Join-Path $backupPath "payload"
@@ -1059,28 +1400,28 @@ function New-GiteaBackupSet {
     $operatorPath = Join-Path $payloadPath "operator-state"
     $privatePath = Join-Path $payloadPath "private"
     foreach ($directory in @($payloadPath, $dataPath, $configPath, $operatorPath, $privatePath)) {
-        New-Item -ItemType Directory -Path $directory -Force | Out-Null
+        New-LongPathDirectory -Path $directory
     }
 
     Copy-DirectoryTree -Source $Context.GiteaDataDir -Destination $dataPath
     Copy-DirectoryTree -Source $Context.GiteaConfigDir -Destination $configPath
-    if (-not (Test-Path -LiteralPath $Context.ConfigPath -PathType Leaf)) {
+    if (-not (Test-LongPath -Path $Context.ConfigPath -PathType Leaf)) {
         throw "The active Gitea bootstrap config is missing; refusing to create a partial backup."
     }
-    if (((Get-Item -LiteralPath $Context.ConfigPath -Force).Attributes -band [IO.FileAttributes]::ReparsePoint) -ne 0) {
+    if (((Get-LongPathItem -Path $Context.ConfigPath).Attributes -band [IO.FileAttributes]::ReparsePoint) -ne 0) {
         throw "The active Gitea bootstrap config is a reparse point; refusing to back up redirected settings."
     }
-    Copy-Item -LiteralPath $Context.ConfigPath -Destination (Join-Path $operatorPath "bootstrap-config.json")
+    Copy-LongPathFile -Source $Context.ConfigPath -Destination (Join-Path $operatorPath "bootstrap-config.json")
     foreach ($entry in @(
         @{ Source = $Context.GiteaSecretsPath; Name = "generated-secrets.json" },
         @{ Source = $Context.GiteaBootstrapSummaryPath; Name = "bootstrap-summary.json" },
         @{ Source = $Context.EffectiveBootstrapSettingsPath; Name = "effective-settings.json" }
     )) {
-        if (Test-Path -LiteralPath $entry.Source -PathType Leaf) {
-            if (((Get-Item -LiteralPath $entry.Source -Force).Attributes -band [IO.FileAttributes]::ReparsePoint) -ne 0) {
+        if (Test-LongPath -Path $entry.Source -PathType Leaf) {
+            if (((Get-LongPathItem -Path $entry.Source).Attributes -band [IO.FileAttributes]::ReparsePoint) -ne 0) {
                 throw "Operator state file '$($entry.Source)' is a reparse point; refusing to back up redirected settings."
             }
-            Copy-Item -LiteralPath $entry.Source -Destination (Join-Path $operatorPath $entry.Name)
+            Copy-LongPathFile -Source $entry.Source -Destination (Join-Path $operatorPath $entry.Name)
         }
     }
 
@@ -1098,7 +1439,7 @@ function New-GiteaBackupSet {
     $dumpPath = Join-Path $payloadPath "postgres.dump"
     $dumpCommand = 'PGPASSWORD="$POSTGRES_PASSWORD" pg_dump --format=custom --no-owner --no-acl --username "$POSTGRES_USER" --dbname "$POSTGRES_DB"'
     Invoke-GiteaDockerToFile -Arguments @("exec", $Context.GiteaPostgresContainerName, "sh", "-c", $dumpCommand) -OutputPath $dumpPath
-    $dumpStream = [System.IO.File]::OpenRead($dumpPath)
+    $dumpStream = [System.IO.File]::OpenRead((ConvertTo-ExtendedLengthPath -Path $dumpPath))
     try {
         $magic = New-Object byte[] 5
         $read = $dumpStream.Read($magic, 0, 5)
@@ -1153,17 +1494,17 @@ function Get-GiteaBackupById {
     }
     $backupRoot = Ensure-BackupRoot -Context $Context
     $backupPath = Join-Path $backupRoot $BackupId
-    if (-not (Test-Path -LiteralPath $backupPath -PathType Container)) {
+    if (-not (Test-LongPath -Path $backupPath -PathType Container)) {
         throw "Backup ID '$BackupId' was not found."
     }
     $validation = Test-GiteaBackupIntegrity -BackupPath $backupPath
     if (-not $validation.IsValid) {
         throw "Backup '$BackupId' failed integrity validation ($($validation.Reason)); restore is blocked."
     }
-    if (-not (Test-Path -LiteralPath (Join-Path $backupPath "payload\postgres.dump") -PathType Leaf) -or
-        -not (Test-Path -LiteralPath (Join-Path $backupPath "payload\private\gitea-runtime.json") -PathType Leaf) -or
-        -not (Test-Path -LiteralPath (Join-Path $backupPath "payload\private\postgres-topology.json") -PathType Leaf) -or
-        -not (Test-Path -LiteralPath (Join-Path $backupPath "payload\private\restore-context.json") -PathType Leaf)) {
+    if (-not (Test-LongPath -Path (Join-Path $backupPath "payload\postgres.dump") -PathType Leaf) -or
+        -not (Test-LongPath -Path (Join-Path $backupPath "payload\private\gitea-runtime.json") -PathType Leaf) -or
+        -not (Test-LongPath -Path (Join-Path $backupPath "payload\private\postgres-topology.json") -PathType Leaf) -or
+        -not (Test-LongPath -Path (Join-Path $backupPath "payload\private\restore-context.json") -PathType Leaf)) {
         throw "Backup '$BackupId' is missing required restore payloads."
     }
     return [pscustomobject]@{
@@ -1176,7 +1517,7 @@ function Show-GiteaBackupList {
     param([hashtable]$Context)
 
     $backupRoot = Ensure-BackupRoot -Context $Context
-    $directories = @(Get-ChildItem -LiteralPath $backupRoot -Directory -Force | Where-Object { $_.Name -match '^\d{8}T\d{6}Z-[0-9a-f]{32}$' } | Sort-Object Name -Descending)
+    $directories = @(Get-LongPathDirectoryEntries -Path $backupRoot | Where-Object { $_.PSIsContainer -and $_.Name -match '^\d{8}T\d{6}Z-[0-9a-f]{32}$' } | Sort-Object Name -Descending)
     if ($directories.Count -eq 0) {
         Write-Host "No Gitea backups found under '$backupRoot'."
         return
@@ -1203,7 +1544,7 @@ function Get-BackupRuntime {
     param([Parameter(Mandatory = $true)][string]$BackupPath)
 
     $runtimePath = Join-Path $BackupPath "payload\private\gitea-runtime.json"
-    $runtime = Get-Content -LiteralPath $runtimePath -Raw | ConvertFrom-Json
+    $runtime = Read-LongPathText -Path $runtimePath | ConvertFrom-Json
     if (-not $runtime -or -not $runtime.imageReference -or -not $runtime.mounts -or -not $runtime.ports) {
         throw "The backup does not contain enough protected runtime metadata to restore the Gitea container."
     }
@@ -1261,7 +1602,11 @@ function Write-TemporaryEnvironmentFile {
     }
     $backupRoot = Ensure-BackupRoot -Context $Context
     $path = Join-Path $backupRoot (".gitea-env-{0}.tmp" -f [Guid]::NewGuid().ToString("N"))
-    [System.IO.File]::WriteAllLines($path, $Environment, [System.Text.UTF8Encoding]::new($false))
+    $environmentText = if ($Environment.Count -gt 0) {
+        [string]::Join([Environment]::NewLine, $Environment) + [Environment]::NewLine
+    }
+    else { "" }
+    Write-LongPathText -Path $path -Text $environmentText
     Set-RestrictedBackupAcl -Path $path
     return $path
 }
@@ -1297,8 +1642,8 @@ function New-GiteaContainerFromRuntime {
         [void](Invoke-GiteaDocker -Arguments $arguments)
     }
     finally {
-        if (Test-Path -LiteralPath $environmentFile -PathType Leaf) {
-            Remove-Item -LiteralPath $environmentFile -Force
+        if (Test-LongPath -Path $environmentFile -PathType Leaf) {
+            Remove-LongPathEntry -Path $environmentFile
         }
     }
 }
@@ -1374,7 +1719,7 @@ function Get-GiteaApiHealth {
 
 function Read-GiteaRestoreContext {
     param([Parameter(Mandatory = $true)][string]$BackupPath)
-    return Get-Content -LiteralPath (Join-Path $BackupPath "payload\private\restore-context.json") -Raw | ConvertFrom-Json
+    return Read-LongPathText -Path (Join-Path $BackupPath "payload\private\restore-context.json") | ConvertFrom-Json
 }
 
 function Assert-ConfigRestoreCompatibility {
@@ -1400,7 +1745,7 @@ function Restore-GiteaOperatorState {
 
     $operatorPath = Join-Path $BackupPath "payload\operator-state"
     if ([string]$RestoreContext.configSource -in @("local", "custom")) {
-        Copy-Item -LiteralPath (Join-Path $operatorPath "bootstrap-config.json") -Destination $RestoreContext.configPath -Force
+        Copy-LongPathFile -Source (Join-Path $operatorPath "bootstrap-config.json") -Destination $RestoreContext.configPath -Force
     }
     foreach ($entry in @(
         @{ Name = "generated-secrets.json"; Destination = $Context.GiteaSecretsPath },
@@ -1408,11 +1753,11 @@ function Restore-GiteaOperatorState {
         @{ Name = "effective-settings.json"; Destination = $Context.EffectiveBootstrapSettingsPath }
     )) {
         $source = Join-Path $operatorPath $entry.Name
-        if (Test-Path -LiteralPath $source -PathType Leaf) {
-            Copy-Item -LiteralPath $source -Destination $entry.Destination -Force
+        if (Test-LongPath -Path $source -PathType Leaf) {
+            Copy-LongPathFile -Source $source -Destination $entry.Destination -Force
         }
-        elseif (Test-Path -LiteralPath $entry.Destination -PathType Leaf) {
-            Remove-Item -LiteralPath $entry.Destination -Force
+        elseif (Test-LongPath -Path $entry.Destination -PathType Leaf) {
+            Remove-LongPathEntry -Path $entry.Destination
         }
     }
 }
@@ -1423,13 +1768,13 @@ function Replace-GiteaDataTree {
         [Parameter(Mandatory = $true)][string]$LiveDestination
     )
 
-    if (Test-Path -LiteralPath $LiveDestination) {
-        if (((Get-Item -LiteralPath $LiveDestination -Force).Attributes -band [IO.FileAttributes]::ReparsePoint) -ne 0) {
+    if (Test-LongPath -Path $LiveDestination) {
+        if (((Get-LongPathItem -Path $LiveDestination).Attributes -band [IO.FileAttributes]::ReparsePoint) -ne 0) {
             throw "Live Gitea destination '$LiveDestination' is a reparse point; refusing to overwrite redirected data."
         }
-        Remove-Item -LiteralPath $LiveDestination -Recurse -Force
+        Remove-LongPathTree -Path $LiveDestination
     }
-    New-Item -ItemType Directory -Path $LiveDestination -Force | Out-Null
+    New-LongPathDirectory -Path $LiveDestination
     Copy-DirectoryTree -Source $BackupSource -Destination $LiveDestination
 }
 
@@ -1452,8 +1797,8 @@ function New-GiteaOperationRecord {
     )
 
     $recordDirectory = Join-Path $Context.RepoRoot ".agent-sdlc\dev-env\gitea\upgrades"
-    if (-not (Test-Path -LiteralPath $recordDirectory -PathType Container)) {
-        New-Item -ItemType Directory -Path $recordDirectory -Force | Out-Null
+    if (-not (Test-LongPath -Path $recordDirectory -PathType Container)) {
+        New-LongPathDirectory -Path $recordDirectory
     }
     $recordPath = Join-Path $recordDirectory ("{0}.json" -f $Record.operationId)
     Save-BackupJson -Path $recordPath -Value $Record
@@ -1468,12 +1813,12 @@ function Assert-NoPendingGiteaRecovery {
     param([hashtable]$Context)
 
     $markerPath = Get-GiteaLifecycleRecoveryMarkerPath -Context $Context
-    if (-not (Test-Path -LiteralPath $markerPath)) { return }
-    if (-not (Test-Path -LiteralPath $markerPath -PathType Leaf)) {
+    if (-not (Test-LongPath -Path $markerPath)) { return }
+    if (-not (Test-LongPath -Path $markerPath -PathType Leaf)) {
         throw "A Gitea lifecycle recovery marker exists but is not a file; automatic lifecycle operations are blocked."
     }
     try {
-        $marker = Get-Content -LiteralPath $markerPath -Raw | ConvertFrom-Json
+        $marker = Read-LongPathText -Path $markerPath | ConvertFrom-Json
     }
     catch {
         throw "A Gitea lifecycle recovery marker is unreadable; automatic bootstrap is blocked until an operator reviews it."
@@ -1490,9 +1835,9 @@ function Set-GiteaLifecycleRecoveryMarker {
     )
 
     $markerPath = Get-GiteaLifecycleRecoveryMarkerPath -Context $Context
-    $markerDirectory = Split-Path -Parent $markerPath
-    if (-not (Test-Path -LiteralPath $markerDirectory -PathType Container)) {
-        New-Item -ItemType Directory -Path $markerDirectory -Force | Out-Null
+    $markerDirectory = Get-LongPathParent -Path $markerPath
+    if (-not (Test-LongPath -Path $markerDirectory -PathType Container)) {
+        New-LongPathDirectory -Path $markerDirectory
     }
     $temporaryPath = Join-Path $markerDirectory (".lifecycle-recovery-{0}.tmp" -f [Guid]::NewGuid().ToString("N"))
     try {
@@ -1503,11 +1848,11 @@ function Set-GiteaLifecycleRecoveryMarker {
             diagnosticBackupId = $DiagnosticBackupId
             createdAt = [DateTime]::UtcNow.ToString("o")
         }
-        Move-Item -LiteralPath $temporaryPath -Destination $markerPath -Force
+        Move-LongPathFile -Source $temporaryPath -Destination $markerPath -Force
     }
     finally {
-        if (Test-Path -LiteralPath $temporaryPath -PathType Leaf) {
-            Remove-Item -LiteralPath $temporaryPath -Force
+        if (Test-LongPath -Path $temporaryPath -PathType Leaf) {
+            Remove-LongPathEntry -Path $temporaryPath
         }
     }
 }
@@ -1516,11 +1861,11 @@ function Clear-GiteaLifecycleRecoveryMarker {
     param([hashtable]$Context)
 
     $markerPath = Get-GiteaLifecycleRecoveryMarkerPath -Context $Context
-    if ((Test-Path -LiteralPath $markerPath) -and -not (Test-Path -LiteralPath $markerPath -PathType Leaf)) {
+    if ((Test-LongPath -Path $markerPath) -and -not (Test-LongPath -Path $markerPath -PathType Leaf)) {
         throw "The Gitea lifecycle recovery marker path is not a file; refusing to clear it automatically."
     }
-    if (Test-Path -LiteralPath $markerPath -PathType Leaf) {
-        Remove-Item -LiteralPath $markerPath -Force
+    if (Test-LongPath -Path $markerPath -PathType Leaf) {
+        Remove-LongPathEntry -Path $markerPath
     }
 }
 
@@ -1534,13 +1879,13 @@ function Assert-GiteaConfigCanBePinned {
         -not (Get-FullPath -Path $Context.ConfigPath).Equals((Get-FullPath -Path $Context.LocalConfigPath), [StringComparison]::OrdinalIgnoreCase)) {
         throw "Generate and use the ignored local Gitea bootstrap config before upgrading; the tracked template must never be changed by a lifecycle operation."
     }
-    $temporaryPath = Join-Path (Split-Path -Parent $Context.ConfigPath) (".gitea-config-preflight-{0}.tmp" -f [Guid]::NewGuid().ToString("N"))
+    $temporaryPath = Join-Path (Get-LongPathParent -Path $Context.ConfigPath) (".gitea-config-preflight-{0}.tmp" -f [Guid]::NewGuid().ToString("N"))
     try {
-        [System.IO.File]::WriteAllText($temporaryPath, "preflight", [System.Text.UTF8Encoding]::new($false))
+        Write-LongPathText -Path $temporaryPath -Text "preflight"
     }
     finally {
-        if (Test-Path -LiteralPath $temporaryPath -PathType Leaf) {
-            Remove-Item -LiteralPath $temporaryPath -Force
+        if (Test-LongPath -Path $temporaryPath -PathType Leaf) {
+            Remove-LongPathEntry -Path $temporaryPath
         }
     }
 }
@@ -1551,16 +1896,16 @@ function Set-GiteaBootstrapImagePin {
         [Parameter(Mandatory = $true)][string]$ImageReference
     )
 
-    $config = Get-Content -LiteralPath $Context.ConfigPath -Raw | ConvertFrom-Json
+    $config = Read-LongPathText -Path $Context.ConfigPath | ConvertFrom-Json
     $config.gitea.image = $ImageReference
-    $temporaryPath = Join-Path (Split-Path -Parent $Context.ConfigPath) (".gitea-config-{0}.tmp" -f [Guid]::NewGuid().ToString("N"))
+    $temporaryPath = Join-Path (Get-LongPathParent -Path $Context.ConfigPath) (".gitea-config-{0}.tmp" -f [Guid]::NewGuid().ToString("N"))
     try {
         Save-BackupJson -Path $temporaryPath -Value $config
-        Move-Item -LiteralPath $temporaryPath -Destination $Context.ConfigPath -Force
+        Move-LongPathFile -Source $temporaryPath -Destination $Context.ConfigPath -Force
     }
     finally {
-        if (Test-Path -LiteralPath $temporaryPath -PathType Leaf) {
-            Remove-Item -LiteralPath $temporaryPath -Force
+        if (Test-LongPath -Path $temporaryPath -PathType Leaf) {
+            Remove-LongPathEntry -Path $temporaryPath
         }
     }
 }
@@ -1732,7 +2077,7 @@ function Invoke-GiteaRestore {
         [string]$restoreContext.databaseUser -ne [string]$Context.GiteaPostgresUser) {
         throw "The selected backup's PostgreSQL database name or user differs from the configured existing service; restore is blocked."
     }
-    $postgresTopology = Get-Content -LiteralPath (Join-Path $selected.Path "payload\private\postgres-topology.json") -Raw | ConvertFrom-Json
+    $postgresTopology = Read-LongPathText -Path (Join-Path $selected.Path "payload\private\postgres-topology.json") | ConvertFrom-Json
     if ([string]$restoreContext.configSource -eq "local") {
         Assert-GiteaConfigCanBePinned -Context $Context
     }
