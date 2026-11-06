@@ -1300,6 +1300,40 @@ function Assert-PostgresRestoreCompatibility {
     }
 }
 
+function Measure-BackupFileEntriesSize {
+    param(
+        [AllowNull()]
+        [AllowEmptyCollection()]
+        [object[]]$Entries = @()
+    )
+
+    [long]$totalBytes = 0
+    foreach ($entry in @($Entries)) {
+        if ($null -eq $entry) { continue }
+        if ($entry -isnot [System.Collections.IDictionary] -or -not $entry.Contains("sizeBytes")) {
+            throw "A backup file entry is missing its sizeBytes value."
+        }
+
+        [long]$sizeBytes = 0
+        $rawSizeBytes = [string]$entry["sizeBytes"]
+        $parsed = [long]::TryParse(
+            $rawSizeBytes,
+            [System.Globalization.NumberStyles]::Integer,
+            [System.Globalization.CultureInfo]::InvariantCulture,
+            [ref]$sizeBytes
+        )
+        if (-not $parsed -or $sizeBytes -lt 0) {
+            throw "A backup file entry has an invalid sizeBytes value."
+        }
+        if ($totalBytes -gt ([long]::MaxValue - $sizeBytes)) {
+            throw "The total backup file size exceeds the supported byte count."
+        }
+        $totalBytes += $sizeBytes
+    }
+
+    return [long]$totalBytes
+}
+
 function Get-BackupFileEntries {
     param([Parameter(Mandatory = $true)][string]$BackupPath)
 
@@ -1452,7 +1486,7 @@ function New-GiteaBackupSet {
     }
 
     $files = Get-BackupFileEntries -BackupPath $backupPath
-    $totalBytes = [long](($files | Measure-Object -Property sizeBytes -Sum).Sum)
+    $totalBytes = Measure-BackupFileEntriesSize -Entries $files
     $manifest = @{
         schemaVersion = 1
         backupId = $backupId

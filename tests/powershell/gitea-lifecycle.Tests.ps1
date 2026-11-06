@@ -739,6 +739,27 @@ Describe "Gitea PostgreSQL exact-state restore" {
     }
 }
 
+Describe "Gitea backup manifest byte totals" {
+    It "returns zero bytes for an empty file-entry list" {
+        InModuleScope gitea-lifecycle {
+            Measure-BackupFileEntriesSize -Entries @() | Should -Be 0
+        }
+    }
+
+    It "sums sizeBytes from multiple hashtable file entries" {
+        $entries = @(
+            @{ path = "payload/first.dump"; sizeBytes = [long]17; sha256 = "a" },
+            @{ path = "payload/second.json"; sizeBytes = [long]29; sha256 = "b" },
+            @{ path = "payload/third.bin"; sizeBytes = [long]54; sha256 = "c" }
+        )
+
+        InModuleScope gitea-lifecycle -Parameters @{ Entries = $entries } {
+            param($Entries)
+            Measure-BackupFileEntriesSize -Entries $Entries | Should -Be 100
+        }
+    }
+}
+
 Describe "Gitea backup ACL on real NTFS" -Tag "WindowsAcl" {
     It "restricts real backup directories and files from non-elevated Windows PowerShell" {
         if ([Environment]::OSVersion.Platform -ne [PlatformID]::Win32NT) {
@@ -1066,6 +1087,176 @@ Describe "Gitea lifecycle backup long paths on real NTFS" -Tag "WindowsLongPath"
                     }
                     (Test-LongPath -Path $resolvedRoot) | Should -BeFalse
                 }
+            }
+        }
+    }
+}
+
+Describe "Gitea isolated Docker fixture cleanup on real NTFS" -Tag "WindowsLongPath" {
+    BeforeAll {
+        $script:fixtureCleanupModulePath = Join-Path $PSScriptRoot "../../scripts/dev/gitea-lifecycle-e2e-fixture-cleanup.psm1"
+        Import-Module $script:fixtureCleanupModulePath -Force -ErrorAction Stop
+    }
+
+    It "previews and then removes only the approved marked fixture, including long descendants" {
+        if ([Environment]::OSVersion.Platform -ne [PlatformID]::Win32NT) {
+            Set-ItResult -Skipped -Because "Docker fixture cleanup regression requires Windows NTFS."
+            return
+        }
+
+        $runId = [Guid]::NewGuid().ToString("N")
+        $prefix = "agent-sdlc-life-e2e-$runId"
+        $fixtureRoot = Join-Path $env:TEMP $prefix
+        $markerPath = Join-Path $fixtureRoot ".agent-sdlc-lifecycle-e2e-owner.json"
+        $extendedRoot = "\\?\" + [System.IO.Path]::GetFullPath($fixtureRoot)
+        $fixtureRootCreated = $false
+        $markerWritten = $false
+        $cleanupCompleted = $false
+
+        try {
+            [System.IO.Directory]::CreateDirectory($extendedRoot) | Out-Null
+            $fixtureRootCreated = $true
+            [System.IO.File]::WriteAllText(
+                "\\?\" + [System.IO.Path]::GetFullPath($markerPath),
+                (@{ runId = $runId; prefix = $prefix } | ConvertTo-Json -Compress),
+                [System.Text.UTF8Encoding]::new($false)
+            )
+            $markerWritten = $true
+
+            $deepPath = $fixtureRoot
+            for ($index = 0; $index -lt 6; $index++) {
+                $deepPath = Join-Path $deepPath ("segment-{0}-{1}" -f $index, ("x" * 38))
+            }
+            [System.IO.Directory]::CreateDirectory("\\?\" + [System.IO.Path]::GetFullPath($deepPath)) | Out-Null
+            $deepFilePath = Join-Path $deepPath "fixture-payload.txt"
+            [System.IO.File]::WriteAllText(
+                "\\?\" + [System.IO.Path]::GetFullPath($deepFilePath),
+                "owned fixture payload",
+                [System.Text.UTF8Encoding]::new($false)
+            )
+            $deepFilePath.Length | Should -BeGreaterThan 260
+
+            {
+                Remove-GiteaLifecycleE2EFixtureDirectory `
+                    -RunId $runId `
+                    -ExpectedPath (Join-Path $env:TEMP "agent-sdlc-life-e2e-other-$runId") `
+                    -WhatIf
+            } | Should -Throw "*exact GUID-named direct child*"
+            Remove-GiteaLifecycleE2EFixtureDirectory -RunId $runId -ExpectedPath $fixtureRoot -WhatIf | Out-Null
+            (([System.IO.File]::GetAttributes($extendedRoot) -band [System.IO.FileAttributes]::Directory) -ne 0) |
+                Should -BeTrue
+            {
+                Remove-GiteaLifecycleE2EFixtureDirectory `
+                    -RunId $runId `
+                    -ExpectedPath $fixtureRoot `
+                    -ApproveRunId "00000000000000000000000000000000" `
+                    -Confirm:$false
+            } | Should -Throw "*same RunId*"
+            $result = Remove-GiteaLifecycleE2EFixtureDirectory `
+                -RunId $runId `
+                -ExpectedPath $fixtureRoot `
+                -ApproveRunId $runId `
+                -Confirm:$false
+
+            $result.Removed | Should -BeTrue
+            (Test-Path -LiteralPath $fixtureRoot) | Should -BeFalse
+            $cleanupCompleted = $true
+        }
+        finally {
+            if ($fixtureRootCreated -and -not $cleanupCompleted -and [System.IO.Directory]::Exists($extendedRoot)) {
+                if ($markerWritten) {
+                    Remove-GiteaLifecycleE2EFixtureDirectory `
+                        -RunId $runId `
+                        -ExpectedPath $fixtureRoot `
+                        -ApproveRunId $runId `
+                        -Confirm:$false | Out-Null
+                }
+                elseif (@([System.IO.Directory]::EnumerateFileSystemEntries($extendedRoot)).Count -eq 0) {
+                    [System.IO.Directory]::Delete($extendedRoot, $false)
+                }
+            }
+        }
+    }
+
+    It "refuses a fixture tree with a reparse point and preserves its target" {
+        if ([Environment]::OSVersion.Platform -ne [PlatformID]::Win32NT) {
+            Set-ItResult -Skipped -Because "Docker fixture cleanup regression requires Windows NTFS."
+            return
+        }
+
+        $runId = [Guid]::NewGuid().ToString("N")
+        $targetId = [Guid]::NewGuid().ToString("N")
+        $prefix = "agent-sdlc-life-e2e-$runId"
+        $fixtureRoot = Join-Path $env:TEMP $prefix
+        $extendedRoot = "\\?\" + [System.IO.Path]::GetFullPath($fixtureRoot)
+        $markerPath = Join-Path $fixtureRoot ".agent-sdlc-lifecycle-e2e-owner.json"
+        $targetRoot = Join-Path $env:TEMP "agent-sdlc-life-e2e-target-$targetId"
+        $junctionPath = Join-Path $fixtureRoot "redirected-target"
+        $fixtureCreated = $false
+        $targetCreated = $false
+        $junctionCreated = $false
+
+        try {
+            [System.IO.Directory]::CreateDirectory($extendedRoot) | Out-Null
+            $fixtureCreated = $true
+            [System.IO.Directory]::CreateDirectory([System.IO.Path]::GetFullPath($targetRoot)) | Out-Null
+            $targetCreated = $true
+            [System.IO.File]::WriteAllText(
+                "\\?\" + [System.IO.Path]::GetFullPath($markerPath),
+                (@{ runId = $targetId; prefix = $prefix } | ConvertTo-Json -Compress),
+                [System.Text.UTF8Encoding]::new($false)
+            )
+            {
+                Remove-GiteaLifecycleE2EFixtureDirectory `
+                    -RunId $runId `
+                    -ExpectedPath $fixtureRoot `
+                    -ApproveRunId $runId `
+                    -Confirm:$false
+            } | Should -Throw "*ownership marker does not match*"
+            [System.IO.Directory]::Exists($extendedRoot) | Should -BeTrue
+            [System.IO.File]::WriteAllText(
+                "\\?\" + [System.IO.Path]::GetFullPath($markerPath),
+                (@{ runId = $runId; prefix = $prefix } | ConvertTo-Json -Compress),
+                [System.Text.UTF8Encoding]::new($false)
+            )
+            try {
+                New-Item -ItemType Junction -Path $junctionPath -Target $targetRoot -ErrorAction Stop | Out-Null
+                $junctionCreated = $true
+            }
+            catch {
+                Set-ItResult -Skipped -Because "This Windows host could not create the disposable junction used to verify fail-closed cleanup."
+                return
+            }
+
+            {
+                Remove-GiteaLifecycleE2EFixtureDirectory `
+                    -RunId $runId `
+                    -ExpectedPath $fixtureRoot `
+                    -ApproveRunId $runId `
+                    -Confirm:$false
+            } | Should -Throw "*reparse point*"
+
+            [System.IO.Directory]::Exists($extendedRoot) | Should -BeTrue
+            [System.IO.Directory]::Exists("\\?\" + [System.IO.Path]::GetFullPath($targetRoot)) | Should -BeTrue
+        }
+        finally {
+            if ($junctionCreated) {
+                [System.IO.Directory]::Delete("\\?\" + [System.IO.Path]::GetFullPath($junctionPath), $false)
+            }
+            if ($fixtureCreated -and [System.IO.Directory]::Exists($extendedRoot)) {
+                [System.IO.File]::WriteAllText(
+                    "\\?\" + [System.IO.Path]::GetFullPath($markerPath),
+                    (@{ runId = $runId; prefix = $prefix } | ConvertTo-Json -Compress),
+                    [System.Text.UTF8Encoding]::new($false)
+                )
+                Remove-GiteaLifecycleE2EFixtureDirectory `
+                    -RunId $runId `
+                    -ExpectedPath $fixtureRoot `
+                    -ApproveRunId $runId `
+                    -Confirm:$false | Out-Null
+            }
+            if ($targetCreated -and [System.IO.Directory]::Exists("\\?\" + [System.IO.Path]::GetFullPath($targetRoot))) {
+                [System.IO.Directory]::Delete("\\?\" + [System.IO.Path]::GetFullPath($targetRoot), $true)
             }
         }
     }

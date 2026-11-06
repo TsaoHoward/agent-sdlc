@@ -596,20 +596,12 @@ function Remove-GiteaLifecycleE2EFixture {
             throw "Could not confirm whether the isolated Docker E2E network was removed."
         }
 
-        $rootExpected = Join-Path ([System.IO.Path]::GetFullPath($env:TEMP)) $state.Prefix
-        if (-not (Test-GiteaLifecycleE2EPathEqual -Left $state.TestRoot -Right $rootExpected) -or
-            [string]([System.IO.Path]::GetFileName($state.TestRoot)) -ne [string]$state.Prefix) {
-            throw "The Docker E2E fixture directory is outside its expected unique temp path; refusing filesystem cleanup."
-        }
-        if ($state.TestRootCreated -and (Test-Path -LiteralPath $state.TestRoot)) {
-            if (-not (Test-Path -LiteralPath $state.OwnershipMarkerPath -PathType Leaf)) {
-                throw "The Docker E2E fixture ownership marker is missing; refusing filesystem cleanup."
-            }
-            $owner = Get-Content -LiteralPath $state.OwnershipMarkerPath -Raw | ConvertFrom-Json
-            if ([string]$owner.runId -ne [string]$state.RunId -or [string]$owner.prefix -ne [string]$state.Prefix) {
-                throw "The Docker E2E fixture ownership marker does not match this run; refusing filesystem cleanup."
-            }
-            Remove-Item -LiteralPath $state.TestRoot -Recurse -Force -ErrorAction Stop
+        if ($state.TestRootCreated) {
+            Remove-GiteaLifecycleE2EFixtureDirectory `
+                -RunId $state.RunId `
+                -ExpectedPath $state.TestRoot `
+                -ApproveRunId $state.RunId `
+                -Confirm:$false
             $state.TestRootCreated = $false
         }
         $cleanupComplete = $true

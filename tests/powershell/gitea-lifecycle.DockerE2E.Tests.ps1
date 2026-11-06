@@ -6,6 +6,7 @@ Describe "Gitea lifecycle isolated Docker acceptance" -Tag "DockerE2E" -Skip:($e
 
         . (Join-Path $PSScriptRoot "gitea-lifecycle.DockerE2E.Helpers.ps1")
         try {
+            Import-Module (Join-Path $PSScriptRoot "../../scripts/dev/gitea-lifecycle-e2e-fixture-cleanup.psm1") -Force -ErrorAction Stop
             Import-Module (Join-Path $PSScriptRoot "../../scripts/dev/gitea-lifecycle.psm1") -Force -ErrorAction Stop
             Initialize-GiteaLifecycleE2EFixture
         }
@@ -53,6 +54,11 @@ Describe "Gitea lifecycle isolated Docker acceptance" -Tag "DockerE2E" -Skip:($e
         }
         $integrity.IsValid | Should -BeTrue
         [string]$integrity.Manifest.sourceVersion | Should -Be "1.25.5"
+        [long]$manifestFilesSize = 0
+        foreach ($fileEntry in @($integrity.Manifest.files)) {
+            $manifestFilesSize += [long]$fileEntry.sizeBytes
+        }
+        [long]$integrity.Manifest.sizeBytes | Should -Be $manifestFilesSize
 
         $backupList = InModuleScope gitea-lifecycle -Parameters @{ Context = $context } {
             param($Context)
@@ -69,8 +75,11 @@ Describe "Gitea lifecycle isolated Docker acceptance" -Tag "DockerE2E" -Skip:($e
 
     It "retains recovery evidence after a post-migration failure" {
         $state = Get-GiteaLifecycleE2EState
+        if (-not $state.InitialBackupId) {
+            Set-ItResult -Skipped -Because "Blocked: the first Docker E2E scenario did not produce its prerequisite Backup ID."
+            return
+        }
         $context = $state.Context
-        $state.InitialBackupId | Should -Not -BeNullOrEmpty
 
         InModuleScope gitea-lifecycle -Parameters @{ Context = $context } {
             param($Context)
@@ -116,9 +125,12 @@ Describe "Gitea lifecycle isolated Docker acceptance" -Tag "DockerE2E" -Skip:($e
 
     It "explicitly restores the pre-failure exact database snapshot and preserves unrelated databases" {
         $state = Get-GiteaLifecycleE2EState
+        if (-not $state.RecoveryBackupId) {
+            Set-ItResult -Skipped -Because "Blocked: the preceding recovery scenario did not produce its prerequisite Recovery Backup ID."
+            return
+        }
         $context = $state.Context
         $backupId = $state.RecoveryBackupId
-        $backupId | Should -Not -BeNullOrEmpty
         $recoveryMarker = Join-Path $context.RepoRoot ".agent-sdlc\dev-env\gitea\lifecycle-recovery.json"
         InModuleScope gitea-lifecycle -Parameters @{ Context = $context; SelectedBackupId = $backupId } {
             param($Context, $SelectedBackupId)
