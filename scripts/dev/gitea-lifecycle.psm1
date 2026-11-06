@@ -309,7 +309,40 @@ function Move-LongPathFile {
         $replacementBackupExtended = ConvertTo-ExtendedLengthPath -Path $replacementBackupPath
         [System.IO.File]::Replace($sourceExtended, $destinationExtended, $replacementBackupExtended)
         if (Test-LongPath -Path $replacementBackupPath -PathType Leaf) {
-            Remove-LongPathEntry -Path $replacementBackupPath
+            try {
+                Remove-LongPathEntry -Path $replacementBackupPath
+            }
+            catch {
+                $cleanupException = Get-GiteaLifecycleRootException -Exception $_.Exception
+                $rollbackPath = Join-Path (Get-LongPathParent -Path $Destination) (
+                    ".{0}.{1}.replace-rollback.tmp" -f (Get-LongPathLeaf -Path $Destination), [Guid]::NewGuid().ToString("N")
+                )
+                if (Test-LongPath -Path $rollbackPath) {
+                    throw "Atomic replacement completed, but its previous-file backup could not be removed or safely rolled back. The original file remains preserved at '$replacementBackupPath'. Cleanup exception type '$($cleanupException.GetType().FullName)': $($cleanupException.Message)"
+                }
+                $rollbackExtended = ConvertTo-ExtendedLengthPath -Path $rollbackPath
+                try {
+                    [System.IO.File]::Replace($replacementBackupExtended, $destinationExtended, $rollbackExtended)
+                }
+                catch {
+                    $rollbackException = Get-GiteaLifecycleRootException -Exception $_.Exception
+                    if (Test-LongPath -Path $replacementBackupPath -PathType Leaf) {
+                        throw "Atomic replacement completed, but the previous-file backup could not be removed or restored. The original file remains preserved at '$replacementBackupPath'. Cleanup exception type '$($cleanupException.GetType().FullName)': $($cleanupException.Message) Rollback exception type '$($rollbackException.GetType().FullName)': $($rollbackException.Message)"
+                    }
+                    throw "Atomic replacement completed, but cleanup and restoration of the previous file both failed. Inspect the destination before retrying. Cleanup exception type '$($cleanupException.GetType().FullName)': $($cleanupException.Message) Rollback exception type '$($rollbackException.GetType().FullName)': $($rollbackException.Message)"
+                }
+
+                try {
+                    if (Test-LongPath -Path $rollbackPath -PathType Leaf) {
+                        Remove-LongPathEntry -Path $rollbackPath
+                    }
+                }
+                catch {
+                    $rollbackCleanupException = Get-GiteaLifecycleRootException -Exception $_.Exception
+                    throw "The original file was restored, but cleanup of the replacement file failed. The replacement remains at '$rollbackPath'. Exception type '$($rollbackCleanupException.GetType().FullName)': $($rollbackCleanupException.Message)"
+                }
+                throw "Atomic replacement was rolled back because its temporary previous-file backup could not be removed. The original file is restored. Cleanup exception type '$($cleanupException.GetType().FullName)': $($cleanupException.Message)"
+            }
         }
         return
     }
@@ -2204,7 +2237,8 @@ function Invoke-GiteaUpgrade {
         Set-GiteaBootstrapImagePin -Context $Context -ImageReference $targetImage
     }
     catch {
-        throw "Gitea passed startup/version health checks, but the bootstrap image pin could not be updated. Recovery marker and backup '$($backup.BackupId)' are retained; the Runner remains stopped."
+        $pinFailureDiagnostic = [string]$_.Exception.Message
+        throw "Gitea passed startup/version health checks, but the bootstrap image pin could not be updated. $pinFailureDiagnostic Recovery marker and backup '$($backup.BackupId)' are retained; the Runner remains stopped."
     }
     if ($runnerWasRunning) {
         try {

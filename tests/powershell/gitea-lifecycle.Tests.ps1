@@ -466,6 +466,34 @@ Describe "Gitea lifecycle safety helpers" {
             $script:lifecycleActions | Should -Not -Contain "create-gitea"
         }
 
+        It "surfaces the safe image-pin stage, exception type, and masked cause after health checks" {
+            Mock Get-GiteaContainerInfo {
+                return [pscustomobject]@{
+                    State = [pscustomobject]@{ Status = "running" }
+                }
+            }
+            Mock Set-GiteaBootstrapImagePin {
+                throw "Bootstrap image pin update failed during stage 'atomically replace the existing bootstrap config'. Exception type 'System.UnauthorizedAccessException'. Masked cause: adminPassword=[REDACTED]"
+            }
+
+            $failureMessage = $null
+            try {
+                Invoke-GiteaLifecycle -Action upgrade -Context $script:upgradeContext -GiteaVersion "1.26.0"
+            }
+            catch {
+                $failureMessage = $_.Exception.Message
+            }
+
+            $failureMessage | Should -Match "stage 'atomically replace the existing bootstrap config'"
+            $failureMessage | Should -Match "System\.UnauthorizedAccessException"
+            $failureMessage | Should -Match 'adminPassword=\[REDACTED\]'
+            $failureMessage | Should -Match "Backup ID|backup '20261105T000000Z-0123456789abcdef0123456789abcdef'"
+            $failureMessage | Should -Match 'Runner remains stopped'
+            $script:lifecycleActions | Should -Contain "set-recovery-marker"
+            $script:lifecycleActions | Should -Not -Contain "clear-recovery-marker"
+            $script:lifecycleActions | Should -Not -Contain "start-runner"
+        }
+
         It "resumes the unchanged source service and original Runner when stopping Gitea fails" {
             $script:sourceContainerStopped = $false
             Mock Get-GiteaContainerInfo {

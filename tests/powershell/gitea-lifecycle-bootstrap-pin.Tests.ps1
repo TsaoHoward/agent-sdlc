@@ -167,6 +167,38 @@ Describe "Gitea bootstrap image pin on real NTFS" -Tag "WindowsBootstrapPin" {
         $entries[0].Name | Should -Be "gitea-bootstrap.json"
     }
 
+    It "restores the original config when the previous-file backup cannot be cleaned" {
+        $failureMessage = InModuleScope gitea-lifecycle -Parameters @{ Context = $script:pinContext; ImageReference = $script:pinExpectedImage } {
+            param($Context, $ImageReference)
+            Mock Remove-LongPathEntry {
+                param($Path)
+                if ($Path -match '\.replace-backup\.tmp$') {
+                    throw "simulated previous-file backup cleanup failure"
+                }
+                $extendedPath = ConvertTo-ExtendedLengthPath -Path $Path
+                [System.IO.File]::SetAttributes($extendedPath, [System.IO.FileAttributes]::Normal)
+                [System.IO.File]::Delete($extendedPath)
+            }
+            try {
+                Set-GiteaBootstrapImagePin -Context $Context -ImageReference $ImageReference
+            }
+            catch {
+                $_.Exception.Message
+            }
+        }
+
+        $failureMessage | Should -Match 'Atomic replacement was rolled back'
+        $failureMessage | Should -Match "stage 'atomically replace the existing bootstrap config'"
+        [System.IO.File]::ReadAllText($script:pinConfigExtendedPath) | Should -Be $script:pinInitialJson
+
+        $entries = @(InModuleScope gitea-lifecycle -Parameters @{ Directory = $script:pinConfigDirectory } {
+            param($Directory)
+            Get-LongPathDirectoryEntries -Path $Directory
+        })
+        $entries.Count | Should -Be 1
+        $entries[0].Name | Should -Be "gitea-bootstrap.json"
+    }
+
     It "masks credentials echoed by a failed image-pin operation" {
         $failureMessage = InModuleScope gitea-lifecycle -Parameters @{ Context = $script:pinContext; ImageReference = $script:pinExpectedImage } {
             param($Context, $ImageReference)
