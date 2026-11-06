@@ -3,7 +3,7 @@
 ## Metadata
 - Test ID: TC-011
 - Status: In Progress
-- Last Updated: 2026-11-05
+- Last Updated: 2026-11-06
 - Owner: Project Maintainer
 - Mode: Windows PowerShell/Pester safety tests, isolated Docker acceptance, and separate manual Windows Host acceptance
 - Related Docs / WBS: GitHub issue #3; WBS `3.12`; `docs/issues/items/I-007-gitea-version-lifecycle-operations.md`
@@ -74,6 +74,9 @@ Live acceptance for the real 43000 instance is a separate, authorized Windows Ho
 
 ## Current Execution Result
 
+- Windows Host report: `npm ci` and `npm run typecheck` passed. `npm run test:gitea-lifecycle` failed during Pester Discovery with `No modules named 'gitea-lifecycle' are currently loaded`.
+- Fixed the Discovery ordering by importing the module in `BeforeDiscovery`, before the `InModuleScope` blocks are discovered. Removed `$TestDrive` from Discovery-time `InModuleScope -Parameters` expressions and resolve the `TestDrive` PSDrive root inside `BeforeAll` during Run. The Windows Pester rerun is pending.
+- This WSL workspace has Windows PowerShell/Pester installed through Windows interop, but Pester cannot resolve the Linux workspace current directory (`Directory.GetParent` reports an unsupported path format); no post-fix Pester result is claimed.
 - Passed in this WSL pass: `npm run validate:platform`, `git diff --check`, and `package.json` JSON parsing.
 - Not executed: Pester; `npm run test:gitea-lifecycle` exits 127 because `powershell` is not installed in WSL.
 - Not completed: Typecheck; `npm run typecheck` exits 1 because `node_modules/typescript/bin/tsc` is absent. The earlier `npm ci` attempt could not fetch `@types/node` because `registry.npmjs.org` returned `EAI_AGAIN`; it was not retried in this pass.
@@ -90,3 +93,4 @@ Use disposable test directories/containers only. Do not delete backup fixtures a
 - 2026-11-05: Added exported lifecycle-command coverage for restore identity, integrity, confirmation, diagnostic snapshot, and ordered matching-state restoration gates.
 - 2026-11-05: Added unexecuted Windows Docker E2E coverage and recorded the WSL PowerShell, Docker socket, and npm dependency-install limitations.
 - 2026-11-05: Fixed the isolated failure path to use the valid `1.26.4` to `1.27.3` step and added exact database recreation plus post-backup-table and unrelated-database assertions; Windows execution remains pending.
+- 2026-11-06: Recorded the Windows Host Discovery failure and corrected test-module loading and TestDrive timing; post-fix Windows Pester rerun remains pending.

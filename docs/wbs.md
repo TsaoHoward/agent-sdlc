@@ -3,7 +3,7 @@
 ## Document Metadata
 - Version: 0.1
 - Status: Draft
-- Last Updated: 2026-11-05
+- Last Updated: 2026-11-06
 - Owner: Project Maintainer
 - Source Template: docs/templates/wbs.template.md
 
@@ -317,7 +317,7 @@
 - Dependencies: 1.5, 3.7
 - Critical-Path-Candidate: No
 - Status: In Progress
-- Notes: Implements issue #3 without changing the separate Compose 46300 environment, PostgreSQL or Runner identity, and without authorizing a live upgrade. Every upgrade requires an explicit fixed version, verifies the legacy container identity and mounts, checks Runner activity and local capacity, then requires a complete checksum-verified backup before recreating only Gitea. Restore requires a Backup ID and confirmation; it preserves the current failed state as a separate diagnostic backup before overwriting. The PostgreSQL archive database name is checked against the configured Gitea database, then `pg_restore --clean --create` recreates that database inside the existing PostgreSQL container; unrelated databases and the container are retained. An incomplete operation leaves bootstrap `up` blocked until explicit restore succeeds. Official guidance plus release notes support the candidate sequence 1.25.5 -> 1.26.4 -> 1.27.3 -> 28.3.0; the final direct jump is inferred from the documented next-series rule and the dropped `1.` version prefix, so the live operator must review breaking changes. Mocked Pester and isolated Docker E2E procedures cover marker/image-pin ordering, service-stop recovery, valid `1.26.4` -> `1.27.3` post-start failure, backup-list/integrity, explicit restore, post-backup table removal, unrelated-database preservation, and existing-container isolation. Windows Pester and Docker E2E remain unexecuted; WBS remains In Progress until Windows evidence is captured.
+- Notes: Implements issue #3 without changing the separate Compose 46300 environment, PostgreSQL or Runner identity, and without authorizing a live upgrade. Every upgrade requires an explicit fixed version, verifies the legacy container identity and mounts, checks Runner activity and local capacity, then requires a complete checksum-verified backup before recreating only Gitea. Restore requires a Backup ID and confirmation; it preserves the current failed state as a separate diagnostic backup before overwriting. The PostgreSQL archive database name is checked against the configured Gitea database, then `pg_restore --clean --create` recreates that database inside the existing PostgreSQL container; unrelated databases and the container are retained. An incomplete operation leaves bootstrap `up` blocked until explicit restore succeeds. Official guidance plus release notes support the candidate sequence 1.25.5 -> 1.26.4 -> 1.27.3 -> 28.3.0; the final direct jump is inferred from the documented next-series rule and the dropped `1.` version prefix, so the live operator must review breaking changes. Mocked Pester and isolated Docker E2E procedures cover marker/image-pin ordering, service-stop recovery, valid `1.26.4` -> `1.27.3` post-start failure, backup-list/integrity, explicit restore, post-backup table removal, unrelated-database preservation, and existing-container isolation. Windows Host reports npm install and typecheck passed; the initial Pester Discovery failure is fixed in the test setup, with a Windows rerun and Docker E2E still pending. WBS remains In Progress until Windows evidence is captured.
 
 ### WBS 4 — Controlled Expansion
 - Parent:
@@ -518,3 +518,4 @@
 - 2026-04-30: Marked WBS `3` and `3.9` done after the large-file docs-update fix was revalidated through live rerun evidence on `PR #44` / run `#71`.
 - 2026-11-05: Added WBS `3.12` for issue #3 as a bounded Phase 1 operator-maintenance follow-up; live service changes remain separately authorized.
 - 2026-11-05: Updated WBS `3.12` with the verified Gitea 28.x upgrade-series path and the outstanding Windows execution gate for TC-011.
+- 2026-11-06: Recorded the Windows Pester Discovery failure and the test setup fix; Windows Pester rerun and isolated Docker E2E remain pending.

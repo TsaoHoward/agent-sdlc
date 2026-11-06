@@ -3,7 +3,7 @@
 ## Metadata
 - Issue ID: I-007
 - Status: In Progress
-- Last Updated: 2026-11-05
+- Last Updated: 2026-11-06
 - Owner: Project Maintainer
 - Related Docs / WBS: GitHub issue #3; `docs/roadmap.md` Phase 1 follow-up; WBS `3.12`; `docs/testing/items/TC-011-gitea-version-lifecycle-operations.md`
 - Source Dashboard: docs/issues/issue-dashboard.md
@@ -40,7 +40,7 @@ Archive after implementation review and authorized Windows Host acceptance are c
 
 ## Next Actions
 
-- Run `npm ci`, typecheck, mocked Pester, and the opt-in isolated Docker E2E on Windows. The latest WSL pass ran `validate:platform`, `git diff --check`, and package JSON parsing successfully; Pester and Docker E2E could not launch without PowerShell, typecheck lacks its installed compiler, and Docker daemon access is denied.
+- Windows Host reports `npm ci` and typecheck passed. The first mocked Pester run failed in Discovery because `InModuleScope` was discovered before the module loaded; the test file now imports during `BeforeDiscovery` and resolves the TestDrive root in Run. Rerun mocked Pester, then the opt-in isolated Docker E2E. WSL Docker daemon access is denied, and Pester cannot resolve this Linux workspace path through Windows interop.
 - Before live maintenance, verify actual container topology, disk capacity, source version, official upgrade path, and representative smoke checks on Windows.
 
 ## Change Log
@@ -48,3 +48,4 @@ Archive after implementation review and authorized Windows Host acceptance are c
 - 2026-11-05: Added the guarded lifecycle entrypoint and mocked Pester coverage; native Windows integration and live acceptance remain outstanding.
 - 2026-11-05: Added the isolated Docker E2E harness, corrected the 28.x upgrade-series handling from official Gitea guidance, and recorded that Windows execution is still required.
 - 2026-11-05: Fixed the isolated migration-failure step and switched PostgreSQL restore to validated target-database recreation; Windows verification remains pending.
+- 2026-11-06: Recorded Windows `npm ci`/typecheck success and the Pester Discovery failure; corrected test setup ordering and left Pester/Docker E2E reruns pending.

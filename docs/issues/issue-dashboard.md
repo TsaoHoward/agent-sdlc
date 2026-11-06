@@ -3,7 +3,7 @@
 ## Document Metadata
 - Version: 0.1
 - Status: Active
-- Last Updated: 2026-11-05
+- Last Updated: 2026-11-06
 - Owner: Project Maintainer
 - Source Template: docs/templates/issue-dashboard.template.md
 
@@ -45,7 +45,7 @@ It does not replace forge issues, roadmap/WBS planning structure, the decision b
 ## Dashboard
 | Issue ID | Title | Status | Related Docs / WBS | Next Action | Exit Path |
 |---|---|---|---|---|---|
-| #3 | Add safe, repeatable version upgrades for the existing Docker Gitea | In Progress | `docs/issues/items/I-007-gitea-version-lifecycle-operations.md`; WBS `3.12`; TC-011 | Run Windows typecheck, mocked Pester, and GUID-isolated Docker E2E; keep live acceptance pending separate authorization | Move to archive after implementation review and authorized Windows Host acceptance; keep any unresolved runtime blocker linked from the canonical test case |
+| #3 | Add safe, repeatable version upgrades for the existing Docker Gitea | In Progress | `docs/issues/items/I-007-gitea-version-lifecycle-operations.md`; WBS `3.12`; TC-011 | Rerun Windows mocked Pester after the Discovery/TestDrive fix, then run GUID-isolated Docker E2E; keep live acceptance pending separate authorization | Move to archive after implementation review and authorized Windows Host acceptance; keep any unresolved runtime blocker linked from the canonical test case |
 
 ## Issue Items
 ### #3 — Gitea Version Lifecycle Operations
@@ -53,7 +53,7 @@ It does not replace forge issues, roadmap/WBS planning structure, the decision b
 - Related Docs / WBS: `docs/issues/items/I-007-gitea-version-lifecycle-operations.md`; WBS `3.12`; `docs/testing/items/TC-011-gitea-version-lifecycle-operations.md`
 - Why It Matters: The existing legacy Gitea instance has persistent repositories, Actions, Registry, and shared Runner state. Replacing its image without a verified backup and restore path risks making that state unusable.
 - Current State: The accepted implementation contract separates the legacy Docker instance on port 43000 from Compose port 46300. Upgrade is explicit-version only, backup-first, local-only, retained without automatic deletion, and restore is an explicit destructive operation. The review fixes use a valid `1.26.4` -> `1.27.3` failure path and exact target-database recreation after verifying the archive database name; the fixture also checks post-backup table removal and unrelated-database preservation. No live upgrade is authorized by this implementation work.
-- Next Action: On Windows, run `npm ci`, typecheck, mocked Pester, then the opt-in isolated Docker E2E; this WSL pass could not run PowerShell or Docker E2E and lacked TypeScript dependencies. Schedule live Windows Host acceptance separately.
+- Next Action: Windows Host reports `npm ci` and typecheck passed; rerun mocked Pester after the Discovery/TestDrive fix, then the opt-in isolated Docker E2E. Schedule live Windows Host acceptance separately.
 - Exit Path: Archive after implementation and authorized Windows Host acceptance are complete; record any remaining issue as a separate follow-up.
 - Supporting Note: `docs/issues/items/I-007-gitea-version-lifecycle-operations.md`
 - Promotion Check: WBS `3.12` added; no architecture boundary or source-of-truth change is intended, so no ADR is required.

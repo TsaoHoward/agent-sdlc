@@ -1,11 +1,13 @@
-BeforeAll {
+BeforeDiscovery {
     $modulePath = Join-Path $PSScriptRoot "../../scripts/dev/gitea-lifecycle.psm1"
     Import-Module (Resolve-Path $modulePath) -Force
 }
 
 Describe "Gitea lifecycle safety helpers" {
-    InModuleScope gitea-lifecycle -Parameters @{ TestRoot = $TestDrive } {
-        param($TestRoot)
+    InModuleScope gitea-lifecycle {
+        BeforeAll {
+            $TestRoot = (Get-PSDrive -Name TestDrive).Root
+        }
 
         BeforeEach {
             $script:lifecycleActions = [System.Collections.Generic.List[string]]::new()
@@ -222,8 +224,10 @@ Describe "Gitea lifecycle safety helpers" {
 }
 
 Describe "Gitea lifecycle operator restore command" {
-    InModuleScope gitea-lifecycle -Parameters @{ TestRoot = $TestDrive } {
-        param($TestRoot)
+    InModuleScope gitea-lifecycle {
+        BeforeAll {
+            $TestRoot = (Get-PSDrive -Name TestDrive).Root
+        }
 
         BeforeEach {
             $script:restoreActions = [System.Collections.Generic.List[string]]::new()
