@@ -299,7 +299,18 @@ function Move-LongPathFile {
             throw "Move destination '$Destination' is not a regular file."
         }
         if (-not $Force) { throw "Move destination '$Destination' already exists." }
-        [System.IO.File]::Replace($sourceExtended, $destinationExtended, $null)
+        # Windows PowerShell 5.1's .NET Framework rejects a null File.Replace backup path, including extended-length paths.
+        $replacementBackupPath = Join-Path (Get-LongPathParent -Path $Destination) (
+            ".{0}.{1}.replace-backup.tmp" -f (Get-LongPathLeaf -Path $Destination), [Guid]::NewGuid().ToString("N")
+        )
+        if (Test-LongPath -Path $replacementBackupPath) {
+            throw "A temporary replacement backup path already exists; refusing to overwrite it."
+        }
+        $replacementBackupExtended = ConvertTo-ExtendedLengthPath -Path $replacementBackupPath
+        [System.IO.File]::Replace($sourceExtended, $destinationExtended, $replacementBackupExtended)
+        if (Test-LongPath -Path $replacementBackupPath -PathType Leaf) {
+            Remove-LongPathEntry -Path $replacementBackupPath
+        }
         return
     }
     [System.IO.File]::Move($sourceExtended, $destinationExtended)
@@ -1924,24 +1935,158 @@ function Assert-GiteaConfigCanBePinned {
     }
 }
 
+function Add-GiteaLifecycleDiagnosticValues {
+    param(
+        [AllowNull()][object]$Value,
+        [AllowEmptyString()][string]$PropertyName,
+        [System.Collections.Generic.List[string]]$Values,
+        [bool]$MaskAllStrings = $false
+    )
+
+    if ($null -eq $Value) { return }
+    $propertyIsSensitive = $PropertyName -match '(?i)password|passwd|token|secret|credential|authorization|private[_-]?key|access[_-]?key'
+    if ($Value -is [string]) {
+        if (($MaskAllStrings -or $propertyIsSensitive) -and $Value.Length -ge 4) {
+            $Values.Add($Value)
+        }
+        return
+    }
+
+    $maskChildren = $MaskAllStrings -or $propertyIsSensitive
+    if ($Value -is [System.Collections.IDictionary]) {
+        foreach ($key in $Value.Keys) {
+            Add-GiteaLifecycleDiagnosticValues -Value $Value[$key] -PropertyName ([string]$key) -Values $Values -MaskAllStrings $maskChildren
+        }
+        return
+    }
+    if ($Value -is [System.Collections.IEnumerable] -and $Value -isnot [string]) {
+        foreach ($item in $Value) {
+            Add-GiteaLifecycleDiagnosticValues -Value $item -PropertyName $PropertyName -Values $Values -MaskAllStrings $maskChildren
+        }
+        return
+    }
+
+    foreach ($property in $Value.PSObject.Properties) {
+        Add-GiteaLifecycleDiagnosticValues -Value $property.Value -PropertyName $property.Name -Values $Values -MaskAllStrings $maskChildren
+    }
+}
+
+function Add-GiteaLifecycleRawJsonDiagnosticValues {
+    param(
+        [AllowEmptyString()][string]$JsonText,
+        [System.Collections.Generic.List[string]]$Values
+    )
+
+    if (-not $JsonText) { return }
+    $pattern = '"(?<key>[^"\\]*(?:password|passwd|token|secret|credential|authorization|private[_-]?key|access[_-]?key)[^"\\]*)"\s*:\s*"(?<value>(?:\\.|[^"\\])*)"'
+    foreach ($match in [Regex]::Matches($JsonText, $pattern, [System.Text.RegularExpressions.RegexOptions]::IgnoreCase)) {
+        $rawValue = [string]$match.Groups['value'].Value
+        if ($rawValue.Length -ge 4) { $Values.Add($rawValue) }
+        try {
+            $decodedValue = ('"' + $rawValue + '"') | ConvertFrom-Json -ErrorAction Stop
+            if ($decodedValue -is [string] -and $decodedValue.Length -ge 4) { $Values.Add($decodedValue) }
+        }
+        catch { }
+    }
+}
+
+function Get-GiteaLifecycleRootException {
+    param([Parameter(Mandatory = $true)][System.Exception]$Exception)
+
+    $root = $Exception
+    while ($root.InnerException) { $root = $root.InnerException }
+    return $root
+}
+
+function Protect-GiteaLifecycleDiagnosticMessage {
+    param(
+        [AllowEmptyString()][string]$Message,
+        [string[]]$SensitiveValues = @()
+    )
+
+    $sanitized = [string]$Message
+    foreach ($sensitiveValue in @($SensitiveValues | Where-Object { $_ } | Sort-Object -Unique | Sort-Object Length -Descending)) {
+        $sanitized = [Regex]::Replace(
+            $sanitized,
+            [Regex]::Escape([string]$sensitiveValue),
+            '[REDACTED]',
+            [System.Text.RegularExpressions.RegexOptions]::IgnoreCase
+        )
+    }
+    $sanitized = [Regex]::Replace(
+        $sanitized,
+        '(?im)(\b[A-Z0-9_.-]*(?:password|passwd|token|secret|credential|authorization|private[_-]?key|access[_-]?key)[A-Z0-9_.-]*\s*[=:]\s*)(?:"[^"]*"|''[^'']*''|[^\s,;]+)',
+        '$1[REDACTED]'
+    )
+    $sanitized = [Regex]::Replace($sanitized, '(?i)\b(Basic\s+|Bearer\s+)[A-Za-z0-9._~+/-]+=*', '$1[REDACTED]')
+    $sanitized = [Regex]::Replace($sanitized, '(?i)(https?://[^:/\s@]+:)[^@\s]+(@)', '$1[REDACTED]$2').Trim()
+    if (-not $sanitized) { return '(no safe exception message available)' }
+    if ($sanitized.Length -gt 1000) { return $sanitized.Substring(0, 1000) + ' [message truncated]' }
+    return $sanitized
+}
+
+function New-GiteaBootstrapImagePinFailure {
+    param(
+        [Parameter(Mandatory = $true)][System.Management.Automation.ErrorRecord]$ErrorRecord,
+        [Parameter(Mandatory = $true)][string]$Stage,
+        [System.Collections.Generic.List[string]]$SensitiveValues
+    )
+
+    $rootException = Get-GiteaLifecycleRootException -Exception $ErrorRecord.Exception
+    $cause = Protect-GiteaLifecycleDiagnosticMessage -Message $rootException.Message -SensitiveValues @($SensitiveValues)
+    return [System.InvalidOperationException]::new(
+        "Bootstrap image pin update failed during stage '$Stage'. Exception type '$($rootException.GetType().FullName)'. Masked cause: $cause"
+    )
+}
+
 function Set-GiteaBootstrapImagePin {
     param(
         [hashtable]$Context,
         [Parameter(Mandatory = $true)][string]$ImageReference
     )
 
-    $config = Read-LongPathText -Path $Context.ConfigPath | ConvertFrom-Json
-    $config.gitea.image = $ImageReference
-    $temporaryPath = Join-Path (Get-LongPathParent -Path $Context.ConfigPath) (".gitea-config-{0}.tmp" -f [Guid]::NewGuid().ToString("N"))
+    $sensitiveValues = [System.Collections.Generic.List[string]]::new()
+    Add-GiteaLifecycleDiagnosticValues -Value $Context -PropertyName 'context' -Values $sensitiveValues
+    $temporaryPath = $null
+    $configurationText = $null
+    $failure = $null
+    $stage = 'read the existing bootstrap config'
     try {
+        $configurationText = Read-LongPathText -Path $Context.ConfigPath
+        Add-GiteaLifecycleRawJsonDiagnosticValues -JsonText $configurationText -Values $sensitiveValues
+        $stage = 'parse the existing bootstrap config'
+        $config = $configurationText | ConvertFrom-Json -ErrorAction Stop
+        Add-GiteaLifecycleDiagnosticValues -Value $config -PropertyName 'config' -Values $sensitiveValues -MaskAllStrings $true
+        $stage = 'update the Gitea image setting'
+        $config.gitea.image = $ImageReference
+        $temporaryPath = Join-Path (Get-LongPathParent -Path $Context.ConfigPath) (".gitea-config-{0}.tmp" -f [Guid]::NewGuid().ToString("N"))
+        $stage = 'write the temporary bootstrap config'
         Save-BackupJson -Path $temporaryPath -Value $config
+        $stage = 'atomically replace the existing bootstrap config'
         Move-LongPathFile -Source $temporaryPath -Destination $Context.ConfigPath -Force
     }
+    catch {
+        $failure = New-GiteaBootstrapImagePinFailure -ErrorRecord $_ -Stage $stage -SensitiveValues $sensitiveValues
+    }
     finally {
-        if (Test-LongPath -Path $temporaryPath -PathType Leaf) {
-            Remove-LongPathEntry -Path $temporaryPath
+        if ($temporaryPath -and (Test-LongPath -Path $temporaryPath -PathType Leaf)) {
+            try {
+                Remove-LongPathEntry -Path $temporaryPath
+            }
+            catch {
+                $cleanupFailure = New-GiteaBootstrapImagePinFailure -ErrorRecord $_ -Stage 'clean the temporary bootstrap config' -SensitiveValues $sensitiveValues
+                if ($failure) {
+                    $failure = [System.InvalidOperationException]::new(
+                        "$($failure.Message) Temporary-file cleanup also failed. $($cleanupFailure.Message)"
+                    )
+                }
+                else {
+                    $failure = $cleanupFailure
+                }
+            }
         }
     }
+    if ($failure) { throw $failure }
 }
 
 function Resume-GiteaUpgradeSource {
