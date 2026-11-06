@@ -155,7 +155,7 @@ The npm `dev:env:init` and `dev:env:up*` commands ensure the ignored local Gitea
 
 The Gitea lifecycle commands run only from native Windows PowerShell and target the legacy PostgreSQL-backed instance on port `43000`. Generate the ignored local config first, clear `AGENT_SDLC_GITEA_IMAGE`, set `gitea.backup.root` to a local fixed-drive path or accept the default under `%USERPROFILE%\Backups\agent-sdlc\gitea`, and review the actual supported source-to-target Gitea upgrade path before using an explicit fixed version. The command creates a checksum-verified backup before replacing only the Gitea container; it does not operate on the separate Compose instance on port `46300`. Restore requires a Backup ID and typed confirmation. Live service maintenance requires separate authorization and the TC-011 manual smoke checks.
 
-Run the lifecycle checks from native Windows PowerShell with Node.js 22+, npm, Pester 5, and Docker Desktop:
+Run the lifecycle checks from native Windows PowerShell with Node.js 22+, npm, Pester 5 or 6.2.0, and Docker Desktop:
 
 ```powershell
 npm ci

@@ -45,15 +45,15 @@ It does not replace forge issues, roadmap/WBS planning structure, the decision b
 ## Dashboard
 | Issue ID | Title | Status | Related Docs / WBS | Next Action | Exit Path |
 |---|---|---|---|---|---|
-| #3 | Add safe, repeatable version upgrades for the existing Docker Gitea | In Progress | `docs/issues/items/I-007-gitea-version-lifecycle-operations.md`; WBS `3.12`; TC-011 | Rerun Windows mocked Pester after the Discovery/TestDrive fix, then run GUID-isolated Docker E2E; keep live acceptance pending separate authorization | Move to archive after implementation review and authorized Windows Host acceptance; keep any unresolved runtime blocker linked from the canonical test case |
+| #3 | Add safe, repeatable version upgrades for the existing Docker Gitea | In Progress | `docs/issues/items/I-007-gitea-version-lifecycle-operations.md`; WBS `3.12`; TC-011 | Windows npm/typecheck and mocked Pester 19/19 pass; fix the three Pester 6.2.0 Docker E2E setup failures and rerun the GUID-isolated E2E; keep live acceptance pending separate authorization | Move to archive after implementation review and authorized Windows Host acceptance; keep any unresolved runtime blocker linked from the canonical test case |
 
 ## Issue Items
 ### #3 — Gitea Version Lifecycle Operations
 - Status: `In Progress`
 - Related Docs / WBS: `docs/issues/items/I-007-gitea-version-lifecycle-operations.md`; WBS `3.12`; `docs/testing/items/TC-011-gitea-version-lifecycle-operations.md`
 - Why It Matters: The existing legacy Gitea instance has persistent repositories, Actions, Registry, and shared Runner state. Replacing its image without a verified backup and restore path risks making that state unusable.
-- Current State: The accepted implementation contract separates the legacy Docker instance on port 43000 from Compose port 46300. Upgrade is explicit-version only, backup-first, local-only, retained without automatic deletion, and restore is an explicit destructive operation. The review fixes use a valid `1.26.4` -> `1.27.3` failure path and exact target-database recreation after verifying the archive database name; the fixture also checks post-backup table removal and unrelated-database preservation. No live upgrade is authorized by this implementation work.
-- Next Action: Windows Host reports `npm ci` and typecheck passed; rerun mocked Pester after the Discovery/TestDrive fix, then the opt-in isolated Docker E2E. Schedule live Windows Host acceptance separately.
+- Current State: The accepted implementation contract separates the legacy Docker instance on port 43000 from Compose port 46300. Upgrade is explicit-version only, backup-first, local-only, retained without automatic deletion, and restore is an explicit destructive operation. The review fixes use a valid `1.26.4` -> `1.27.3` failure path and exact target-database recreation after verifying the archive database name; the fixture also checks post-backup table removal and unrelated-database preservation. Windows reports `npm ci`, typecheck, and mocked Pester 19/19 passed; all three Docker E2E cases then failed under Pester 6.2.0 because Run skipped fixture/module setup. The Run-phase setup and ownership-verified cleanup are fixed, but the post-fix Docker E2E has not run. No live upgrade is authorized by this implementation work.
+- Next Action: Rerun the opt-in GUID-isolated Docker E2E on Windows and record its actual result. Schedule live Windows Host acceptance separately.
 - Exit Path: Archive after implementation and authorized Windows Host acceptance are complete; record any remaining issue as a separate follow-up.
 - Supporting Note: `docs/issues/items/I-007-gitea-version-lifecycle-operations.md`
 - Promotion Check: WBS `3.12` added; no architecture boundary or source-of-truth change is intended, so no ADR is required.
@@ -117,3 +117,4 @@ It does not replace forge issues, roadmap/WBS planning structure, the decision b
 - 2026-11-05: Updated issue #3 handoff to track mocked Pester checks and outstanding isolated Windows Docker validation separately from live acceptance.
 - 2026-11-05: Recorded the isolated Docker E2E harness, version-path correction, and the remaining Windows Host execution requirement.
 - 2026-11-05: Updated issue #3 handoff with the valid post-start failure path, exact target-database restore checks, and current WSL validation limits.
+- 2026-11-06: Recorded Windows Pester 6.2.0 Docker E2E failures and the Run-phase fixture/module setup plus verified-cleanup fix; post-fix E2E remains pending.

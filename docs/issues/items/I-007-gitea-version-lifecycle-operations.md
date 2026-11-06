@@ -40,7 +40,7 @@ Archive after implementation review and authorized Windows Host acceptance are c
 
 ## Next Actions
 
-- Windows Host reports `npm ci` and typecheck passed. The first mocked Pester run failed in Discovery because `InModuleScope` was discovered before the module loaded; the test file now imports during `BeforeDiscovery` and resolves the TestDrive root in Run. Rerun mocked Pester, then the opt-in isolated Docker E2E. WSL Docker daemon access is denied, and Pester cannot resolve this Linux workspace path through Windows interop.
+- Windows Host reports `npm ci`, typecheck, and mocked Pester unit tests (19/19) passed. Under Pester 6.2.0, all three Docker E2E cases then failed: the first could not find the lifecycle module in Run, and the remaining cases had no initialized fixture/Backup ID. The cause was a Discovery-scoped opt-in variable reused by Run. The fix now selects tests during Discovery, rechecks opt-in and loads helpers/module plus fixtures during Run, reports initialization errors explicitly, and removes only containers/network/temp data whose test ownership is verified. Run the post-fix opt-in Docker E2E on Windows; no E2E pass is claimed yet. WSL Docker daemon access is denied, and Pester cannot resolve this Linux workspace path through Windows interop.
 - Before live maintenance, verify actual container topology, disk capacity, source version, official upgrade path, and representative smoke checks on Windows.
 
 ## Change Log
@@ -49,3 +49,4 @@ Archive after implementation review and authorized Windows Host acceptance are c
 - 2026-11-05: Added the isolated Docker E2E harness, corrected the 28.x upgrade-series handling from official Gitea guidance, and recorded that Windows execution is still required.
 - 2026-11-05: Fixed the isolated migration-failure step and switched PostgreSQL restore to validated target-database recreation; Windows verification remains pending.
 - 2026-11-06: Recorded Windows `npm ci`/typecheck success and the Pester Discovery failure; corrected test setup ordering and left Pester/Docker E2E reruns pending.
+- 2026-11-06: Recorded Windows Pester 6.2.0 Docker E2E failures and the Run-phase setup/ownership cleanup fix; post-fix E2E rerun remains pending.

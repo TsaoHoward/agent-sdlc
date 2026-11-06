@@ -16,13 +16,13 @@ Verify the operator-facing upgrade, backup-list, and restore commands protect th
 
 ## Scope
 
-Run the automated Pester suite against temporary directories and a mocked Docker/API boundary through the exported lifecycle command. It covers supported version steps, backup path separation, checksum validation, upgrade ordering and health-failure behavior, recovery-marker/image-pin ordering, source-service recovery after stop failure, restore Backup ID and manifest gates, typed-confirmation refusal, exact PostgreSQL database recreation, and diagnostic-backup retention after restore failure without opening a Docker connection. The opt-in Docker E2E creates GUID-named Gitea/PostgreSQL/Runner fixtures with isolated bind mounts and publishes only on `127.0.0.2`; it upgrades from `1.25.5` to `1.26.4`, checks backup listing/integrity, then starts `1.27.3` and injects a failure after the new version is reachable. It explicitly restores the `1.26.4` pre-failure backup, verifies a table added after that backup disappears, confirms existing repository data remains, and verifies an unrelated database in the same PostgreSQL container is unchanged. The E2E snapshots all pre-existing container identities/states and removes only its uniquely named resources.
+Run the automated Pester suite against temporary directories and a mocked Docker/API boundary through the exported lifecycle command. It covers supported version steps, backup path separation, checksum validation, upgrade ordering and health-failure behavior, recovery-marker/image-pin ordering, source-service recovery after stop failure, restore Backup ID and manifest gates, typed-confirmation refusal, exact PostgreSQL database recreation, and diagnostic-backup retention after restore failure without opening a Docker connection. The opt-in Docker E2E creates GUID-named Gitea/PostgreSQL/Runner fixtures with isolated bind mounts and publishes only on `127.0.0.2`; it upgrades from `1.25.5` to `1.26.4`, checks backup listing/integrity, then starts `1.27.3` and injects a failure after the new version is reachable. It explicitly restores the `1.26.4` pre-failure backup, verifies a table added after that backup disappears, confirms existing repository data remains, and verifies an unrelated database in the same PostgreSQL container is unchanged. The E2E snapshots all pre-existing container identities/states and removes only fixture container IDs whose label or GUID-scoped network and exact bind mounts confirm ownership. The network and temp directory are removed only after their run ID and ownership marker are verified.
 
 Live acceptance for the real 43000 instance is a separate, authorized Windows Host operation. It must also cover API, Git read/write, Registry access, Actions dispatch and Runner execution, Run Attempt visibility, and representative integrations. The local-agent-infra #29 E2E remains a separate result.
 
 ## Preconditions
 
-- Use native Windows PowerShell with Pester 5, Node.js 22+, npm, and a Docker Desktop engine.
+- Use native Windows PowerShell with Pester 5 or 6.2.0, Node.js 22+, npm, and a Docker Desktop engine.
 - The Docker E2E requires `AGENT_SDLC_GITEA_DOCKER_E2E=1`; it refuses occupied test endpoints and runs Gitea at `127.0.0.2:43000`, isolated from a legacy service bound to `127.0.0.1:43000`.
 - The E2E's Runner is an inert disposable container used to verify identity and stop/start handling; it does not validate Actions registration or job execution.
 - Never point tests at the real Gitea containers, host mounts, repository, Registry, or shared Runner.
@@ -74,13 +74,15 @@ Live acceptance for the real 43000 instance is a separate, authorized Windows Ho
 
 ## Current Execution Result
 
-- Windows Host report: `npm ci` and `npm run typecheck` passed. `npm run test:gitea-lifecycle` failed during Pester Discovery with `No modules named 'gitea-lifecycle' are currently loaded`.
-- Fixed the Discovery ordering by importing the module in `BeforeDiscovery`, before the `InModuleScope` blocks are discovered. Removed `$TestDrive` from Discovery-time `InModuleScope -Parameters` expressions and resolve the `TestDrive` PSDrive root inside `BeforeAll` during Run. The Windows Pester rerun is pending.
+- Windows Host report: `npm ci`, `npm run typecheck`, and mocked Pester unit tests (19/19) passed. The opt-in Docker E2E ran under Pester 6.2.0 and all three cases failed. The first reported `No modules named 'gitea-lifecycle' are currently loaded`; the next two failed because the fixture had not initialized and its Backup ID was empty.
+- Root cause: the test selected cases with `$script:dockerE2EEnabled` set at file scope during Discovery, then reused that Discovery-only value in Run's `BeforeAll`. With Pester 6's isolated Discovery/Run phases, Run skipped fixture initialization and module loading. The E2E now applies opt-in only to `Describe` selection, rechecks the environment in Run, dot-sources its helper file and imports the lifecycle module before fixture initialization. Initialization errors are rethrown as explicit fixture failures.
+- Cleanup now registers exact fixture container IDs and verifies the run label or GUID network plus expected mounts before removing them. It verifies the owned network ID/label and a run-specific temp-directory ownership marker before cleanup; unverified resources and fixture data are preserved.
+- The post-fix Windows Pester/Docker E2E rerun is pending. No post-fix Docker E2E pass is claimed.
 - This WSL workspace has Windows PowerShell/Pester installed through Windows interop, but Pester cannot resolve the Linux workspace current directory (`Directory.GetParent` reports an unsupported path format); no post-fix Pester result is claimed.
 - Passed in this WSL pass: `npm run validate:platform`, `git diff --check`, and `package.json` JSON parsing.
-- Not executed: Pester; `npm run test:gitea-lifecycle` exits 127 because `powershell` is not installed in WSL.
+- Not executed in WSL: Pester; `npm run test:gitea-lifecycle` exits 127 because `powershell` is not installed in WSL.
 - Not completed: Typecheck; `npm run typecheck` exits 1 because `node_modules/typescript/bin/tsc` is absent. The earlier `npm ci` attempt could not fetch `@types/node` because `registry.npmjs.org` returned `EAI_AGAIN`; it was not retried in this pass.
-- Not executed: Docker E2E; `npm run test:gitea-lifecycle:docker-e2e` exits 127 because `powershell` is not installed. Separately, `docker info` is denied access to `/var/run/docker.sock` in WSL.
+- Not executed in WSL: Docker E2E; `npm run test:gitea-lifecycle:docker-e2e` exits 127 because `powershell` is not installed. Separately, `docker info` is denied access to `/var/run/docker.sock` in WSL.
 - No PowerShell/Pester, TypeScript, or Docker E2E result is marked passed.
 - No live Gitea, PostgreSQL, Runner, or Compose service was operated.
 
@@ -94,3 +96,4 @@ Use disposable test directories/containers only. Do not delete backup fixtures a
 - 2026-11-05: Added unexecuted Windows Docker E2E coverage and recorded the WSL PowerShell, Docker socket, and npm dependency-install limitations.
 - 2026-11-05: Fixed the isolated failure path to use the valid `1.26.4` to `1.27.3` step and added exact database recreation plus post-backup-table and unrelated-database assertions; Windows execution remains pending.
 - 2026-11-06: Recorded the Windows Host Discovery failure and corrected test-module loading and TestDrive timing; post-fix Windows Pester rerun remains pending.
+- 2026-11-06: Recorded Windows Pester 6.2.0 results (three Docker E2E failures; unit suite 19/19 passed), moved fixture setup/helpers into Run, and tightened ownership-verified cleanup; post-fix E2E remains pending.
