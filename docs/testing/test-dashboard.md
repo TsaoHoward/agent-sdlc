@@ -3,7 +3,7 @@
 ## Document Metadata
 - Version: 0.1
 - Status: Active
-- Last Updated: 2026-04-30
+- Last Updated: 2026-11-06
 - Owner: Project Maintainer
 - Source Template: docs/templates/test-dashboard.template.md
 
@@ -41,6 +41,7 @@ It does not replace CI run history, forge issue or PR history, roadmap/WBS plann
 | Test ID | Title | Status | Mode | Related Docs / WBS | Next Action | Exit Path |
 |---|---|---|---|---|---|---|
 | TC-001 | CLI Replay Intake And Session Smoke | Ready | CLI replay | `docs/roadmap.md` Phase 1; WBS `3.1`, `3.2`, `3.3` | Re-run when intake or session-start behavior changes and keep the case note current if task/session fields or evidence paths move | Move out after the current validation window once the case no longer needs active dashboard attention; keep the canonical case note as the long-lived procedure |
+| TC-011 | Local Gitea Version Lifecycle Operations | In Progress | Windows PowerShell/Pester plus isolated Docker acceptance | `docs/testing/items/TC-011-gitea-version-lifecycle-operations.md`; WBS `3.12` | Native bootstrap-pin 5/5, full Pester 44/44 and isolated Docker E2E 3/3 passed; await separately authorized live 43000 upgrade/restore and API/Git/Registry/Actions/Runner smoke evidence | Move out after isolated CLI verification and separately authorized Windows Host acceptance; keep the canonical case note as the long-lived procedure |
 
 ## Test Items
 
@@ -83,3 +84,18 @@ It does not replace CI run history, forge issue or PR history, roadmap/WBS plann
 - 2026-04-29: Added `TC-010` after a fresh docs-safe run on `README.md` exposed a large-file truncation regression caused by partial context plus full-file rewrite response requirements.
 - 2026-04-30: Moved `TC-010` to ready after landing the fail-closed guardrail plus safe fragment-edit support and verifying both behaviors through deterministic local stubbed execution.
 - 2026-04-30: Archived the passed or deferred Phase 1 close-window cases after live rerun evidence on `PR #44` / run `#71` cleared `TC-010`, leaving `TC-001` as the primary always-ready diagnostic case.
+- 2026-11-05: Added draft TC-011 for the Gitea upgrade/backup/restore CLI and its separate live Windows Host acceptance boundary.
+- 2026-11-05: Updated TC-011 to distinguish the mocked Pester suite from the outstanding Windows Docker-boundary and live acceptance procedures.
+- 2026-11-05: Added the opt-in isolated Docker E2E and recorded that Windows execution remains outstanding because WSL lacks PowerShell, Docker daemon access, and installed npm dependencies.
+- 2026-11-05: Corrected the Docker E2E to exercise a valid next-version failure and exact database restore, including post-backup table removal and unrelated-database preservation; Windows execution remains outstanding.
+- 2026-11-06: Recorded the Windows Pester Discovery failure, fixed module import timing and deferred TestDrive access to Run, and requested a Windows Pester rerun; the isolated Docker E2E remains pending.
+- 2026-11-06: Recorded Windows Pester 6.2.0 Docker E2E failures, moved helper/module/fixture initialization into Run, and tightened verified-resource cleanup; the post-fix E2E remains pending.
+- 2026-11-06: Added Docker stage/subcommand and credential-redacted stderr diagnostics; Windows isolated E2E rerun remains pending.
+- 2026-11-06: Recorded the confirmed socket-only PostgreSQL initialization readiness race, added TCP/SQL readiness checks and bounded-retry regressions; Windows Pester and isolated E2E reruns remain pending.
+- 2026-11-06: Recorded the Windows 23/23 Pester and fixture-initialization report plus the Actions preflight E2E failure; moved preflight to Gitea's paginated instance-wide admin endpoint and added contract-shaped tests. Windows post-fix Pester and real-API isolated E2E remain pending.
+- 2026-11-06: Recorded the Windows 32/32 Pester report and the real fixture E2E failure at backup ACL setup; added a tagged non-elevated real-NTFS ACL test and kept post-fix Windows Pester/E2E pending.
+- 2026-11-06: Recorded Windows Pester 33/33, NTFS ACL 1/1, and fixture progress through Actions preflight and backup ACL; tracked the subsequent 268-character `Copy-Item` failure and added pending long-path regression coverage.
+- 2026-11-06: Recorded Windows Pester 34/34 and real NTFS long-path 1/1 alongside the Docker E2E Hashtable-total and long-path cleanup failures; added the regression fixes and kept post-fix Windows verification active.
+- 2026-11-06: Added direct real-NTFS bootstrap image-pin and existing Recovery Marker replacement coverage after the .NET Framework `File.Replace` null-backup failure was reproduced. Focused/full Pester and Docker E2E still await the native Windows checkout.
+- 2026-11-06: Recorded focused real-NTFS bootstrap-pin Pester 5/5 and combined non-Docker Pester 43/44; the only failure was the `whoami.exe /priv` ACL precondition under WSL interop. Post-fix Docker E2E remains unrun.
+- 2026-11-06: Native Windows PowerShell 5.1 acceptance passed: bootstrap pin 5/5, full Pester 44/44 and isolated Docker E2E 3/3; teardown removed the GUID fixture. TC-011 remains In Progress solely for separately authorized live 43000 smoke acceptance.

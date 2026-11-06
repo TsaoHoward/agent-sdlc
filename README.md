@@ -139,16 +139,54 @@ powershell -File scripts/dev/manage-dev-environment.ps1 -Command up
 powershell -File scripts/dev/manage-dev-environment.ps1 -Command up -GiteaDatabaseMode sqlite
 powershell -File scripts/dev/manage-dev-environment.ps1 -Command up -SkipGitea
 powershell -File scripts/dev/manage-dev-environment.ps1 -Command status
+powershell -File scripts/dev/manage-dev-environment.ps1 -Command backup-list
 npm run dev:env:init
 npm run dev:env:up
 npm run dev:env:up:sqlite
 npm run dev:env:up:no-gitea
 npm run dev:env:status
 npm run dev:env:down
+npm run dev:env:backup-list
+npm run test:gitea-lifecycle:acl
+npm run test:gitea-lifecycle:long-path
+npm run test:gitea-lifecycle
 ```
 
 `dev:env:up` now also starts the default task-intake and review-follow-up webhook listeners from template/local config, and the default local Gitea repo bootstrap path now ensures both issue-comment and review-follow-up webhooks are configured against that repo.
 The npm `dev:env:init` and `dev:env:up*` commands ensure the ignored local Gitea bootstrap config before starting; run `npm run dev:gitea-bootstrap-config` once first when using the direct PowerShell `up` command without password environment variables.
+
+The Gitea lifecycle commands run only from native Windows PowerShell and target the legacy PostgreSQL-backed instance on port `43000`. Generate the ignored local config first, clear `AGENT_SDLC_GITEA_IMAGE`, set `gitea.backup.root` to a local fixed-drive path or accept the default under `%USERPROFILE%\Backups\agent-sdlc\gitea`, and review the actual supported source-to-target Gitea upgrade path before using an explicit fixed version. The command creates a checksum-verified backup before replacing only the Gitea container; it does not operate on the separate Compose instance on port `46300`. Restore requires a Backup ID and typed confirmation. Live service maintenance requires separate authorization and the TC-011 manual smoke checks.
+
+Run the lifecycle checks from native Windows PowerShell with Node.js 22+, npm, Pester 5 or 6.2.0, and Docker Desktop:
+
+```powershell
+npm ci
+npm run typecheck
+npm run test:gitea-lifecycle:acl
+npm run test:gitea-lifecycle:long-path
+npm run test:gitea-lifecycle
+$env:AGENT_SDLC_GITEA_DOCKER_E2E = "1"
+npm run test:gitea-lifecycle:docker-e2e
+Remove-Item Env:AGENT_SDLC_GITEA_DOCKER_E2E
+```
+
+The NTFS ACL check must run from non-elevated Windows PowerShell. It creates a GUID-named directory under the Windows temp directory, exercises the real NTFS DACL through the operator backup-list command, and checks ownership, inheritance and effective access rules. Cleanup verifies the exact temp path and owner; it checks the marker before recursive removal, or removes an empty directory if setup failed before marker creation. It does not use the configured or formal backup directory.
+
+The long-path check also runs from non-elevated Windows PowerShell and uses only a GUID-owned NTFS temp tree. It creates a backup object whose destination path exceeds 260 characters, records whether unprefixed `Copy-Item` fails while the source and destination parent still exist, then checks extended-path copy, SHA256 manifest generation/validation, restore replacement, content equality, and ownership-verified cleanup. It does not change Windows long-path policy or use the configured backup directory.
+
+The Docker E2E creates only GUID-named disposable fixtures, uses separate bind mounts and a private network, and binds to `127.0.0.2` so the existing `127.0.0.1:43000` service is outside its target. It checks pre-existing container identities and states before cleanup. It uses an inert fixture Runner and does not validate real Actions dispatch or Runner execution. If teardown leaves a temp directory, use the standalone GUID/marker/owner/path/reparse-verified cleanup procedure in `docs/testing/items/TC-011-gitea-version-lifecycle-operations.md`; it requires a WhatIf review and explicit same-Run-ID confirmation.
+
+If an upgrade or restore stops before its health checks complete, the local bootstrap `up` command stays blocked by a recovery marker until an operator completes an explicit restore. The failed state and Backup IDs remain available for review.
+
+For an upgrade, enter the next supported release series one step at a time:
+
+```powershell
+$verifiedNextVersion = Read-Host "Enter the verified next supported Gitea version"
+npm run dev:env:upgrade -- -GiteaVersion $verifiedNextVersion
+npm run dev:env:backup-list
+$backupId = Read-Host "Enter the Backup ID to restore"
+npm run dev:env:restore -- -BackupId $backupId
+```
 
 Current platform package commands:
 

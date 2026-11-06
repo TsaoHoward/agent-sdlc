@@ -3,7 +3,7 @@
 ## Document Metadata
 - Version: 0.1
 - Status: Draft
-- Last Updated: 2026-04-30
+- Last Updated: 2026-11-06
 - Owner: Project Maintainer
 - Source Template: docs/templates/wbs.template.md
 
@@ -44,6 +44,7 @@
 | 3.9 | Minimal Real Agent Execution | 3 | Phase 1 | one provider-backed bounded execution path for a supported task class |
 | 3.10 | External Target Repo Evaluation Baseline | 3 | Phase 1 | distinct target-repo baseline for service evaluation beyond platform self-test |
 | 3.11 | Service-State And Evaluation Workflow | 3 | Phase 1 | durable workbench/internal-eval/pilot/production model with evidence rules |
+| 3.12 | Local Gitea Version Lifecycle Operations | 3 | Phase 1 | guarded upgrade, backup inventory, and explicit restore workflow for the legacy Windows Host Gitea |
 | 4 | Controlled Expansion | - | Phase 2 | structured expansion without boundary collapse |
 | 4.1 | Additional Intake Paths | 4 | Phase 2 | more adapters |
 | 4.2 | Policy Pack Expansion | 4 | Phase 2 | richer policy definitions |
@@ -308,6 +309,18 @@
 - Status: Done
 - Notes: This item is about governance and current-state clarity, not only about new code. ADR-0009 plus `docs/policies/service-state-and-evaluation.md` now define the evidence rule that self-targeted `agent-sdlc` runs remain valid for bootstrap and regression but cannot by themselves justify pilot or production service claims. The first runnable external-target evidence set now exists, so the policy, testing workflow, and current-state docs are aligned to a real `Workbench` / `Internal Eval` evidence model instead of a purely planned one.
 
+### WBS 3.12 — Local Gitea Version Lifecycle Operations
+- Parent: 3
+- Related Phase: Phase 1 follow-up
+- Description: Extend the existing Windows PowerShell operator entrypoint with guarded upgrade, retained local backup listing, and confirmed restore operations for the legacy Docker Gitea on port 43000.
+- Deliverable: repeatable lifecycle commands, isolated operator-facing verification, and a canonical Windows Host acceptance case
+- Dependencies: 1.5, 3.7
+- Critical-Path-Candidate: No
+- Status: In Progress
+- Notes: Implements issue #3 without changing the separate Compose 46300 environment, PostgreSQL or Runner identity, and without authorizing a live upgrade. Every upgrade requires an explicit fixed version, verifies the legacy container identity and mounts, checks Runner activity and local capacity, then requires a complete checksum-verified backup before recreating only Gitea. Restore requires a Backup ID and confirmation; it preserves the current failed state as a separate diagnostic backup before overwriting. The PostgreSQL archive database name is checked against the configured Gitea database, then `pg_restore --clean --create` recreates that database inside the existing PostgreSQL container; unrelated databases and the container are retained. An incomplete operation leaves bootstrap `up` blocked until explicit restore succeeds. Official guidance plus release notes support the candidate sequence 1.25.5 -> 1.26.4 -> 1.27.3 -> 28.3.0; the final direct jump is inferred from the documented next-series rule and the dropped `1.` version prefix, so the live operator must review breaking changes. Mocked Pester and isolated Docker E2E procedures cover marker/image-pin ordering, service-stop recovery, valid `1.26.4` -> `1.27.3` post-start failure, backup-list/integrity, explicit restore, post-backup table removal, unrelated-database preservation, and existing-container isolation. The latest Windows report provided for this patch had full Pester 34/34 and real NTFS long-path 1/1 pass; Docker E2E reached fixture setup, Actions preflight, ACL, long-path copy and PostgreSQL dump, then failed because `Measure-Object` could not total Hashtable file entries. The later cases lacked the first Backup ID and teardown failed at `Remove-Item -Recurse` on long paths. This patch adds Hashtable-safe totals and tests, explicit blocked-prerequisite skips, and a GUID/marker/owner/path/reparse-verified extended-path cleanup utility. Windows post-patch Pester and Docker E2E remain pending. The source Gitea and Runner are stopped before snapshotting and fixture cleanup runs after the test; code inspection found no concurrent source deletion or target cleanup path. Explicit extended-length .NET file operations now cover traversal, copy, SHA256, manifest I/O/validation, ACL access, restore and cleanup without changing Windows policy. A real-NTFS test records source/parent existence around the unprefixed `Copy-Item` control and verifies copy/checksum/manifest/restore/cleanup. Post-patch Windows Pester and Docker E2E remain pending; no live upgrade is authorized.
+
+- Follow-up evidence: A native Windows PowerShell 5.1/.NET Framework NTFS probe confirmed `File.Replace(..., $null)` fails with `ArgumentException` / HRESULT `0x80070057`, while a unique same-directory backup argument works on ordinary and 406-character extended paths. `Move-LongPathFile -Force` now supplies that backup and rolls back if its cleanup fails; direct image-pin/recovery-marker NTFS tests and outer-catch diagnostic coverage were added. Focused real-NTFS Pester passed 5/5. Combined non-Docker Pester was 43/44 because the WSL interop session returned no output for the ACL test's `whoami.exe /priv` precondition. Post-fix Docker E2E remains unrun; no live upgrade is authorized.
+
 ### WBS 4 — Controlled Expansion
 - Parent:
 - Related Phase: Phase 2
@@ -426,6 +439,7 @@
 | 3.9 | 3.2, 3.3, 3.4, 3.5, 3.6, 3.7, 3.8 | the first real agent execution path depends on working session/runtime/proposal/verification handoffs plus current-state workflow and validation surfaces |
 | 3.10 | 3.4, 3.5, 3.7, 3.8, 3.9 | credible service evaluation needs a working proposal/CI/testing baseline plus at least one real execution path before it can move beyond self-targeted platform runs |
 | 3.11 | 3.7, 3.8, 3.10 | service-state and evidence rules depend on both the testing workflow and the introduction of a distinct target-repo evaluation baseline |
+| 3.12 | 1.5, 3.7 | safe local forge maintenance depends on the environment baseline and repeatable operator-facing validation surfaces |
 | 4 | 3 | expansion should follow first working loop |
 | 4.4 | 3.10, 3.11, 4.2, 4.3 | staged pilot rollout depends on explicit evidence tiers plus policy and observability support |
 | 5 | 4 | governance evolution should follow practical expansion experience |
@@ -504,3 +518,15 @@
 - 2026-04-29: Updated WBS 3.1 and 3.9 after landing bounded issue-thread feedback for malformed/fail-closed live issue-comment results and a no-op stop that avoids creating traceability-only PRs.
 - 2026-04-29: Kept WBS `3` and `3.9` in progress after a fresh docs-safe run exposed a large-file truncation regression in the current agent-execution contract.
 - 2026-04-30: Marked WBS `3` and `3.9` done after the large-file docs-update fix was revalidated through live rerun evidence on `PR #44` / run `#71`.
+- 2026-11-05: Added WBS `3.12` for issue #3 as a bounded Phase 1 operator-maintenance follow-up; live service changes remain separately authorized.
+- 2026-11-05: Updated WBS `3.12` with the verified Gitea 28.x upgrade-series path and the outstanding Windows execution gate for TC-011.
+- 2026-11-06: Recorded the Windows Pester Discovery failure and the test setup fix; Windows Pester rerun and isolated Docker E2E remain pending.
+- 2026-11-06: Recorded Windows Pester 6.2.0 results and moved Docker E2E setup into Run; the post-fix isolated E2E remains pending.
+- 2026-11-06: Added stage/subcommand and credential-redacted Docker stderr diagnostics; post-fix Windows E2E remains pending.
+- 2026-11-06: Confirmed the socket-only PostgreSQL initialization readiness race; fixture readiness now checks TCP plus authenticated SQL with bounded retries, and regression Pester tests were added. Native Windows reruns remain pending.
+- 2026-11-06: Recorded Windows 23/23 Pester and initialized-fixture results, fixed the Actions response-contract mismatch with the documented instance-wide admin endpoint, and added private-repository, pagination, permission, status, and malformed-response regressions. Post-fix Windows verification remains pending.
+- 2026-11-06: Recorded Windows 32/32 Pester and the Docker E2E ACL failure; replaced `Set-Acl` with DACL-only persistence and owner/inheritance/ACE verification, and added a non-elevated real-NTFS temp-directory test. Post-fix Windows Pester and Docker E2E remain pending.
+- 2026-11-06: Recorded Windows Pester 33/33, ACL 1/1, and Docker E2E failure at the 268-character copy target; added extended-length backup/checksum/manifest/restore I/O and a real-NTFS long-path regression. Post-patch Windows Pester and Docker E2E remain pending.
+- 2026-11-06: Updated WBS 3.12 from the Windows Pester 34/34, long-path 1/1, and Docker E2E byte-total/cleanup report; added the regression fixes and left host acceptance pending.
+- 2026-11-06: Identified the `File.Replace` null-backup failure on .NET Framework, used a same-directory temporary backup with rollback on cleanup failure, and added direct NTFS bootstrap-pin/recovery-marker plus outer-catch diagnostics tests. Native Pester and isolated Docker E2E remain pending.
+- 2026-11-06: Recorded focused real-NTFS bootstrap-pin Pester 5/5 and combined non-Docker suite 43/44; native Windows rerun is required for the WSL interop ACL precondition, and post-fix Docker E2E remains pending.

@@ -3,7 +3,7 @@
 ## Document Metadata
 - Version: 0.1
 - Status: Active
-- Last Updated: 2026-04-30
+- Last Updated: 2026-11-06
 - Owner: Project Maintainer
 - Source Template: docs/templates/issue-dashboard.template.md
 
@@ -45,10 +45,19 @@ It does not replace forge issues, roadmap/WBS planning structure, the decision b
 ## Dashboard
 | Issue ID | Title | Status | Related Docs / WBS | Next Action | Exit Path |
 |---|---|---|---|---|---|
-No active near-term issue items currently need dashboard visibility.
+| #3 | Add safe, repeatable version upgrades for the existing Docker Gitea | In Progress | `docs/issues/items/I-007-gitea-version-lifecycle-operations.md`; WBS `3.12`; TC-011 | Isolated acceptance passed (bootstrap 5/5, Pester 44/44, Docker E2E 3/3); schedule separately authorized real 43000 upgrade and smoke verification | Move to archive after implementation review and authorized Windows Host acceptance; keep any unresolved runtime blocker linked from the canonical test case |
 
 ## Issue Items
-No active issue-item detail currently needs dashboard expansion. Use the archive plus supporting notes for historical context.
+### #3 — Gitea Version Lifecycle Operations
+- Status: `In Progress`
+- Related Docs / WBS: `docs/issues/items/I-007-gitea-version-lifecycle-operations.md`; WBS `3.12`; `docs/testing/items/TC-011-gitea-version-lifecycle-operations.md`
+- Why It Matters: The existing legacy Gitea instance has persistent repositories, Actions, Registry, and shared Runner state. Replacing its image without a verified backup and restore path risks making that state unusable.
+- Current State: The accepted implementation contract separates legacy Docker Gitea on port 43000 from Compose port 46300. Upgrade remains explicit-version, backup-first, local-only, and live maintenance remains separately authorized. Earlier Docker E2E work verified fixture backup and upgrade health checks, then exposed the bootstrap image-pin failure; its dependent cases were skipped for missing Backup ID. The null-backup `File.Replace` cause is now fixed with a named same-directory backup and rollback on backup-cleanup failure. Direct real-NTFS pin/recovery-marker tests were added; focused Pester passed 5/5. Combined non-Docker Pester was 43/44, with the lone failure in the ACL test's `whoami /priv` precondition under WSL interop. Post-fix Docker E2E has not been rerun, and no live service was operated.
+- Current Finding: Windows PowerShell 5.1/.NET Framework NTFS evidence confirms `File.Replace(source, destination, $null)` fails with `ArgumentException` / HRESULT `0x80070057` for ordinary and extended paths, while a unique same-directory backup succeeds at both, including 406 characters. The pin catch now reports sanitized stage, exception type, and cause through the upgrade catch. Same helper usage by Recovery Marker replacement is covered; Restore writes/clears the marker and pins the bootstrap config when a local source is present. Focused NTFS Pester passed; the full suite needs a native-host rerun for the `whoami` precondition.
+- Next Action: Merge the isolated implementation PR after documenting the native 5/5 + 44/44 + 3/3 evidence. Keep Issue #3 open for separately authorized 43000 upgrade and API/Git/Registry/Actions/Runner/Run Attempt smoke acceptance.
+- Exit Path: Archive after implementation and authorized Windows Host acceptance are complete; record any remaining issue as a separate follow-up.
+- Supporting Note: `docs/issues/items/I-007-gitea-version-lifecycle-operations.md`
+- Promotion Check: WBS `3.12` added; no architecture boundary or source-of-truth change is intended, so no ADR is required.
 
 ## Change Log
 - 2026-04-15: Initial version.
@@ -105,3 +114,15 @@ No active issue-item detail currently needs dashboard expansion. Use the archive
 - 2026-04-29: Added I-006 after a fresh provider-backed docs-safe run on `README.md` exposed a large-file truncation regression in the current agent-execution contract.
 - 2026-04-30: Moved I-006 to ready-for-review after landing fail-closed guardrails plus safe fragment-edit support for truncated large files and verifying both behaviors through deterministic local stubbed execution.
 - 2026-04-30: Cleared the last active Phase 1 issue blockers after live rerun evidence (`#41` / comment `#204` -> `trq-763eac216fe1` -> `ags-716c62e3f62c` -> `PR #44` -> run `#71`) confirmed safe large-file docs updates, and moved completed or no-longer-near-term items to the issue archive.
+- 2026-11-05: Added issue #3 as active near-term work and linked it to new WBS `3.12` and TC-011.
+- 2026-11-05: Updated issue #3 handoff to track mocked Pester checks and outstanding isolated Windows Docker validation separately from live acceptance.
+- 2026-11-05: Recorded the isolated Docker E2E harness, version-path correction, and the remaining Windows Host execution requirement.
+- 2026-11-05: Updated issue #3 handoff with the valid post-start failure path, exact target-database restore checks, and current WSL validation limits.
+- 2026-11-06: Recorded Windows Pester 6.2.0 Docker E2E failures and the Run-phase fixture/module setup plus verified-cleanup fix; post-fix E2E remains pending.
+- 2026-11-06: Recorded stage/subcommand and credential-redacted stderr diagnostics; post-fix Windows Docker E2E remains pending.
+- 2026-11-06: Recorded the Windows 23/23 Pester and fixture setup report plus the Actions preflight failure; switched to the documented paginated instance-wide admin-run API and left post-fix Windows Pester/E2E pending.
+- 2026-11-06: Recorded Windows Pester 33/33, real NTFS ACL 1/1, and Docker E2E failure at the 268-character Git Object copy target; added extended-length file operations and a real-NTFS long-path regression, with post-patch Windows validation pending.
+- 2026-11-06: Recorded the Windows 34/34 Pester and 1/1 long-path results and the subsequent Docker E2E byte-total/cleanup failures; added Hashtable summation, explicit prerequisite skips, and verified extended-path fixture cleanup. Post-fix Windows rerun remains pending.
+- 2026-11-06: Recorded the Windows PowerShell/.NET Framework `File.Replace` null-backup root cause, the named-backup fix, and the focused real-NTFS bootstrap-pin verification still pending on the native checkout.
+- 2026-11-06: Recorded focused bootstrap-pin Pester 5/5 and combined non-Docker Pester 43/44; full native-host Pester and post-fix isolated Docker E2E remain outstanding.
+- 2026-11-06: Native Windows focused pin 5/5, full Pester 44/44, and GUID-isolated Docker E2E 3/3 passed; test fixture safely removed. Live 43000 acceptance remains pending; Issue #3 remains open.
