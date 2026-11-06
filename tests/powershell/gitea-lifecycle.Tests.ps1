@@ -779,13 +779,33 @@ Describe "Gitea backup ACL on real NTFS" -Tag "WindowsAcl" {
         $expectedDirectoryInheritance = [System.Security.AccessControl.InheritanceFlags]::ContainerInherit -bor
             [System.Security.AccessControl.InheritanceFlags]::ObjectInherit
         $markerValue = "agent-sdlc-gitea-acl-test:$runId"
+        $fixtureRootCreated = $false
+        $markerCreatedByThisRun = $false
+        $markerWriteCompleted = $false
 
         try {
             $drive = [System.IO.DriveInfo]::new([System.IO.Path]::GetPathRoot($fixtureRoot))
             $drive.DriveFormat | Should -Be "NTFS"
 
+            (Test-Path -LiteralPath $fixtureRoot) | Should -BeFalse
             New-Item -ItemType Directory -Path $fixtureRoot -ErrorAction Stop | Out-Null
-            [System.IO.File]::WriteAllText($markerPath, $markerValue, [System.Text.UTF8Encoding]::new($false))
+            $fixtureRootCreated = $true
+            $markerStream = [System.IO.File]::Open(
+                $markerPath,
+                [System.IO.FileMode]::CreateNew,
+                [System.IO.FileAccess]::Write,
+                [System.IO.FileShare]::None
+            )
+            $markerCreatedByThisRun = $true
+            try {
+                $markerBytes = [System.Text.UTF8Encoding]::new($false).GetBytes($markerValue)
+                $markerStream.Write($markerBytes, 0, $markerBytes.Length)
+                $markerStream.Flush($true)
+                $markerWriteCompleted = $true
+            }
+            finally {
+                $markerStream.Dispose()
+            }
 
             $context = @{
                 BackupRoot = $backupRoot
@@ -852,13 +872,38 @@ Describe "Gitea backup ACL on real NTFS" -Tag "WindowsAcl" {
             [System.IO.File]::ReadAllText($privateFile) | Should -Be "updated"
         }
         finally {
-            if (Test-Path -LiteralPath $markerPath -PathType Leaf) {
+            if ($fixtureRootCreated -and (Test-Path -LiteralPath $fixtureRoot -PathType Container)) {
                 $resolvedFixtureRoot = [System.IO.Path]::GetFullPath($fixtureRoot)
                 $tempPrefix = $tempParent + [System.IO.Path]::DirectorySeparatorChar
                 $resolvedFixtureRoot.StartsWith($tempPrefix, [StringComparison]::OrdinalIgnoreCase) | Should -BeTrue
                 [System.IO.Path]::GetFileName($resolvedFixtureRoot) | Should -Be "agent-sdlc-gitea-acl-$runId"
-                [System.IO.File]::ReadAllText($markerPath) | Should -Be $markerValue
-                Remove-Item -LiteralPath $resolvedFixtureRoot -Recurse -Force -ErrorAction Stop
+                ([System.IO.Path]::GetDirectoryName($resolvedFixtureRoot)).Equals(
+                    $tempParent,
+                    [StringComparison]::OrdinalIgnoreCase
+                ) | Should -BeTrue
+                (([System.IO.File]::GetAttributes($resolvedFixtureRoot) -band [System.IO.FileAttributes]::ReparsePoint) -eq 0) |
+                    Should -BeTrue
+
+                $fixtureRootAcl = [System.IO.Directory]::GetAccessControl(
+                    $resolvedFixtureRoot,
+                    [System.Security.AccessControl.AccessControlSections]::Owner
+                )
+                $fixtureRootAcl.GetOwner([System.Security.Principal.SecurityIdentifier]).Value | Should -Be $currentSid.Value
+
+                if (Test-Path -LiteralPath $markerPath -PathType Leaf) {
+                    if (-not $markerCreatedByThisRun) {
+                        throw "Refusing to clean the ACL test directory because its ownership marker was not created by this test."
+                    }
+                    if ($markerWriteCompleted) {
+                        [System.IO.File]::ReadAllText($markerPath) | Should -Be $markerValue
+                    }
+                    Remove-Item -LiteralPath $resolvedFixtureRoot -Recurse -Force -ErrorAction Stop
+                }
+                else {
+                    $remainingEntries = @(Get-ChildItem -LiteralPath $resolvedFixtureRoot -Force -ErrorAction Stop)
+                    $remainingEntries.Count | Should -Be 0
+                    [System.IO.Directory]::Delete($resolvedFixtureRoot, $false)
+                }
             }
         }
     }

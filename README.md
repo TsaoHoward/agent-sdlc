@@ -168,7 +168,7 @@ npm run test:gitea-lifecycle:docker-e2e
 Remove-Item Env:AGENT_SDLC_GITEA_DOCKER_E2E
 ```
 
-The NTFS ACL check must run from non-elevated Windows PowerShell. It creates a GUID-named directory under the Windows temp directory, exercises the real NTFS DACL through the operator backup-list command, checks ownership, inheritance and effective access rules, then removes only that directory after verifying its ownership marker. It does not use the configured or formal backup directory.
+The NTFS ACL check must run from non-elevated Windows PowerShell. It creates a GUID-named directory under the Windows temp directory, exercises the real NTFS DACL through the operator backup-list command, and checks ownership, inheritance and effective access rules. Cleanup verifies the exact temp path and owner; it checks the marker before recursive removal, or removes an empty directory if setup failed before marker creation. It does not use the configured or formal backup directory.
 
 The Docker E2E creates only GUID-named disposable fixtures, uses separate bind mounts and a private network, and binds to `127.0.0.2` so the existing `127.0.0.1:43000` service is outside its target. It checks pre-existing container identities and states before cleanup. It uses an inert fixture Runner and does not validate real Actions dispatch or Runner execution.
 
