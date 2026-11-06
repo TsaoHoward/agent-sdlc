@@ -134,6 +134,160 @@ Describe "Gitea lifecycle isolated Docker failure diagnostics" {
     }
 }
 
+Describe "Gitea Actions upgrade preflight" {
+    InModuleScope gitea-lifecycle {
+        BeforeEach {
+            $script:actionsApiRequests = [System.Collections.Generic.List[string]]::new()
+            $script:actionsApiIsAdmin = $true
+            $script:actionsApiFailure = $false
+            $script:actionsRunPages = @()
+            $script:actionsContext = @{
+                GiteaRootUrl = "http://127.0.0.2:43000/"
+                GiteaAdminUsername = "fixture-admin"
+                GiteaAdminPassword = "fixture-password"
+            }
+
+            Mock Invoke-GiteaApiRead {
+                param($Context, $RelativePath)
+
+                $script:actionsApiRequests.Add($RelativePath)
+                if ($RelativePath -eq "user") {
+                    return [pscustomobject]@{ is_admin = $script:actionsApiIsAdmin }
+                }
+                if ($script:actionsApiFailure) {
+                    throw "simulated API permission failure"
+                }
+                if ($RelativePath -match '^admin/actions/runs\?limit=50&page=(\d+)$') {
+                    $pageNumber = [int]$matches[1]
+                    return $script:actionsRunPages[$pageNumber - 1]
+                }
+
+                throw "Unexpected Gitea API path '$RelativePath'."
+            }
+        }
+
+        It "accepts the official empty instance-wide workflow-run response" {
+            $script:actionsRunPages = @([pscustomobject]@{
+                total_count = 0
+                workflow_runs = @()
+            })
+
+            { Assert-NoActiveGiteaActions -Context $script:actionsContext } | Should -Not -Throw
+
+            $script:actionsApiRequests -join "," | Should -Be "user,admin/actions/runs?limit=50&page=1"
+        }
+
+        It "checks active runs from private repositories through the instance-wide admin endpoint" {
+            $script:actionsRunPages = @([pscustomobject]@{
+                total_count = 1
+                workflow_runs = @([pscustomobject]@{
+                    id = 42
+                    run_attempt = 1
+                    run_number = 7
+                    repository_id = 9001
+                    status = "running"
+                    repository = [pscustomobject]@{
+                        id = 9001
+                        name = "private-repo"
+                        full_name = "private-owner/private-repo"
+                        private = $true
+                    }
+                })
+            })
+
+            { Assert-NoActiveGiteaActions -Context $script:actionsContext } | Should -Throw "*running*"
+
+            $script:actionsApiRequests -join "," | Should -Be "user,admin/actions/runs?limit=50&page=1"
+            $script:actionsApiRequests | Should -Not -Contain "repos/search?limit=50&page=1"
+        }
+
+        It "accepts only recognized terminal workflow statuses" {
+            $terminalStatuses = @("success", "failure", "cancelled", "skipped")
+            $runs = @($terminalStatuses | ForEach-Object {
+                [pscustomobject]@{ id = 1; status = $_ }
+            })
+            $script:actionsRunPages = @([pscustomobject]@{
+                total_count = $runs.Count
+                workflow_runs = $runs
+            })
+
+            { Assert-NoActiveGiteaActions -Context $script:actionsContext } | Should -Not -Throw
+        }
+
+        It "rejects running, queued, waiting, blocked, and unknown statuses" {
+            foreach ($status in @("running", "queued", "waiting", "blocked", "completed", "mystery")) {
+                $script:actionsRunPages = @([pscustomobject]@{
+                    total_count = 1
+                    workflow_runs = @([pscustomobject]@{ id = 99; status = $status })
+                })
+
+                { Assert-NoActiveGiteaActions -Context $script:actionsContext } | Should -Throw
+            }
+        }
+
+        It "reads every page of instance-wide workflow runs" {
+            $firstPageRuns = @(1..50 | ForEach-Object {
+                [pscustomobject]@{ id = $_; status = "success" }
+            })
+            $script:actionsRunPages = @(
+                [pscustomobject]@{ total_count = 51; workflow_runs = $firstPageRuns },
+                [pscustomobject]@{ total_count = 51; workflow_runs = @([pscustomobject]@{ id = 51; status = "success" }) }
+            )
+
+            { Assert-NoActiveGiteaActions -Context $script:actionsContext } | Should -Not -Throw
+
+            $script:actionsApiRequests -join "," | Should -Be "user,admin/actions/runs?limit=50&page=1,admin/actions/runs?limit=50&page=2"
+        }
+
+        It "fails closed when a workflow-run page is incomplete" {
+            $firstPageRuns = @(1..50 | ForEach-Object {
+                [pscustomobject]@{ id = $_; status = "success" }
+            })
+            $script:actionsRunPages = @(
+                [pscustomobject]@{ total_count = 51; workflow_runs = $firstPageRuns },
+                [pscustomobject]@{ total_count = 51; workflow_runs = @() }
+            )
+
+            { Assert-NoActiveGiteaActions -Context $script:actionsContext } | Should -Throw "*incomplete*"
+
+            $script:actionsApiRequests.Count | Should -Be 3
+        }
+
+        It "fails closed when the response does not match the official run-list contract" {
+            $script:actionsRunPages = @([pscustomobject]@{
+                workflow_runs = @()
+            })
+
+            { Assert-NoActiveGiteaActions -Context $script:actionsContext } | Should -Throw "*unexpected response*"
+
+            $script:actionsRunPages = @([pscustomobject]@{
+                total_count = "0"
+                workflow_runs = @()
+            })
+
+            { Assert-NoActiveGiteaActions -Context $script:actionsContext } | Should -Throw "*invalid total*"
+        }
+
+        It "requires an administrator before calling the instance-wide endpoint" {
+            $script:actionsApiIsAdmin = $false
+
+            { Assert-NoActiveGiteaActions -Context $script:actionsContext } | Should -Throw "*not an administrator*"
+
+            $script:actionsApiRequests.Count | Should -Be 1
+            $script:actionsApiRequests[0] | Should -Be "user"
+        }
+
+        It "fails closed when the instance-wide endpoint denies access or errors" {
+            $script:actionsApiFailure = $true
+
+            { Assert-NoActiveGiteaActions -Context $script:actionsContext } | Should -Throw "*permission failure*"
+
+            $script:actionsApiRequests.Count | Should -Be 2
+            $script:actionsApiRequests[1] | Should -Be "admin/actions/runs?limit=50&page=1"
+        }
+    }
+}
+
 Describe "Gitea lifecycle safety helpers" {
     InModuleScope gitea-lifecycle {
         BeforeAll {

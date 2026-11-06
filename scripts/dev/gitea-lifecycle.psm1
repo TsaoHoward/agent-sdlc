@@ -491,70 +491,51 @@ function Assert-NoActiveGiteaActions {
     }
     $limit = 50
     $page = 1
-    $repositories = @()
     while ($true) {
-        $response = Invoke-GiteaApiRead -Context $Context -RelativePath "repos/search?limit=$limit&page=$page"
-        $dataProperty = $response.PSObject.Properties["data"]
+        $response = Invoke-GiteaApiRead -Context $Context -RelativePath "admin/actions/runs?limit=$limit&page=$page"
+        if ($null -eq $response) {
+            throw "Gitea instance-wide Actions enumeration returned an empty response; refusing maintenance."
+        }
+        $runsProperty = $response.PSObject.Properties["workflow_runs"]
         $totalProperty = $response.PSObject.Properties["total_count"]
-        if (-not $dataProperty -or -not $totalProperty) {
-            throw "Gitea repository enumeration returned an unexpected response; refusing maintenance."
+        if (-not $runsProperty -or -not $totalProperty) {
+            throw "Gitea instance-wide Actions enumeration returned an unexpected response; refusing maintenance."
         }
-        $totalCount = [int]$totalProperty.Value
+
+        $totalValue = $totalProperty.Value
+        if ($totalValue -isnot [int] -and $totalValue -isnot [long]) {
+            throw "Gitea instance-wide Actions enumeration returned an invalid total; refusing maintenance."
+        }
+        $totalCount = [long]$totalValue
         if ($totalCount -lt 0) {
-            throw "Gitea repository enumeration returned an invalid total; refusing maintenance."
+            throw "Gitea instance-wide Actions enumeration returned an invalid total; refusing maintenance."
         }
-        $batch = @()
-        if ($null -ne $dataProperty.Value) { $batch = @($dataProperty.Value) }
+
+        $runs = @($runsProperty.Value)
         $expectedCount = [Math]::Min($limit, [Math]::Max(0, $totalCount - (($page - 1) * $limit)))
-        if ($batch.Count -ne $expectedCount) {
-            throw "Gitea repository enumeration was incomplete; refusing maintenance."
+        if ($runs.Count -ne $expectedCount) {
+            throw "Gitea instance-wide Actions run enumeration was incomplete; refusing maintenance."
         }
-        $repositories += $batch
+
+        # Gitea 1.25.5 emits success, failure, cancelled, and skipped for terminal
+        # runs. Waiting, running, blocked, and any unknown value all fail closed.
+        foreach ($run in $runs) {
+            if ($null -eq $run -or -not $run.PSObject.Properties["status"]) {
+                throw "Gitea instance-wide Actions enumeration returned a run without a status; refusing maintenance."
+            }
+            $status = [string]$run.status
+            if ($status -notin @("success", "failure", "skipped", "cancelled")) {
+                $runId = if ($run.PSObject.Properties["id"]) { [string]$run.id } else { "unknown" }
+                throw "Gitea Actions has active or unrecognized '$status' work in run '$runId'; wait for it to finish before maintenance."
+            }
+        }
+
         if (($page * $limit) -ge $totalCount) {
             break
         }
         $page += 1
         if ($page -gt 10000) {
-            throw "Gitea repository enumeration exceeded its safety bound; refusing maintenance."
-        }
-    }
-
-    foreach ($repository in $repositories) {
-        $owner = [Uri]::EscapeDataString([string]$repository.owner.login)
-        $name = [Uri]::EscapeDataString([string]$repository.name)
-        $runPage = 1
-        while ($true) {
-            $path = "repos/$owner/$name/actions/runs?limit=$limit&page=$runPage"
-            $response = Invoke-GiteaApiRead -Context $Context -RelativePath $path
-            $runsProperty = $response.PSObject.Properties["workflow_runs"]
-            $totalProperty = $response.PSObject.Properties["total_count"]
-            if (-not $runsProperty -or -not $totalProperty) {
-                throw "Gitea Actions enumeration returned an unexpected response for '$($repository.full_name)'; refusing maintenance."
-            }
-            $totalCount = [int]$totalProperty.Value
-            if ($totalCount -lt 0) {
-                throw "Gitea Actions enumeration returned an invalid total for '$($repository.full_name)'; refusing maintenance."
-            }
-            $runs = @()
-            if ($null -ne $runsProperty.Value) { $runs = @($runsProperty.Value) }
-            $expectedCount = [Math]::Min($limit, [Math]::Max(0, $totalCount - (($runPage - 1) * $limit)))
-            if ($runs.Count -ne $expectedCount) {
-                throw "Gitea Actions run enumeration was incomplete for '$($repository.full_name)'; refusing maintenance."
-            }
-            # Gitea returns workflow_runs; unknown status values fail closed as active work.
-            foreach ($run in $runs) {
-                $status = [string]$run.status
-                if ($status -notin @("success", "failure", "skipped", "cancelled", "completed")) {
-                    throw "Gitea Actions has '$status' work in repository '$($repository.full_name)'; wait for it to finish before maintenance."
-                }
-            }
-            if (($runPage * $limit) -ge $totalCount) {
-                break
-            }
-            $runPage += 1
-            if ($runPage -gt 10000) {
-                throw "Gitea Actions run enumeration exceeded its safety bound; refusing maintenance."
-            }
+            throw "Gitea instance-wide Actions run enumeration exceeded its safety bound; refusing maintenance."
         }
     }
 }
