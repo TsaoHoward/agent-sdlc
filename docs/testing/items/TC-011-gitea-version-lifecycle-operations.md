@@ -127,6 +127,17 @@ Live acceptance for the real 43000 instance is a separate, authorized Windows Ho
 - The prior isolated Docker E2E reached Gitea startup and API/version health checks, then failed while setting the bootstrap image pin; the two dependent cases were skipped because no Backup ID was produced. The `File.Replace` fix and diagnostic changes have not been followed by another Docker E2E run. No post-fix E2E pass or live-service acceptance is claimed.
 - Minimum native Windows Host rerun from the repository root, using a non-elevated Windows PowerShell 5.1 session: `npm run test:gitea-lifecycle:bootstrap-pin`, then `npm run test:gitea-lifecycle`. The first isolates the reported regression. The Docker E2E remains a separate opt-in acceptance run and was intentionally not repeated in this pass.
 
+## Native Windows isolated acceptance — 2026-11-06 (PR #4, head `071cb08`)
+
+The operator executed these tests from non-elevated native Windows PowerShell 5.1 with Pester 6.2.0:
+
+- `npm run test:gitea-lifecycle:bootstrap-pin`: **5 passed, 0 failed, 0 skipped**. Includes real-NTFS existing-file replacement, recovery-marker replacement, read-only failure safety, rollback on temporary-backup cleanup failure, and credential redaction.
+- `npm run test:gitea-lifecycle`: **44 passed, 0 failed, 0 skipped**. The prior WSL-interop-only ACL preflight failure did not reproduce on the native host.
+- `AGENT_SDLC_GITEA_DOCKER_E2E=1` with `npm run test:gitea-lifecycle:docker-e2e`: **3 passed, 0 failed, 0 skipped**. The isolated Gitea fixture upgraded from 1.25.5 to 1.26.4; backup creation/listing, manifest integrity and size, and HTTP/API checks passed. The next case injected a post-migration failure at 1.27.3, retained recovery evidence, and stopped the fixture Runner. Explicit restore to the 1.26.4 snapshot succeeded, including deletion of a post-backup table, preservation of an unrelated PostgreSQL database, and unchanged PostgreSQL/Runner container identities.
+- The ownership-verified teardown removed fixture `agent-sdlc-life-e2e-0fed2f593b394ce3ad53103b961e46e4`. No cleanup failure was reported.
+
+**Acceptance boundary:** This completes *isolated implementation acceptance* for PR #4 only. No upgrade, backup/restore operation, or production smoke verification has been carried out on the real legacy `127.0.0.1:43000` service. Before Issue #3 can be closed, schedule a separately authorized live maintenance window, verify topology/capacity/upgrade path and restoration prerequisites, and record API, Git read/write, Registry, Actions dispatch/Runner, Run Attempt, and representative-integration smoke evidence. Keep `local-agent-infra#29` E2E separate.
+
 ## Cleanup
 
 Use disposable test directories/containers only. Do not delete backup fixtures as part of the tested lifecycle operation; test teardown may remove only the isolated temporary fixture after evidence is captured.
@@ -159,3 +170,4 @@ The preview must identify the expected GUID path, matching ownership marker, cur
 - 2026-11-06: Added direct real-NTFS bootstrap image-pin coverage for extended-length replacement, digest/settings preservation, read-only failure safety, secret-masked diagnostics, recovery-marker replacement, and fixture cleanup. Native PowerShell compatibility evidence confirms `File.Replace` needs a named same-directory backup on .NET Framework; Pester and Docker E2E reruns remain pending because the WSL UNC workspace is unsupported by Pester's repo-root discovery.
 - 2026-11-06: Added upgrade-level assertions that the masked stage/type/cause survive the outer catch and added rollback coverage for a failed temporary-backup cleanup after replacement. Native Pester remains pending on the Windows checkout.
 - 2026-11-06: Focused real-NTFS bootstrap-pin Pester passed 5/5. Combined non-Docker lifecycle Pester was 43/44; the only failure was the Windows ACL test's `whoami.exe /priv` precondition under WSL interop. Recorded the null-backup root cause and fix; post-fix Docker E2E remains unrun.
+- 2026-11-06: Native Windows PowerShell 5.1 accepted bootstrap pin 5/5 and full Pester 44/44; GUID-isolated Docker E2E passed 3/3 with verified fixture cleanup. Real 43000 maintenance and smoke acceptance remain outstanding.
