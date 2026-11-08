@@ -3,7 +3,7 @@
 ## Document Metadata
 - Version: 0.1
 - Status: Active
-- Last Updated: 2026-11-06
+- Last Updated: 2026-11-08
 - Owner: Project Maintainer
 - Source Template: docs/templates/issue-dashboard.template.md
 
@@ -45,16 +45,16 @@ It does not replace forge issues, roadmap/WBS planning structure, the decision b
 ## Dashboard
 | Issue ID | Title | Status | Related Docs / WBS | Next Action | Exit Path |
 |---|---|---|---|---|---|
-| #3 | Add safe, repeatable version upgrades for the existing Docker Gitea | In Progress | `docs/issues/items/I-007-gitea-version-lifecycle-operations.md`; WBS `3.12`; TC-011 | Isolated acceptance passed (bootstrap 5/5, Pester 44/44, Docker E2E 3/3); schedule separately authorized real 43000 upgrade and smoke verification | Move to archive after implementation review and authorized Windows Host acceptance; keep any unresolved runtime blocker linked from the canonical test case |
+| #3 | Add safe, repeatable version upgrades for the existing Docker Gitea | In Progress | `docs/issues/items/I-007-gitea-version-lifecycle-operations.md`; WBS `3.12`; TC-011 | Review the Actions preflight compatibility PR; Pester passed 45/45 excluding the WSL interop ACL precondition (full run 45/46); keep real 43000 upgrade and smoke verification separately authorized | Move to archive after implementation review and authorized Windows Host acceptance; keep any unresolved runtime blocker linked from the canonical test case |
 
 ## Issue Items
 ### #3 — Gitea Version Lifecycle Operations
 - Status: `In Progress`
 - Related Docs / WBS: `docs/issues/items/I-007-gitea-version-lifecycle-operations.md`; WBS `3.12`; `docs/testing/items/TC-011-gitea-version-lifecycle-operations.md`
 - Why It Matters: The existing legacy Gitea instance has persistent repositories, Actions, Registry, and shared Runner state. Replacing its image without a verified backup and restore path risks making that state unusable.
-- Current State: The accepted implementation contract separates legacy Docker Gitea on port 43000 from Compose port 46300. Upgrade remains explicit-version, backup-first, local-only, and live maintenance remains separately authorized. Earlier Docker E2E work verified fixture backup and upgrade health checks, then exposed the bootstrap image-pin failure; its dependent cases were skipped for missing Backup ID. The null-backup `File.Replace` cause is now fixed with a named same-directory backup and rollback on backup-cleanup failure. Direct real-NTFS pin/recovery-marker tests were added; focused Pester passed 5/5. Combined non-Docker Pester was 43/44, with the lone failure in the ACL test's `whoami /priv` precondition under WSL interop. Post-fix Docker E2E has not been rerun, and no live service was operated.
-- Current Finding: Windows PowerShell 5.1/.NET Framework NTFS evidence confirms `File.Replace(source, destination, $null)` fails with `ArgumentException` / HRESULT `0x80070057` for ordinary and extended paths, while a unique same-directory backup succeeds at both, including 406 characters. The pin catch now reports sanitized stage, exception type, and cause through the upgrade catch. Same helper usage by Recovery Marker replacement is covered; Restore writes/clears the marker and pins the bootstrap config when a local source is present. Focused NTFS Pester passed; the full suite needs a native-host rerun for the `whoami` precondition.
-- Next Action: Merge the isolated implementation PR after documenting the native 5/5 + 44/44 + 3/3 evidence. Keep Issue #3 open for separately authorized 43000 upgrade and API/Git/Registry/Actions/Runner/Run Attempt smoke acceptance.
+- Current State: The accepted implementation contract separates legacy Docker Gitea on port 43000 from Compose port 46300. Upgrade remains explicit-version, backup-first, local-only, and live maintenance remains separately authorized. Isolated acceptance passed on 2026-11-06 (bootstrap 5/5, Pester 44/44, Docker E2E 3/3). A subsequent read-only site-wide Actions API observation found Run #95 as `completed` / `failure` with completion time `2026-11-06T11:52:25Z`; the preflight had treated `completed` as unknown. The bounded compatibility fix passed the non-Docker suite 45/45 when excluding only the WSL interop `WindowsAcl` precondition; the full run was 45/46 because that precondition received no `whoami /priv` output. No formal Gitea service was operated.
+- Current Finding: Windows PowerShell 5.1/.NET Framework NTFS evidence confirms `File.Replace(source, destination, $null)` fails with `ArgumentException` / HRESULT `0x80070057` for ordinary and extended paths, while a unique same-directory backup succeeds at both, including 406 characters. The pin catch now reports sanitized stage, exception type, and cause through the upgrade catch. Same helper usage by Recovery Marker replacement is covered; restore marker and image-pin paths are covered. Native Windows Pester 44/44 and isolated Docker E2E 3/3 passed. The latest Actions compatibility correction passed in mocked Pester cases; the current full suite reported 45/46 due only to the WSL interop ACL precondition, and passed 45/45 with that tag excluded.
+- Next Action: Review the isolated Actions preflight compatibility PR. Keep Issue #3 open for separately authorized 43000 upgrade and API/Git/Registry/Actions/Runner/Run Attempt smoke acceptance.
 - Exit Path: Archive after implementation and authorized Windows Host acceptance are complete; record any remaining issue as a separate follow-up.
 - Supporting Note: `docs/issues/items/I-007-gitea-version-lifecycle-operations.md`
 - Promotion Check: WBS `3.12` added; no architecture boundary or source-of-truth change is intended, so no ADR is required.
@@ -126,3 +126,4 @@ It does not replace forge issues, roadmap/WBS planning structure, the decision b
 - 2026-11-06: Recorded the Windows PowerShell/.NET Framework `File.Replace` null-backup root cause, the named-backup fix, and the focused real-NTFS bootstrap-pin verification still pending on the native checkout.
 - 2026-11-06: Recorded focused bootstrap-pin Pester 5/5 and combined non-Docker Pester 43/44; full native-host Pester and post-fix isolated Docker E2E remain outstanding.
 - 2026-11-06: Native Windows focused pin 5/5, full Pester 44/44, and GUID-isolated Docker E2E 3/3 passed; test fixture safely removed. Live 43000 acceptance remains pending; Issue #3 remains open.
+- 2026-11-08: Added the Run #95 `completed` response compatibility follow-up; formal Gitea lifecycle operations remain separate and have not been performed.
