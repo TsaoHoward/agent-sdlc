@@ -186,7 +186,7 @@ $runnerId = Read-Host "Enter the verified original full Runner container ID"
 powershell -File scripts/dev/manage-dev-environment.ps1 -Command reconcile-recovery -BackupId $backupId -ExpectedGiteaContainerId $giteaId -ExpectedPostgresContainerId $postgresId -ExpectedRunnerContainerId $runnerId
 ```
 
-The command independently checks the matching upgrade marker and checksum-verified backup, container IDs, source image and API version, Runner state, and PostgreSQL topology, then requires a typed confirmation ending in `DATABASE VERIFIED`. That phrase is the operator's attestation that the live database itself was checked; it is not a substitute for doing that check.
+The command independently checks the matching upgrade marker and checksum-verified backup, container IDs, source image and API version, Runner state, and PostgreSQL topology, then requires a typed confirmation ending in `DATABASE VERIFIED`. That phrase is the operator's attestation that the live database itself was checked; it is not a substitute for doing that check. For compatibility, reconciliation alone accepts the precisely identified schema-1 upgrade backup defect with exactly three official digest references concatenated by one space, after confirming its manifest fields match. It records that legacy form without using it as an image reference. The Restore path continues to reject it.
 
 For an upgrade, enter the next supported release series one step at a time:
 

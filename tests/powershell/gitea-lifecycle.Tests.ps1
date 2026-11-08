@@ -727,12 +727,19 @@ Describe "Gitea recovery marker reconciliation" {
                 imageId = "sha256:$('e' * 64)"
                 sourceVersion = "1.26.4"
                 networkMode = "agent-sdlc-gitea-network"
-                mounts = @()
-                ports = @()
+                mounts = @([pscustomobject]@{ destination = "/var/lib/gitea" }, [pscustomobject]@{ destination = "/etc/gitea" })
+                ports = @([pscustomobject]@{ containerPort = "3000/tcp" }, [pscustomobject]@{ containerPort = "22/tcp" })
             }
             $script:reconcileBackup = [pscustomobject]@{
                 Path = "C:\isolated-backups\$($script:reconcileBackupId)"
-                Manifest = [pscustomobject]@{ kind = "upgrade"; sourceVersion = "1.26.4"; runnerWasRunning = $true }
+                Manifest = [pscustomobject]@{
+                    schemaVersion = 1
+                    kind = "upgrade"
+                    sourceVersion = "1.26.4"
+                    sourceImage = $script:reconcileRuntime.originalImageReference
+                    sourceImageDigest = $script:reconcileRuntime.imageReference
+                    runnerWasRunning = $true
+                }
             }
             $script:reconcileGitea = [pscustomobject]@{
                 Id = $script:reconcileGiteaId
@@ -754,12 +761,17 @@ Describe "Gitea recovery marker reconciliation" {
             Mock Assert-DockerDesktopReady { return @{ id = "isolated-test-engine" } }
             Mock Get-GiteaLifecycleRecoveryMarker { return $script:reconcileMarker }
             Mock Get-GiteaBackupById { return $script:reconcileBackup }
-            Mock Get-BackupRuntime { return $script:reconcileRuntime }
             Mock Assert-BackupRuntimeMatchesContext { $script:reconcileActions.Add("validate-gitea-topology") }
             Mock Assert-GiteaContainerIdentity { return $script:reconcileGitea }
             Mock Assert-PostgresContainerIdentity { return $script:reconcilePostgres }
             Mock Get-GiteaRunnerInfo { return $script:reconcileRunner }
-            Mock Read-LongPathText { return "{}" }
+            Mock Read-LongPathText {
+                param($Path)
+                if ([string]$Path -like "*gitea-runtime.json") {
+                    return ($script:reconcileRuntime | ConvertTo-Json -Depth 20)
+                }
+                return "{}"
+            }
             Mock Assert-PostgresRestoreCompatibility { $script:reconcileActions.Add("validate-postgres-topology") }
             Mock Assert-GiteaDatabaseTarget { $script:reconcileActions.Add("validate-database-target") }
             Mock Assert-GiteaApiVersion { $script:reconcileActions.Add("validate-api-version") }
@@ -782,6 +794,40 @@ Describe "Gitea recovery marker reconciliation" {
             $script:reconcileRecord.markerSchemaVersion | Should -Be 1
             $script:reconcileRecord.giteaContainerId | Should -Be $script:reconcileGiteaId
             $script:reconcileRecord.operatorAttestation | Should -Match "DATABASE VERIFIED"
+            $script:reconcileRecord.legacyImageReferenceReconciled | Should -BeFalse
+        }
+
+        It "reconciles the exact schema-1 three-digest incident reference without using it as an image" {
+            $legacyReference = @(
+                "docker.gitea.com/gitea@sha256:$('1' * 64)"
+                "docker.gitea.com/gitea@sha256:$('2' * 64)"
+                "docker.gitea.com/gitea@sha256:$('3' * 64)"
+            ) -join " "
+            $script:reconcileRuntime.imageReference = $legacyReference
+            $script:reconcileBackup.Manifest.sourceImageDigest = $legacyReference
+
+            Invoke-GiteaLifecycle -Action reconcile-recovery -Context $script:reconcileContext -BackupId $script:reconcileBackupId -ExpectedGiteaContainerId $script:reconcileGiteaId -ExpectedPostgresContainerId $script:reconcilePostgresId -ExpectedRunnerContainerId $script:reconcileRunnerId
+
+            $script:reconcileActions.IndexOf("write-operation-record") | Should -BeLessThan $script:reconcileActions.IndexOf("clear-recovery-marker")
+            $script:reconcileRecord.legacyImageReferenceReconciled | Should -BeTrue
+            $script:reconcileRecord.legacyRepoDigestCount | Should -Be 3
+            $script:reconcileRecord.sourceImageDigest | Should -BeNullOrEmpty
+            $script:reconcileRecord.sourceImageId | Should -Be $script:reconcileRuntime.imageId
+            $script:reconcileRecord.databaseRestorePerformed | Should -BeFalse
+        }
+
+        It "rejects other concatenated digest counts and leaves the Recovery Marker intact" {
+            $legacyReference = @(
+                "docker.gitea.com/gitea@sha256:$('1' * 64)"
+                "docker.gitea.com/gitea@sha256:$('2' * 64)"
+            ) -join " "
+            $script:reconcileRuntime.imageReference = $legacyReference
+            $script:reconcileBackup.Manifest.sourceImageDigest = $legacyReference
+
+            { Invoke-GiteaLifecycle -Action reconcile-recovery -Context $script:reconcileContext -BackupId $script:reconcileBackupId -ExpectedGiteaContainerId $script:reconcileGiteaId -ExpectedPostgresContainerId $script:reconcilePostgresId -ExpectedRunnerContainerId $script:reconcileRunnerId } | Should -Throw "*narrowly supported schema-1 recovery format*"
+
+            $script:reconcileActions | Should -Not -Contain "write-operation-record"
+            $script:reconcileActions | Should -Not -Contain "clear-recovery-marker"
         }
 
         It "retains the marker when any live container ID differs from the operator's verified original ID" {
@@ -912,7 +958,11 @@ Describe "Gitea lifecycle operator restore command" {
 
         It "rejects a multi-digest runtime reference before stopping services or creating a diagnostic backup" {
             $backupId = "20261105T000001Z-0123456789abcdef0123456789abcdef"
-            $script:restoreRuntime.imageReference = "docker.gitea.com/gitea@sha256:$('a' * 64) docker.gitea.com/gitea@sha256:$('b' * 64)"
+            $script:restoreRuntime.imageReference = @(
+                "docker.gitea.com/gitea@sha256:$('a' * 64)"
+                "docker.gitea.com/gitea@sha256:$('b' * 64)"
+                "docker.gitea.com/gitea@sha256:$('c' * 64)"
+            ) -join " "
             Mock Get-GiteaBackupById { return $script:selectedBackup }
 
             { Invoke-GiteaLifecycle -Action restore -Context $script:restoreContext -BackupId $backupId } | Should -Throw

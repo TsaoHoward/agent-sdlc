@@ -1745,6 +1745,59 @@ function Get-BackupRuntime {
     return $runtime
 }
 
+function Get-GiteaRecoveryRuntime {
+    param(
+        [Parameter(Mandatory = $true)][string]$BackupPath,
+        [Parameter(Mandatory = $true)][object]$Manifest
+    )
+
+    $runtimePath = Join-Path $BackupPath "payload\private\gitea-runtime.json"
+    try {
+        $runtime = Read-LongPathText -Path $runtimePath | ConvertFrom-Json -ErrorAction Stop
+    }
+    catch {
+        throw "The upgrade backup runtime metadata is unreadable; recovery reconciliation is blocked."
+    }
+    if (-not $runtime -or -not $runtime.imageReference -or -not $runtime.mounts -or -not $runtime.ports -or
+        [string]$runtime.imageId -cnotmatch '^sha256:[0-9a-f]{64}$' -or
+        [string]$runtime.sourceVersion -cnotmatch '^\d+\.\d+\.\d+$' -or
+        [string]$Manifest.sourceVersion -cne [string]$runtime.sourceVersion -or
+        [string]$Manifest.sourceImage -cne [string]$runtime.originalImageReference -or
+        [string]$Manifest.sourceImageDigest -cne [string]$runtime.imageReference) {
+        throw "The upgrade backup runtime metadata does not match its manifest or lacks a captured source image identity; recovery reconciliation is blocked."
+    }
+
+    $reference = [string]$runtime.imageReference
+    $isLegacyConcatenation = $false
+    $legacyDigestCount = 0
+    if ($reference -cmatch '^(docker\.gitea\.com/gitea@sha256:[0-9a-f]{64}|sha256:[0-9a-f]{64})$') {
+        Assert-GiteaImmutableImageReference -Reference $reference
+    }
+    else {
+        # Compatibility is limited to the known schema-1 upgrade backup defect:
+        # exactly three official digest references joined with one ASCII space.
+        # This value is never used to pull, create, pin, or restore an image.
+        $references = $reference.Split([char[]]@([char]32), [System.StringSplitOptions]::None)
+        $allReferencesAreOfficial = $references.Count -eq 3
+        foreach ($candidate in $references) {
+            if ($candidate -cnotmatch '^docker\.gitea\.com/gitea@sha256:[0-9a-f]{64}$') {
+                $allReferencesAreOfficial = $false
+                break
+            }
+        }
+        if ([int]$Manifest.schemaVersion -ne 1 -or [string]$Manifest.kind -cne "upgrade" -or
+            -not $allReferencesAreOfficial -or [string]::Join(" ", $references) -cne $reference) {
+            throw "The upgrade backup image reference is invalid and does not match the narrowly supported schema-1 recovery format; recovery reconciliation is blocked."
+        }
+        $isLegacyConcatenation = $true
+        $legacyDigestCount = $references.Count
+    }
+
+    $runtime | Add-Member -NotePropertyName recoveryUsedLegacyDigestCompatibility -NotePropertyValue $isLegacyConcatenation -Force
+    $runtime | Add-Member -NotePropertyName recoveryLegacyDigestCount -NotePropertyValue $legacyDigestCount -Force
+    return $runtime
+}
+
 function Assert-BackupRuntimeMatchesContext {
     param([hashtable]$Context, [object]$Runtime)
 
@@ -2130,7 +2183,7 @@ function Invoke-GiteaRecoveryReconciliation {
     if ([string]$selected.Manifest.kind -ne "upgrade") {
         throw "Recovery reconciliation requires a valid upgrade backup; no service state was changed."
     }
-    $runtime = Get-BackupRuntime -BackupPath $selected.Path
+    $runtime = Get-GiteaRecoveryRuntime -BackupPath $selected.Path -Manifest $selected.Manifest
     Assert-BackupRuntimeMatchesContext -Context $Context -Runtime $runtime
     if ([string]$selected.Manifest.sourceVersion -ne [string]$runtime.sourceVersion) {
         throw "The upgrade backup manifest and runtime source versions disagree; recovery reconciliation is blocked."
@@ -2176,7 +2229,11 @@ function Invoke-GiteaRecoveryReconciliation {
         completedAt = [DateTime]::UtcNow.ToString("o")
         backupId = $BackupId
         sourceVersion = [string]$runtime.sourceVersion
-        sourceImageDigest = [string]$runtime.imageReference
+        sourceImageDigest = if ([bool]$runtime.recoveryUsedLegacyDigestCompatibility) { $null } else { [string]$runtime.imageReference }
+        sourceImageId = [string]$runtime.imageId
+        originalImageReference = [string]$runtime.originalImageReference
+        legacyImageReferenceReconciled = [bool]$runtime.recoveryUsedLegacyDigestCompatibility
+        legacyRepoDigestCount = [int]$runtime.recoveryLegacyDigestCount
         giteaContainerId = $ExpectedGiteaContainerId
         postgresContainerId = $ExpectedPostgresContainerId
         runnerContainerId = $ExpectedRunnerContainerId

@@ -159,6 +159,43 @@ Describe "Gitea lifecycle isolated Docker acceptance" -Tag "DockerE2E" -Skip:($e
         [string]$marker.postgresContainerId | Should -Be $sourcePostgresId
         [string]$marker.runnerContainerId | Should -Be $sourceRunnerId
 
+        $legacyBackupPath = Join-Path $state.BackupRoot $marker.backupId
+        $legacyRuntimePath = Join-Path $legacyBackupPath "payload\private\gitea-runtime.json"
+        $legacyManifestPath = Join-Path $legacyBackupPath "manifest.json"
+        $legacyRuntime = Get-Content -LiteralPath $legacyRuntimePath -Raw | ConvertFrom-Json
+        $legacyDigestReference = @(
+            [string]$legacyRuntime.imageReference
+            "docker.gitea.com/gitea@sha256:$('b' * 64)"
+            "docker.gitea.com/gitea@sha256:$('c' * 64)"
+        ) -join " "
+        $legacyRuntime.imageReference = $legacyDigestReference
+        $utf8NoBom = [System.Text.UTF8Encoding]::new($false)
+        [System.IO.File]::WriteAllText($legacyRuntimePath, ($legacyRuntime | ConvertTo-Json -Depth 32), $utf8NoBom)
+
+        $legacyManifest = Get-Content -LiteralPath $legacyManifestPath -Raw | ConvertFrom-Json
+        $legacyManifest.schemaVersion | Should -Be 1
+        $legacyManifest.sourceImageDigest = $legacyDigestReference
+        $runtimeManifestEntries = @($legacyManifest.files | Where-Object { [string]$_.path -eq "payload/private/gitea-runtime.json" })
+        $runtimeManifestEntries.Count | Should -Be 1
+        $runtimeManifestEntries[0].sizeBytes = [long](Get-Item -LiteralPath $legacyRuntimePath).Length
+        $runtimeManifestEntries[0].sha256 = (Get-FileHash -LiteralPath $legacyRuntimePath -Algorithm SHA256).Hash.ToLowerInvariant()
+        [long]$legacyTotalBytes = 0
+        foreach ($manifestEntry in @($legacyManifest.files)) {
+            $legacyTotalBytes += [long]$manifestEntry.sizeBytes
+        }
+        $legacyManifest.sizeBytes = $legacyTotalBytes
+        [System.IO.File]::WriteAllText($legacyManifestPath, ($legacyManifest | ConvertTo-Json -Depth 32), $utf8NoBom)
+        $legacyIntegrity = InModuleScope gitea-lifecycle -Parameters @{ BackupPath = $legacyBackupPath } {
+            param($BackupPath)
+            Test-GiteaBackupIntegrity -BackupPath $BackupPath
+        }
+        $legacyIntegrity.IsValid | Should -BeTrue
+        [string]$legacyIntegrity.Manifest.sourceImageDigest | Should -Be $legacyDigestReference
+        InModuleScope gitea-lifecycle -Parameters @{ BackupPath = $legacyBackupPath } {
+            param($BackupPath)
+            { Get-BackupRuntime -BackupPath $BackupPath } | Should -Throw "*immutable*"
+        }
+
         $preupgradeName = "$($state.GiteaName)-preupgrade-$($marker.backupId)"
         Invoke-GiteaLifecycleE2EDocker -Arguments @("rename", $preupgradeName, $state.GiteaName) | Out-Null
         Invoke-GiteaLifecycleE2EDocker -Arguments @("start", $state.GiteaName) | Out-Null
@@ -183,6 +220,12 @@ Describe "Gitea lifecycle isolated Docker acceptance" -Tag "DockerE2E" -Skip:($e
         [string](Invoke-GiteaLifecycleE2EDocker -Arguments @("inspect", $state.RunnerName, "--format", "{{.Id}}")) | Should -Be $sourceRunnerId
         [string](Invoke-RestMethod -Uri ($state.GiteaUrl + "api/v1/version") -Method Get).version | Should -Be "1.26.4"
         (Invoke-GiteaLifecycleE2EPsql -ContainerName $state.PostgresName -DatabaseName "gitea" -Sql "SELECT 1") | Should -Be "1"
+        $reconciliationRecordPath = Join-Path $context.RepoRoot ".agent-sdlc\dev-env\gitea\upgrades\$($marker.backupId)-recovery-reconciled.json"
+        $reconciliationRecord = Get-Content -LiteralPath $reconciliationRecordPath -Raw | ConvertFrom-Json
+        [bool]$reconciliationRecord.legacyImageReferenceReconciled | Should -BeTrue
+        [int]$reconciliationRecord.legacyRepoDigestCount | Should -Be 3
+        $reconciliationRecord.sourceImageDigest | Should -BeNullOrEmpty
+        [bool]$reconciliationRecord.databaseRestorePerformed | Should -BeFalse
     }
 
     It "retains recovery evidence after a post-migration failure" {
