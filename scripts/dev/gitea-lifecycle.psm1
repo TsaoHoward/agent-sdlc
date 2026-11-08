@@ -945,6 +945,40 @@ function Invoke-GiteaApiRead {
     }
 }
 
+function Test-GiteaActionsCompletionTime {
+    param([AllowNull()][object]$Value)
+
+    if ($null -eq $Value) {
+        return $false
+    }
+    if ($Value -is [DateTimeOffset]) {
+        return $true
+    }
+    if ($Value -is [DateTime]) {
+        return $Value.Kind -ne [DateTimeKind]::Unspecified
+    }
+    if ($Value -isnot [string]) {
+        return $false
+    }
+
+    $text = [string]$Value
+    $timestampPattern = '\A\d{4}-\d{2}-\d{2}T\d{2}:\d{2}:\d{2}(?:\.\d+)?(?:Z|[+-]\d{2}:\d{2})\z'
+    if ($text -cnotmatch $timestampPattern) {
+        return $false
+    }
+
+    # .NET Framework stores seven fractional digits; discard any additional
+    # RFC 3339 precision only after the full timestamp shape has been checked.
+    $parseableText = $text -replace '(?<=\.\d{7})\d+(?=(?:Z|[+-]\d{2}:\d{2})\z)', ''
+    $parsedValue = [DateTimeOffset]::MinValue
+    return [DateTimeOffset]::TryParse(
+        $parseableText,
+        [Globalization.CultureInfo]::InvariantCulture,
+        [Globalization.DateTimeStyles]::None,
+        [ref]$parsedValue
+    )
+}
+
 function Assert-NoActiveGiteaActions {
     param([hashtable]$Context)
 
@@ -980,15 +1014,29 @@ function Assert-NoActiveGiteaActions {
             throw "Gitea instance-wide Actions run enumeration was incomplete; refusing maintenance."
         }
 
-        # Gitea 1.25.5 emits success, failure, cancelled, and skipped for terminal
-        # runs. Waiting, running, blocked, and any unknown value all fail closed.
+        # Preserve Gitea's direct terminal statuses and accept the completed / conclusion
+        # shape only when both its outcome and completion timestamp are trustworthy.
         foreach ($run in $runs) {
             if ($null -eq $run -or -not $run.PSObject.Properties["status"]) {
                 throw "Gitea instance-wide Actions enumeration returned a run without a status; refusing maintenance."
             }
             $status = [string]$run.status
-            if ($status -notin @("success", "failure", "skipped", "cancelled")) {
-                $runId = if ($run.PSObject.Properties["id"]) { [string]$run.id } else { "unknown" }
+            $runId = if ($run.PSObject.Properties["id"]) { [string]$run.id } else { "unknown" }
+            if ($status -ceq "completed") {
+                $conclusionProperty = $run.PSObject.Properties["conclusion"]
+                $validConclusions = @("success", "failure", "cancelled", "skipped")
+                if (-not $conclusionProperty -or [string]$conclusionProperty.Value -cnotin $validConclusions) {
+                    throw "Gitea Actions run '$runId' has a missing or unrecognized completed conclusion; refusing maintenance."
+                }
+
+                $completedAtProperty = $run.PSObject.Properties["completed_at"]
+                if (-not $completedAtProperty -or -not (Test-GiteaActionsCompletionTime -Value $completedAtProperty.Value)) {
+                    throw "Gitea Actions run '$runId' is completed without a valid completion time; refusing maintenance."
+                }
+                continue
+            }
+
+            if ($status -cnotin @("success", "failure", "skipped", "cancelled")) {
                 throw "Gitea Actions has active or unrecognized '$status' work in run '$runId'; wait for it to finish before maintenance."
             }
         }

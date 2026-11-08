@@ -201,11 +201,38 @@ Describe "Gitea Actions upgrade preflight" {
             $script:actionsApiRequests | Should -Not -Contain "repos/search?limit=50&page=1"
         }
 
-        It "accepts only recognized terminal workflow statuses" {
+        It "accepts the existing terminal statuses and completed runs with valid conclusions and timestamps" {
             $terminalStatuses = @("success", "failure", "cancelled", "skipped")
-            $runs = @($terminalStatuses | ForEach-Object {
+            $legacyRuns = @($terminalStatuses | ForEach-Object {
                 [pscustomobject]@{ id = 1; status = $_ }
             })
+            $completedRuns = @(
+                [pscustomobject]@{
+                    id = 95
+                    status = "completed"
+                    conclusion = "failure"
+                    completed_at = "2026-11-06T11:52:25Z"
+                }
+                [pscustomobject]@{
+                    id = 96
+                    status = "completed"
+                    conclusion = "success"
+                    completed_at = "2026-11-06T11:52:25.123456789+00:00"
+                }
+                [pscustomobject]@{
+                    id = 97
+                    status = "completed"
+                    conclusion = "cancelled"
+                    completed_at = "2026-11-06T19:52:25+08:00"
+                }
+                [pscustomobject]@{
+                    id = 98
+                    status = "completed"
+                    conclusion = "skipped"
+                    completed_at = "2026-11-06T11:52:25Z"
+                }
+            )
+            $runs = @($legacyRuns) + @($completedRuns)
             $script:actionsRunPages = @([pscustomobject]@{
                 total_count = $runs.Count
                 workflow_runs = $runs
@@ -215,7 +242,7 @@ Describe "Gitea Actions upgrade preflight" {
         }
 
         It "rejects running, queued, waiting, blocked, and unknown statuses" {
-            foreach ($status in @("running", "queued", "waiting", "blocked", "completed", "mystery")) {
+            foreach ($status in @("running", "queued", "waiting", "blocked", "mystery", "Completed")) {
                 $script:actionsRunPages = @([pscustomobject]@{
                     total_count = 1
                     workflow_runs = @([pscustomobject]@{ id = 99; status = $status })
@@ -223,6 +250,39 @@ Describe "Gitea Actions upgrade preflight" {
 
                 { Assert-NoActiveGiteaActions -Context $script:actionsContext } | Should -Throw
             }
+        }
+
+        It "fails closed when a completed run is missing or has an invalid conclusion or completion time" {
+            $invalidCompletedRuns = @(
+                [pscustomobject]@{ id = 95; status = "completed"; completed_at = "2026-11-06T11:52:25Z" }
+                [pscustomobject]@{ id = 95; status = "completed"; conclusion = $null; completed_at = "2026-11-06T11:52:25Z" }
+                [pscustomobject]@{ id = 95; status = "completed"; conclusion = "neutral"; completed_at = "2026-11-06T11:52:25Z" }
+                [pscustomobject]@{ id = 95; status = "completed"; conclusion = "Failure"; completed_at = "2026-11-06T11:52:25Z" }
+                [pscustomobject]@{ id = 95; status = "completed"; conclusion = "failure" }
+                [pscustomobject]@{ id = 95; status = "completed"; conclusion = "failure"; completed_at = $null }
+                [pscustomobject]@{ id = 95; status = "completed"; conclusion = "failure"; completed_at = "" }
+                [pscustomobject]@{ id = 95; status = "completed"; conclusion = "failure"; completed_at = "not-a-time" }
+                [pscustomobject]@{ id = 95; status = "completed"; conclusion = "failure"; completed_at = "2026-02-30T11:52:25Z" }
+                [pscustomobject]@{ id = 95; status = "completed"; conclusion = "failure"; completed_at = "2026-11-06T11:52:25" }
+            )
+
+            foreach ($run in $invalidCompletedRuns) {
+                $script:actionsRunPages = @([pscustomobject]@{
+                    total_count = 1
+                    workflow_runs = @($run)
+                })
+
+                { Assert-NoActiveGiteaActions -Context $script:actionsContext } | Should -Throw
+            }
+        }
+
+        It "fails closed when a run has no status field" {
+            $script:actionsRunPages = @([pscustomobject]@{
+                total_count = 1
+                workflow_runs = @([pscustomobject]@{ id = 99 })
+            })
+
+            { Assert-NoActiveGiteaActions -Context $script:actionsContext } | Should -Throw "*without a status*"
         }
 
         It "reads every page of instance-wide workflow runs" {
