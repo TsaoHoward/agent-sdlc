@@ -1774,19 +1774,33 @@ function Get-GiteaRecoveryRuntime {
         Assert-GiteaImmutableImageReference -Reference $reference
     }
     else {
-        # Compatibility is limited to the known schema-1 upgrade backup defect:
-        # exactly three official digest references joined with one ASCII space.
-        # This value is never used to pull, create, pin, or restore an image.
+        # Compatibility is limited to the reported schema-1 upgrade backup defect:
+        # two identical official refs and one gitea/gitea alias at the same SHA,
+        # joined with one ASCII space. This value is never used as an image reference.
         $references = $reference.Split([char[]]@([char]32), [System.StringSplitOptions]::None)
-        $allReferencesAreOfficial = $references.Count -eq 3
+        $officialDigestCount = 0
+        $aliasDigestCount = 0
+        $sharedDigest = $null
+        $matchesIncidentDigestShape = $references.Count -eq 3
         foreach ($candidate in $references) {
-            if ($candidate -cnotmatch '^docker\.gitea\.com/gitea@sha256:[0-9a-f]{64}$') {
-                $allReferencesAreOfficial = $false
+            if ($candidate -cmatch '^docker\.gitea\.com/gitea@sha256:([0-9a-f]{64})$') {
+                $candidateDigest = [string]$Matches[1]
+                $officialDigestCount++
+            }
+            elseif ($candidate -cmatch '^gitea/gitea@sha256:([0-9a-f]{64})$') {
+                $candidateDigest = [string]$Matches[1]
+                $aliasDigestCount++
+            }
+            else {
+                $matchesIncidentDigestShape = $false
                 break
             }
+            if ($null -eq $sharedDigest) { $sharedDigest = $candidateDigest }
+            elseif ($candidateDigest -cne $sharedDigest) { $matchesIncidentDigestShape = $false }
         }
         if ([int]$Manifest.schemaVersion -ne 1 -or [string]$Manifest.kind -cne "upgrade" -or
-            -not $allReferencesAreOfficial -or [string]::Join(" ", $references) -cne $reference) {
+            -not $matchesIncidentDigestShape -or $officialDigestCount -ne 2 -or $aliasDigestCount -ne 1 -or
+            [string]::Join(" ", $references) -cne $reference) {
             throw "The upgrade backup image reference is invalid and does not match the narrowly supported schema-1 recovery format; recovery reconciliation is blocked."
         }
         $isLegacyConcatenation = $true
@@ -1799,7 +1813,11 @@ function Get-GiteaRecoveryRuntime {
 }
 
 function Assert-BackupRuntimeMatchesContext {
-    param([hashtable]$Context, [object]$Runtime)
+    param(
+        [hashtable]$Context,
+        [object]$Runtime,
+        [switch]$AllowValidatedLegacyImageReference
+    )
 
     if ([string]$Runtime.containerName -ne $Context.GiteaContainerName -or
         [string]$Runtime.networkMode -ne $Context.GiteaNetworkName) {
@@ -1831,7 +1849,17 @@ function Assert-BackupRuntimeMatchesContext {
         -not $sshBinding -or $sshBinding.hostIp -ne $Context.PortBindAddress -or [int]$sshBinding.hostPort -ne $Context.GiteaSshPort) {
         throw "The selected backup does not identify the expected legacy 43000 topology."
     }
-    Assert-GiteaImmutableImageReference -Reference ([string]$Runtime.imageReference)
+    if ($AllowValidatedLegacyImageReference) {
+        $legacyValidationFlag = $Runtime.PSObject.Properties["recoveryUsedLegacyDigestCompatibility"]
+        $legacyDigestCount = $Runtime.PSObject.Properties["recoveryLegacyDigestCount"]
+        if (-not $legacyValidationFlag -or -not [bool]$legacyValidationFlag.Value -or
+            -not $legacyDigestCount -or [int]$legacyDigestCount.Value -ne 3) {
+            throw "Recovery reconciliation received an unverified legacy image reference; the backup topology is blocked."
+        }
+    }
+    else {
+        Assert-GiteaImmutableImageReference -Reference ([string]$Runtime.imageReference)
+    }
 }
 
 function Write-TemporaryEnvironmentFile {
@@ -2184,7 +2212,7 @@ function Invoke-GiteaRecoveryReconciliation {
         throw "Recovery reconciliation requires a valid upgrade backup; no service state was changed."
     }
     $runtime = Get-GiteaRecoveryRuntime -BackupPath $selected.Path -Manifest $selected.Manifest
-    Assert-BackupRuntimeMatchesContext -Context $Context -Runtime $runtime
+    Assert-BackupRuntimeMatchesContext -Context $Context -Runtime $runtime -AllowValidatedLegacyImageReference:([bool]$runtime.recoveryUsedLegacyDigestCompatibility)
     if ([string]$selected.Manifest.sourceVersion -ne [string]$runtime.sourceVersion) {
         throw "The upgrade backup manifest and runtime source versions disagree; recovery reconciliation is blocked."
     }

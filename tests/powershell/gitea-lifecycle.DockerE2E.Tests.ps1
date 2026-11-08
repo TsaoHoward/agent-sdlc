@@ -163,10 +163,11 @@ Describe "Gitea lifecycle isolated Docker acceptance" -Tag "DockerE2E" -Skip:($e
         $legacyRuntimePath = Join-Path $legacyBackupPath "payload\private\gitea-runtime.json"
         $legacyManifestPath = Join-Path $legacyBackupPath "manifest.json"
         $legacyRuntime = Get-Content -LiteralPath $legacyRuntimePath -Raw | ConvertFrom-Json
+        $sharedDigest = ([string]$legacyRuntime.imageReference).Substring(([string]$legacyRuntime.imageReference).IndexOf("@sha256:") + 1)
         $legacyDigestReference = @(
-            [string]$legacyRuntime.imageReference
-            "docker.gitea.com/gitea@sha256:$('b' * 64)"
-            "docker.gitea.com/gitea@sha256:$('c' * 64)"
+            "docker.gitea.com/gitea@$sharedDigest"
+            "docker.gitea.com/gitea@$sharedDigest"
+            "gitea/gitea@$sharedDigest"
         ) -join " "
         $legacyRuntime.imageReference = $legacyDigestReference
         $utf8NoBom = [System.Text.UTF8Encoding]::new($false)
