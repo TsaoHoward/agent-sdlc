@@ -348,6 +348,88 @@ Describe "Gitea Actions upgrade preflight" {
     }
 }
 
+Describe "Gitea immutable image digest resolution" {
+    InModuleScope gitea-lifecycle {
+        BeforeEach {
+            $script:imageInspectStdOut = "[]"
+            $script:localImageId = "sha256:$('f' * 64)"
+            $script:imageInspectCalls = [System.Collections.Generic.List[object]]::new()
+
+            Mock Invoke-GiteaDocker {
+                param($Arguments, $AllowFailure)
+                $script:imageInspectCalls.Add(@($Arguments))
+                if ($Arguments -contains "{{.Id}}") {
+                    return [pscustomobject]@{ ExitCode = 0; StdOut = $script:localImageId; StdErr = "" }
+                }
+                return [pscustomobject]@{ ExitCode = 0; StdOut = $script:imageInspectStdOut; StdErr = "" }
+            }
+        }
+
+        It "selects one official digest from multiple RepoDigests under Windows PowerShell 5.1" {
+            $first = "docker.gitea.com/gitea@sha256:$('a' * 64)"
+            $second = "docker.gitea.com/gitea@sha256:$('b' * 64)"
+            $third = "docker.gitea.com/gitea@sha256:$('c' * 64)"
+            $script:imageInspectStdOut = '["' + $first + '","' + $second + '","' + $third + '"]'
+
+            $reference = Get-ImageDigestReference -Image "docker.gitea.com/gitea:1.26.4-rootless" -RequireRegistryDigest
+
+            $reference | Should -Be $first
+            @($reference).Count | Should -Be 1
+            $reference | Should -Match '^docker\.gitea\.com/gitea@sha256:[0-9a-f]{64}$'
+        }
+
+        It "deduplicates repeated RepoDigests while returning one legal reference" {
+            $digest = "docker.gitea.com/gitea@sha256:$('d' * 64)"
+            $script:imageInspectStdOut = '["' + $digest + '","' + $digest + '"]'
+
+            $reference = Get-ImageDigestReference -Image "docker.gitea.com/gitea:1.26.4-rootless" -RequireRegistryDigest
+
+            $reference | Should -Be $digest
+            @($reference).Count | Should -Be 1
+        }
+
+        It "ignores valid RepoDigests from other repositories and chooses the official Gitea reference" {
+            $other = "ghcr.io/mirror/gitea@sha256:$('e' * 64)"
+            $official = "docker.gitea.com/gitea@sha256:$('a' * 64)"
+            $script:imageInspectStdOut = '["' + $other + '","' + $official + '"]'
+
+            $reference = Get-ImageDigestReference -Image "docker.gitea.com/gitea:1.26.4-rootless" -RequireRegistryDigest
+
+            $reference | Should -Be $official
+            @($reference).Count | Should -Be 1
+        }
+
+        It "rejects malformed JSON and malformed RepoDigest entries instead of persisting them" {
+            $script:imageInspectStdOut = '["docker.gitea.com/gitea@sha256:'
+            { Get-ImageDigestReference -Image "docker.gitea.com/gitea:1.26.4-rootless" } | Should -Throw
+
+            $script:imageInspectStdOut = '["docker.gitea.com/gitea@sha256:bad"]'
+            { Get-ImageDigestReference -Image "docker.gitea.com/gitea:1.26.4-rootless" } | Should -Throw
+
+            $script:imageInspectStdOut = '[null]'
+            { Get-ImageDigestReference -Image "docker.gitea.com/gitea:1.26.4-rootless" } | Should -Throw
+
+            $script:imageInspectStdOut = '{}'
+            { Get-ImageDigestReference -Image "docker.gitea.com/gitea:1.26.4-rootless" } | Should -Throw
+
+            $script:imageInspectStdOut = '[7]'
+            { Get-ImageDigestReference -Image "docker.gitea.com/gitea:1.26.4-rootless" } | Should -Throw
+
+            $script:imageInspectStdOut = '[]'
+            { Get-ImageDigestReference -Image "docker.gitea.com/gitea:1.26.4-rootless" -RequireRegistryDigest } | Should -Throw
+        }
+
+        It "uses a valid local image ID only when no repository digest exists" {
+            $script:imageInspectStdOut = "[]"
+
+            $reference = Get-ImageDigestReference -Image "agent-sdlc-local:gitea"
+
+            $reference | Should -Be $script:localImageId
+            $script:imageInspectCalls.Count | Should -Be 2
+        }
+    }
+}
+
 Describe "Gitea lifecycle safety helpers" {
     InModuleScope gitea-lifecycle {
         BeforeAll {
@@ -373,6 +455,7 @@ Describe "Gitea lifecycle safety helpers" {
             Mock Assert-PostgresContainerIdentity { return [pscustomobject]@{ Name = "/agent-sdlc-gitea-db" } }
             Mock Get-GiteaRunnerInfo { return [pscustomobject]@{ State = [pscustomobject]@{ Status = "running" } } }
             Mock Get-GiteaReportedVersion { return "1.25.5" }
+            Mock Get-RuntimeSnapshot { return [pscustomobject]@{ imageReference = "docker.gitea.com/gitea@sha256:$('a' * 64)"; containerId = "a" } }
             Mock Assert-GiteaDatabaseTarget {}
             Mock Assert-NoActiveGiteaActions {}
             Mock Assert-BackupCapacity { return [pscustomobject]@{ SourceBytes = 10; RequiredFreeBytes = 1024; AvailableFreeBytes = 4096 } }
@@ -397,6 +480,7 @@ Describe "Gitea lifecycle safety helpers" {
             Mock Assert-GiteaApiVersion { $script:lifecycleActions.Add("api-version") }
             Mock Set-GiteaBootstrapImagePin { $script:lifecycleActions.Add("pin-image") }
             Mock Set-GiteaLifecycleRecoveryMarker { $script:lifecycleActions.Add("set-recovery-marker") }
+            Mock Update-GiteaLifecycleRecoveryMarkerPhase { $script:lifecycleActions.Add("target-start-attempted") }
             Mock Clear-GiteaLifecycleRecoveryMarker { $script:lifecycleActions.Add("clear-recovery-marker") }
             Mock Start-GiteaRunner { $script:lifecycleActions.Add("start-runner") }
             Mock New-GiteaOperationRecord { $script:lifecycleActions.Add("operation-record") }
@@ -431,6 +515,16 @@ Describe "Gitea lifecycle safety helpers" {
             $script:lifecycleActions | Should -Not -Contain "backup"
             $script:lifecycleActions | Should -Not -Contain "pin-image"
             $script:lifecycleActions | Should -Not -Contain "create-gitea"
+        }
+
+        It "validates the source image reference before stopping Gitea or Runner" {
+            Mock Get-RuntimeSnapshot { throw "source RepoDigests are malformed" }
+
+            { Invoke-GiteaLifecycle -Action upgrade -Context $script:upgradeContext -GiteaVersion "1.26.4" } | Should -Throw "*source RepoDigests are malformed*"
+
+            $script:lifecycleActions | Should -Not -Contain "stop-runner"
+            $script:lifecycleActions | Should -Not -Contain "backup"
+            $script:lifecycleActions | Should -Not -Contain "docker stop --time 60 agent-sdlc-gitea"
         }
 
         It "resumes the original Runner when new Actions work is detected after it stops" {
@@ -596,6 +690,120 @@ Describe "Gitea lifecycle safety helpers" {
     }
 }
 
+Describe "Gitea recovery marker reconciliation" {
+    InModuleScope gitea-lifecycle {
+        BeforeEach {
+            $script:reconcileBackupId = "20261108T053419Z-a5737137148a41a9bc45d6f7a78485df"
+            $script:reconcileGiteaId = "a" * 64
+            $script:reconcilePostgresId = "b" * 64
+            $script:reconcileRunnerId = "c" * 64
+            $script:reconcileActions = [System.Collections.Generic.List[string]]::new()
+            $script:reconcileContext = @{
+                RepoRoot = "C:\isolated-repo"
+                GiteaContainerName = "agent-sdlc-gitea"
+                GiteaPostgresContainerName = "agent-sdlc-gitea-db"
+                GiteaRunnerContainerName = "agent-sdlc-gitea-runner"
+                GiteaNetworkName = "agent-sdlc-gitea-network"
+                GiteaDataDir = "C:\isolated-repo\.agent-sdlc\dev-env\gitea\data"
+                GiteaConfigDir = "C:\isolated-repo\.agent-sdlc\dev-env\gitea\config"
+                GiteaPostgresDataDir = "C:\isolated-repo\.agent-sdlc\dev-env\gitea\postgres-data"
+                PortBindAddress = "127.0.0.1"
+                GiteaHttpPort = 43000
+                GiteaSshPort = 43022
+                GiteaPostgresHostPort = 43001
+                GiteaPostgresDbName = "gitea"
+                GiteaPostgresUser = "gitea"
+            }
+            $script:reconcileMarker = [pscustomobject]@{
+                schemaVersion = 1
+                operationKind = "upgrade"
+                backupId = $script:reconcileBackupId
+            }
+            $script:reconcileRuntime = [pscustomobject]@{
+                containerName = "agent-sdlc-gitea"
+                containerId = $script:reconcileGiteaId
+                originalImageReference = "docker.gitea.com/gitea:1.26.4-rootless"
+                imageReference = "docker.gitea.com/gitea@sha256:$('d' * 64)"
+                imageId = "sha256:$('e' * 64)"
+                sourceVersion = "1.26.4"
+                networkMode = "agent-sdlc-gitea-network"
+                mounts = @()
+                ports = @()
+            }
+            $script:reconcileBackup = [pscustomobject]@{
+                Path = "C:\isolated-backups\$($script:reconcileBackupId)"
+                Manifest = [pscustomobject]@{ kind = "upgrade"; sourceVersion = "1.26.4"; runnerWasRunning = $true }
+            }
+            $script:reconcileGitea = [pscustomobject]@{
+                Id = $script:reconcileGiteaId
+                Name = "/agent-sdlc-gitea"
+                Image = $script:reconcileRuntime.imageId
+                Config = [pscustomobject]@{ Image = $script:reconcileRuntime.originalImageReference }
+                State = [pscustomobject]@{ Status = "running" }
+            }
+            $script:reconcilePostgres = [pscustomobject]@{
+                Id = $script:reconcilePostgresId
+                State = [pscustomobject]@{ Status = "running" }
+            }
+            $script:reconcileRunner = [pscustomobject]@{
+                Id = $script:reconcileRunnerId
+                State = [pscustomobject]@{ Status = "running" }
+            }
+
+            Mock Assert-NativeWindowsHost {}
+            Mock Assert-DockerDesktopReady { return @{ id = "isolated-test-engine" } }
+            Mock Get-GiteaLifecycleRecoveryMarker { return $script:reconcileMarker }
+            Mock Get-GiteaBackupById { return $script:reconcileBackup }
+            Mock Get-BackupRuntime { return $script:reconcileRuntime }
+            Mock Assert-BackupRuntimeMatchesContext { $script:reconcileActions.Add("validate-gitea-topology") }
+            Mock Assert-GiteaContainerIdentity { return $script:reconcileGitea }
+            Mock Assert-PostgresContainerIdentity { return $script:reconcilePostgres }
+            Mock Get-GiteaRunnerInfo { return $script:reconcileRunner }
+            Mock Read-LongPathText { return "{}" }
+            Mock Assert-PostgresRestoreCompatibility { $script:reconcileActions.Add("validate-postgres-topology") }
+            Mock Assert-GiteaDatabaseTarget { $script:reconcileActions.Add("validate-database-target") }
+            Mock Assert-GiteaApiVersion { $script:reconcileActions.Add("validate-api-version") }
+            Mock Confirm-GiteaLifecycleOperation { $script:reconcileActions.Add("confirm-with-full-container-ids") }
+            Mock New-GiteaOperationRecord {
+                param($Context, $Record)
+                $script:reconcileActions.Add("write-operation-record")
+                $script:reconcileRecord = $Record
+            }
+            Mock Clear-GiteaLifecycleRecoveryMarker { $script:reconcileActions.Add("clear-recovery-marker") }
+        }
+
+        It "records explicit unchanged-container confirmation before clearing a legacy marker without restoring data" {
+            Invoke-GiteaLifecycle -Action reconcile-recovery -Context $script:reconcileContext -BackupId $script:reconcileBackupId -ExpectedGiteaContainerId $script:reconcileGiteaId -ExpectedPostgresContainerId $script:reconcilePostgresId -ExpectedRunnerContainerId $script:reconcileRunnerId
+
+            $script:reconcileActions | Should -Contain "confirm-with-full-container-ids"
+            $script:reconcileActions.IndexOf("write-operation-record") | Should -BeLessThan $script:reconcileActions.IndexOf("clear-recovery-marker")
+            $script:reconcileRecord.result | Should -Be "reconciled-original-source-without-restore"
+            $script:reconcileRecord.databaseRestorePerformed | Should -BeFalse
+            $script:reconcileRecord.markerSchemaVersion | Should -Be 1
+            $script:reconcileRecord.giteaContainerId | Should -Be $script:reconcileGiteaId
+            $script:reconcileRecord.operatorAttestation | Should -Match "DATABASE VERIFIED"
+        }
+
+        It "retains the marker when any live container ID differs from the operator's verified original ID" {
+            $script:reconcileGitea.Id = "f" * 64
+
+            { Invoke-GiteaLifecycle -Action reconcile-recovery -Context $script:reconcileContext -BackupId $script:reconcileBackupId -ExpectedGiteaContainerId $script:reconcileGiteaId -ExpectedPostgresContainerId $script:reconcilePostgresId -ExpectedRunnerContainerId $script:reconcileRunnerId } | Should -Throw "*container ID*"
+
+            $script:reconcileActions | Should -Not -Contain "confirm-with-full-container-ids"
+            $script:reconcileActions | Should -Not -Contain "write-operation-record"
+            $script:reconcileActions | Should -Not -Contain "clear-recovery-marker"
+        }
+
+        It "does not reconcile markers created by a restore operation" {
+            $script:reconcileMarker.operationKind = "restore"
+
+            { Invoke-GiteaLifecycle -Action reconcile-recovery -Context $script:reconcileContext -BackupId $script:reconcileBackupId -ExpectedGiteaContainerId $script:reconcileGiteaId -ExpectedPostgresContainerId $script:reconcilePostgresId -ExpectedRunnerContainerId $script:reconcileRunnerId } | Should -Throw "*upgrade marker*"
+
+            $script:reconcileActions | Should -Not -Contain "clear-recovery-marker"
+        }
+    }
+}
+
 Describe "Gitea lifecycle operator restore command" {
     InModuleScope gitea-lifecycle {
         BeforeAll {
@@ -700,6 +908,18 @@ Describe "Gitea lifecycle operator restore command" {
         It "rejects a restore without a valid Backup ID before service or data operations" {
             { Invoke-GiteaLifecycle -Action restore -Context $script:restoreContext -BackupId "bad-id" } | Should -Throw
             $script:restoreActions | Should -BeNullOrEmpty
+        }
+
+        It "rejects a multi-digest runtime reference before stopping services or creating a diagnostic backup" {
+            $backupId = "20261105T000001Z-0123456789abcdef0123456789abcdef"
+            $script:restoreRuntime.imageReference = "docker.gitea.com/gitea@sha256:$('a' * 64) docker.gitea.com/gitea@sha256:$('b' * 64)"
+            Mock Get-GiteaBackupById { return $script:selectedBackup }
+
+            { Invoke-GiteaLifecycle -Action restore -Context $script:restoreContext -BackupId $backupId } | Should -Throw
+
+            $script:restoreActions | Should -Not -Contain "stop-runner"
+            $script:restoreActions | Should -Not -Contain "docker stop --time 60 agent-sdlc-gitea"
+            $script:restoreActions | Should -Not -Contain "backup-pre-restore-diagnostic"
         }
 
         It "refuses a restore whose backup manifest is missing or corrupt" {

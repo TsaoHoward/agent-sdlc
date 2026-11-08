@@ -1,6 +1,6 @@
 [CmdletBinding()]
 param(
-    [ValidateSet("init", "up", "down", "status", "upgrade", "backup-list", "restore")]
+    [ValidateSet("init", "up", "down", "status", "upgrade", "backup-list", "restore", "reconcile-recovery")]
     [string]$Command = "status",
 
     [string]$ConfigPath,
@@ -10,6 +10,12 @@ param(
     [string]$GiteaVersion,
 
     [string]$BackupId,
+
+    [string]$ExpectedGiteaContainerId,
+
+    [string]$ExpectedPostgresContainerId,
+
+    [string]$ExpectedRunnerContainerId,
 
     [string]$BackupRoot,
 
@@ -1195,7 +1201,7 @@ switch ($Command) {
         break
     }
 
-    { $_ -in @("upgrade", "backup-list", "restore") } {
+    { $_ -in @("upgrade", "backup-list", "restore", "reconcile-recovery") } {
         Import-Module (Join-Path $PSScriptRoot "gitea-lifecycle.psm1") -Force
         $lifecycleContext = @{
             RepoRoot = $RepoRoot
@@ -1225,7 +1231,7 @@ switch ($Command) {
             GiteaAdminUsername = $GiteaAdminUsername
             GiteaAdminPassword = $GiteaAdminPassword
         }
-        Invoke-GiteaLifecycle -Action $Command -Context $lifecycleContext -GiteaVersion $GiteaVersion -BackupId $BackupId
+        Invoke-GiteaLifecycle -Action $Command -Context $lifecycleContext -GiteaVersion $GiteaVersion -BackupId $BackupId -ExpectedGiteaContainerId $ExpectedGiteaContainerId -ExpectedPostgresContainerId $ExpectedPostgresContainerId -ExpectedRunnerContainerId $ExpectedRunnerContainerId
         break
     }
 }

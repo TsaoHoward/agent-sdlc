@@ -176,7 +176,17 @@ The long-path check also runs from non-elevated Windows PowerShell and uses only
 
 The Docker E2E creates only GUID-named disposable fixtures, uses separate bind mounts and a private network, and binds to `127.0.0.2` so the existing `127.0.0.1:43000` service is outside its target. It checks pre-existing container identities and states before cleanup. It uses an inert fixture Runner and does not validate real Actions dispatch or Runner execution. If teardown leaves a temp directory, use the standalone GUID/marker/owner/path/reparse-verified cleanup procedure in `docs/testing/items/TC-011-gitea-version-lifecycle-operations.md`; it requires a WhatIf review and explicit same-Run-ID confirmation.
 
-If an upgrade or restore stops before its health checks complete, the local bootstrap `up` command stays blocked by a recovery marker until an operator completes an explicit restore. The failed state and Backup IDs remain available for review.
+If an upgrade or restore stops before its health checks complete, the local bootstrap `up` command stays blocked by a recovery marker. Do not delete the marker or restore the database only to clear it. If the original Gitea, PostgreSQL, and Runner containers have been returned to their captured IDs, the source Gitea image/version/API is healthy, the retained backup and topology validate, and the operator has independently verified current database health, use the explicit `reconcile-recovery` command below. It records the verification and clears only the marker; it does not restart/recreate services, restore the database, or delete the backup. For legacy schema 1 markers, container IDs are not recorded in the marker, so compare all three full IDs with authoritative pre-operation evidence. If any identity, source health, backup, topology, or database state is uncertain—or the marker is for a restore—leave the marker in place. Use the separately confirmed Restore flow only when data actually needs reverting.
+
+```powershell
+$backupId = Read-Host "Enter the matching upgrade Backup ID"
+$giteaId = Read-Host "Enter the verified original full Gitea container ID"
+$postgresId = Read-Host "Enter the verified original full PostgreSQL container ID"
+$runnerId = Read-Host "Enter the verified original full Runner container ID"
+powershell -File scripts/dev/manage-dev-environment.ps1 -Command reconcile-recovery -BackupId $backupId -ExpectedGiteaContainerId $giteaId -ExpectedPostgresContainerId $postgresId -ExpectedRunnerContainerId $runnerId
+```
+
+The command independently checks the matching upgrade marker and checksum-verified backup, container IDs, source image and API version, Runner state, and PostgreSQL topology, then requires a typed confirmation ending in `DATABASE VERIFIED`. That phrase is the operator's attestation that the live database itself was checked; it is not a substitute for doing that check.
 
 For an upgrade, enter the next supported release series one step at a time:
 

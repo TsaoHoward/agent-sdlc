@@ -48,12 +48,20 @@ Describe "Gitea lifecycle isolated Docker acceptance" -Tag "DockerE2E" -Skip:($e
         $backupDirectories.Count | Should -BeGreaterThan 0
         $state.InitialBackupId = $backupDirectories[0].Name
 
+        $runtimePath = Join-Path $backupDirectories[0].FullName "payload\private\gitea-runtime.json"
+        $runtime = Get-Content -LiteralPath $runtimePath -Raw | ConvertFrom-Json
+        [string]$runtime.imageReference | Should -Match '^(docker\.gitea\.com/gitea@sha256:[0-9a-f]{64}|sha256:[0-9a-f]{64})$'
+        @($runtime.imageReference).Count | Should -Be 1
+
         $integrity = InModuleScope gitea-lifecycle -Parameters @{ BackupPath = $backupDirectories[0].FullName } {
             param($BackupPath)
             Test-GiteaBackupIntegrity -BackupPath $BackupPath
         }
         $integrity.IsValid | Should -BeTrue
         [string]$integrity.Manifest.sourceVersion | Should -Be "1.25.5"
+        [string]$integrity.Manifest.sourceImageDigest | Should -Be ([string]$runtime.imageReference)
+        $resolvedSourceImageId = Invoke-GiteaLifecycleE2EDocker -Arguments @("image", "inspect", [string]$runtime.imageReference, "--format", "{{.Id}}")
+        [string]$resolvedSourceImageId | Should -Be ([string]$runtime.imageId)
         [long]$manifestFilesSize = 0
         foreach ($fileEntry in @($integrity.Manifest.files)) {
             $manifestFilesSize += [long]$fileEntry.sizeBytes
@@ -71,6 +79,110 @@ Describe "Gitea lifecycle isolated Docker acceptance" -Tag "DockerE2E" -Skip:($e
 
         $repo = Invoke-RestMethod -Uri ($state.GiteaUrl + "api/v1/repos/e2e-admin/lifecycle-e2e-sentinel") -Method Get -Headers $headers
         [string]$repo.name | Should -Be "lifecycle-e2e-sentinel"
+    }
+
+    It "resolves multi, duplicate, mixed, and malformed RepoDigest responses against an isolated Docker image" {
+        $state = Get-GiteaLifecycleE2EState
+        if (-not $state.InitialBackupId) {
+            Set-ItResult -Skipped -Because "Blocked: the first Docker E2E scenario did not produce its prerequisite Backup ID."
+            return
+        }
+        $imageReference = [string](Invoke-GiteaLifecycleE2EDocker -Arguments @("inspect", $state.GiteaName, "--format", "{{.Config.Image}}"))
+        $imageId = [string](Invoke-GiteaLifecycleE2EDocker -Arguments @("inspect", $state.GiteaName, "--format", "{{.Image}}"))
+        $imageReference | Should -Match '^docker\.gitea\.com/gitea@sha256:[0-9a-f]{64}$'
+        $digest = $imageReference.Substring($imageReference.IndexOf("@") + 1)
+        $otherRepositoryDigest = "ghcr.io/mirror/gitea@$digest"
+        $secondOfficialDigest = "docker.gitea.com/gitea@sha256:$('f' * 64)"
+        $references = InModuleScope gitea-lifecycle -Parameters @{
+            ImageReference = $imageReference
+            OtherRepositoryDigest = $otherRepositoryDigest
+            SecondOfficialDigest = $secondOfficialDigest
+        } {
+            param($ImageReference, $OtherRepositoryDigest, $SecondOfficialDigest)
+            $script:syntheticRepoDigests = "[]"
+            Mock Invoke-GiteaDocker {
+                return [pscustomobject]@{ ExitCode = 0; StdOut = $script:syntheticRepoDigests; StdErr = "" }
+            }
+
+            $script:syntheticRepoDigests = '["' + $ImageReference + '","' + $SecondOfficialDigest + '"]'
+            $multiple = Get-ImageDigestReference -Image $ImageReference -RequireRegistryDigest
+            @($multiple).Count | Should -Be 1
+
+            $script:syntheticRepoDigests = '["' + $ImageReference + '","' + $ImageReference + '"]'
+            $duplicate = Get-ImageDigestReference -Image $ImageReference -RequireRegistryDigest
+            @($duplicate).Count | Should -Be 1
+
+            $script:syntheticRepoDigests = '["' + $OtherRepositoryDigest + '","' + $ImageReference + '"]'
+            $mixed = Get-ImageDigestReference -Image $ImageReference -RequireRegistryDigest
+            @($mixed).Count | Should -Be 1
+
+            $script:syntheticRepoDigests = '["docker.gitea.com/gitea@sha256:bad"]'
+            { Get-ImageDigestReference -Image $ImageReference -RequireRegistryDigest } | Should -Throw
+            $script:syntheticRepoDigests = '["' + $ImageReference
+            { Get-ImageDigestReference -Image $ImageReference -RequireRegistryDigest } | Should -Throw
+
+            return @($multiple, $duplicate, $mixed)
+        }
+
+        foreach ($reference in $references) {
+            [string]$reference | Should -Be $imageReference
+            $resolvedImageId = Invoke-GiteaLifecycleE2EDocker -Arguments @("image", "inspect", [string]$reference, "--format", "{{.Id}}")
+            [string]$resolvedImageId | Should -Be $imageId
+        }
+    }
+
+    It "reconciles a manually resumed original source without restoring the database" {
+        $state = Get-GiteaLifecycleE2EState
+        if (-not $state.InitialBackupId) {
+            Set-ItResult -Skipped -Because "Blocked: the first Docker E2E scenario did not produce its prerequisite Backup ID."
+            return
+        }
+        $context = $state.Context
+        $sourceGiteaId = Invoke-GiteaLifecycleE2EDocker -Arguments @("inspect", $state.GiteaName, "--format", "{{.Id}}")
+        $sourcePostgresId = [string]$state.PostgresContainerId
+        $sourceRunnerId = [string]$state.RunnerContainerId
+        $recoveryMarker = Join-Path $context.RepoRoot ".agent-sdlc\dev-env\gitea\lifecycle-recovery.json"
+
+        InModuleScope gitea-lifecycle -Parameters @{ Context = $context } {
+            param($Context)
+            Mock Confirm-GiteaLifecycleOperation {}
+            Mock New-GiteaContainerFromRuntime { throw "simulated-invalid-reference-before-container-start" }
+            { Invoke-GiteaLifecycle -Action upgrade -Context $Context -GiteaVersion "1.27.3" } | Should -Throw "*simulated-invalid-reference-before-container-start*"
+        }
+
+        Test-Path -LiteralPath $recoveryMarker -PathType Leaf | Should -BeTrue
+        $marker = Get-Content -LiteralPath $recoveryMarker -Raw | ConvertFrom-Json
+        [int]$marker.schemaVersion | Should -Be 2
+        [string]$marker.phase | Should -Be "target-start-attempted"
+        [string]$marker.backupId | Should -Not -BeNullOrEmpty
+        [string]$marker.giteaContainerId | Should -Be $sourceGiteaId
+        [string]$marker.postgresContainerId | Should -Be $sourcePostgresId
+        [string]$marker.runnerContainerId | Should -Be $sourceRunnerId
+
+        $preupgradeName = "$($state.GiteaName)-preupgrade-$($marker.backupId)"
+        Invoke-GiteaLifecycleE2EDocker -Arguments @("rename", $preupgradeName, $state.GiteaName) | Out-Null
+        Invoke-GiteaLifecycleE2EDocker -Arguments @("start", $state.GiteaName) | Out-Null
+        Wait-GiteaLifecycleE2EHttp -Uri ($state.GiteaUrl + "api/v1/version")
+        Invoke-GiteaLifecycleE2EDocker -Arguments @("start", $state.RunnerName) | Out-Null
+
+        InModuleScope gitea-lifecycle -Parameters @{
+            Context = $context
+            BackupId = [string]$marker.backupId
+            GiteaId = $sourceGiteaId
+            PostgresId = $sourcePostgresId
+            RunnerId = $sourceRunnerId
+        } {
+            param($Context, $BackupId, $GiteaId, $PostgresId, $RunnerId)
+            Mock Confirm-GiteaLifecycleOperation {}
+            Invoke-GiteaLifecycle -Action reconcile-recovery -Context $Context -BackupId $BackupId -ExpectedGiteaContainerId $GiteaId -ExpectedPostgresContainerId $PostgresId -ExpectedRunnerContainerId $RunnerId
+        }
+
+        Test-Path -LiteralPath $recoveryMarker | Should -BeFalse
+        [string](Invoke-GiteaLifecycleE2EDocker -Arguments @("inspect", $state.GiteaName, "--format", "{{.Id}}")) | Should -Be $sourceGiteaId
+        [string](Invoke-GiteaLifecycleE2EDocker -Arguments @("inspect", $state.PostgresName, "--format", "{{.Id}}")) | Should -Be $sourcePostgresId
+        [string](Invoke-GiteaLifecycleE2EDocker -Arguments @("inspect", $state.RunnerName, "--format", "{{.Id}}")) | Should -Be $sourceRunnerId
+        [string](Invoke-RestMethod -Uri ($state.GiteaUrl + "api/v1/version") -Method Get).version | Should -Be "1.26.4"
+        (Invoke-GiteaLifecycleE2EPsql -ContainerName $state.PostgresName -DatabaseName "gitea" -Sql "SELECT 1") | Should -Be "1"
     }
 
     It "retains recovery evidence after a post-migration failure" {

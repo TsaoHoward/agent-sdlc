@@ -746,6 +746,19 @@ function Get-GiteaContainerInfo {
     return $result.StdOut | ConvertFrom-Json
 }
 
+function Get-GiteaContainerId {
+    param([AllowNull()][object]$Container)
+
+    if ($null -eq $Container) { return "" }
+    if ($Container -is [System.Collections.IDictionary]) {
+        if ($Container.Contains("Id")) { return [string]$Container["Id"] }
+        return ""
+    }
+    $property = $Container.PSObject.Properties["Id"]
+    if ($property) { return [string]$property.Value }
+    return ""
+}
+
 function ConvertFrom-DockerHostPath {
     param([Parameter(Mandatory = $true)][string]$Path)
 
@@ -1137,6 +1150,14 @@ function Assert-SupportedGiteaVersionStep {
     }
 }
 
+function Assert-GiteaImmutableImageReference {
+    param([Parameter(Mandatory = $true)][string]$Reference)
+
+    if ($Reference -notmatch '^(docker\.gitea\.com/gitea@sha256:[0-9a-f]{64}|sha256:[0-9a-f]{64})$') {
+        throw "The Gitea image reference is not one valid immutable registry digest or local image ID."
+    }
+}
+
 function Get-ImageDigestReference {
     param(
         [Parameter(Mandatory = $true)][string]$Image,
@@ -1144,10 +1165,44 @@ function Get-ImageDigestReference {
     )
 
     $result = Invoke-GiteaDocker -Arguments @("image", "inspect", $Image, "--format", "{{json .RepoDigests}}")
-    $digests = @($result.StdOut | ConvertFrom-Json)
-    $digest = $digests | Where-Object { $_ -match '^docker\.gitea\.com/gitea@sha256:[0-9a-f]{64}$' } | Select-Object -First 1
+    try {
+        # Windows PowerShell 5.1 enumerates a top-level JSON array through the pipeline as
+        # one space-joined string. Nesting it in an object preserves the array as an object
+        # property so each RepoDigest remains a separate value.
+        $envelope = ('{"repoDigests":' + [string]$result.StdOut + '}') | ConvertFrom-Json -ErrorAction Stop
+    }
+    catch {
+        throw "Docker returned malformed RepoDigests JSON for image '$Image'."
+    }
+
+    $repoDigestsProperty = $envelope.PSObject.Properties["repoDigests"]
+    if (-not $repoDigestsProperty) {
+        throw "Docker returned an unexpected RepoDigests response for image '$Image'."
+    }
+    $repoDigestsValue = $repoDigestsProperty.Value
+    if ($null -eq $repoDigestsValue) {
+        $digests = @()
+    }
+    elseif ($repoDigestsValue -is [System.Array]) {
+        $digests = @($repoDigestsValue)
+    }
+    else {
+        throw "Docker returned a non-array RepoDigests value for image '$Image'."
+    }
+
+    $digest = $null
+    foreach ($candidate in $digests) {
+        if ($candidate -isnot [string] -or
+            $candidate -notmatch '^[a-z0-9][a-z0-9._:-]*(?:/[a-z0-9][a-z0-9._-]*)+@sha256:[0-9a-f]{64}$') {
+            throw "Docker returned an invalid RepoDigest entry for image '$Image'."
+        }
+        if (-not $digest -and $candidate -match '^docker\.gitea\.com/gitea@sha256:[0-9a-f]{64}$') {
+            $digest = [string]$candidate
+        }
+    }
     if ($digest) {
-        return [string]$digest
+        Assert-GiteaImmutableImageReference -Reference $digest
+        return $digest
     }
     if ($RequireRegistryDigest) {
         throw "The pulled Gitea image did not resolve to the expected immutable docker.gitea.com digest."
@@ -1157,10 +1212,12 @@ function Get-ImageDigestReference {
     }
 
     $inspect = Invoke-GiteaDocker -Arguments @("image", "inspect", $Image, "--format", "{{.Id}}")
-    if ($inspect.StdOut -notmatch '^sha256:[0-9a-f]{64}$') {
+    if ([string]$inspect.StdOut -notmatch '^sha256:[0-9a-f]{64}$') {
         throw "Could not resolve an immutable local image identity for restore."
     }
-    return $inspect.StdOut
+    $imageId = [string]$inspect.StdOut
+    Assert-GiteaImmutableImageReference -Reference $imageId
+    return $imageId
 }
 
 function Get-DirectoryBytes {
@@ -1294,6 +1351,7 @@ function Get-RuntimeSnapshot {
     return @{
         containerName = [string]$Context.GiteaContainerName
         capturedContainerName = [string]$Container.Name.TrimStart('/')
+        containerId = Get-GiteaContainerId -Container $Container
         statusAtCapture = [string]$Container.State.Status
         sourceVersion = $SourceVersion
         originalImageReference = [string]$Container.Config.Image
@@ -1511,7 +1569,8 @@ function New-GiteaBackupSet {
         [Parameter(Mandatory = $true)][object]$PostgresContainer,
         [string]$SourceVersion,
         [bool]$RunnerWasRunning,
-        [Parameter(Mandatory = $true)][object]$Capacity
+        [Parameter(Mandatory = $true)][object]$Capacity,
+        [object]$RuntimeSnapshot
     )
 
     $backupRoot = Ensure-BackupRoot -Context $Context
@@ -1551,7 +1610,15 @@ function New-GiteaBackupSet {
         }
     }
 
-    $runtime = Get-RuntimeSnapshot -Context $Context -Container $GiteaContainer -SourceVersion $SourceVersion
+    $runtime = if ($RuntimeSnapshot) {
+        $RuntimeSnapshot
+    }
+    elseif ($GiteaContainer) {
+        Get-RuntimeSnapshot -Context $Context -Container $GiteaContainer -SourceVersion $SourceVersion
+    }
+    else {
+        $null
+    }
     Save-BackupJson -Path (Join-Path $privatePath "gitea-runtime.json") -Value $runtime
     Save-BackupJson -Path (Join-Path $privatePath "postgres-topology.json") -Value (Get-PostgresTopologySnapshot -Container $PostgresContainer)
     Save-BackupJson -Path (Join-Path $privatePath "restore-context.json") -Value @{
@@ -1674,6 +1741,7 @@ function Get-BackupRuntime {
     if (-not $runtime -or -not $runtime.imageReference -or -not $runtime.mounts -or -not $runtime.ports) {
         throw "The backup does not contain enough protected runtime metadata to restore the Gitea container."
     }
+    Assert-GiteaImmutableImageReference -Reference ([string]$runtime.imageReference)
     return $runtime
 }
 
@@ -1710,9 +1778,7 @@ function Assert-BackupRuntimeMatchesContext {
         -not $sshBinding -or $sshBinding.hostIp -ne $Context.PortBindAddress -or [int]$sshBinding.hostPort -ne $Context.GiteaSshPort) {
         throw "The selected backup does not identify the expected legacy 43000 topology."
     }
-    if ([string]$Runtime.imageReference -notmatch '(@sha256:[0-9a-f]{64}$|^sha256:[0-9a-f]{64}$)') {
-        throw "The selected backup does not identify an immutable source image."
-    }
+    Assert-GiteaImmutableImageReference -Reference ([string]$Runtime.imageReference)
 }
 
 function Write-TemporaryEnvironmentFile {
@@ -1744,6 +1810,7 @@ function New-GiteaContainerFromRuntime {
         [Parameter(Mandatory = $true)][string]$ImageReference
     )
 
+    Assert-GiteaImmutableImageReference -Reference $ImageReference
     Assert-BackupRuntimeMatchesContext -Context $Context -Runtime $Runtime
     $environmentFile = Write-TemporaryEnvironmentFile -Context $Context -Environment @($Runtime.environment)
     try {
@@ -1935,21 +2002,34 @@ function Get-GiteaLifecycleRecoveryMarkerPath {
     return Join-Path $Context.RepoRoot ".agent-sdlc\dev-env\gitea\lifecycle-recovery.json"
 }
 
-function Assert-NoPendingGiteaRecovery {
+function Get-GiteaLifecycleRecoveryMarker {
     param([hashtable]$Context)
 
     $markerPath = Get-GiteaLifecycleRecoveryMarkerPath -Context $Context
-    if (-not (Test-LongPath -Path $markerPath)) { return }
+    if (-not (Test-LongPath -Path $markerPath)) { return $null }
     if (-not (Test-LongPath -Path $markerPath -PathType Leaf)) {
         throw "A Gitea lifecycle recovery marker exists but is not a file; automatic lifecycle operations are blocked."
     }
     try {
-        $marker = Read-LongPathText -Path $markerPath | ConvertFrom-Json
+        $marker = Read-LongPathText -Path $markerPath | ConvertFrom-Json -ErrorAction Stop
     }
     catch {
-        throw "A Gitea lifecycle recovery marker is unreadable; automatic bootstrap is blocked until an operator reviews it."
+        throw "A Gitea lifecycle recovery marker is unreadable; an operator must review it before continuing."
     }
-    throw "A previous Gitea $($marker.operationKind) operation is incomplete. Automatic bootstrap is blocked; use an explicitly confirmed restore. Backup ID: '$($marker.backupId)'."
+    if ([int]$marker.schemaVersion -notin @(1, 2) -or
+        [string]$marker.operationKind -notin @("upgrade", "restore") -or
+        [string]$marker.backupId -notmatch '^\d{8}T\d{6}Z-[0-9a-f]{32}$') {
+        throw "The Gitea lifecycle recovery marker has an unsupported or incomplete schema; automatic lifecycle operations are blocked."
+    }
+    return $marker
+}
+
+function Assert-NoPendingGiteaRecovery {
+    param([hashtable]$Context)
+
+    $marker = Get-GiteaLifecycleRecoveryMarker -Context $Context
+    if (-not $marker) { return }
+    throw "A previous Gitea $($marker.operationKind) operation is incomplete. Lifecycle operations remain blocked. Review the current service and retained backup; use reconcile-recovery only when the original Gitea, PostgreSQL, and Runner containers are verified unchanged and the source version is healthy, otherwise use an explicitly confirmed restore. Backup ID: '$($marker.backupId)'."
 }
 
 function Set-GiteaLifecycleRecoveryMarker {
@@ -1957,7 +2037,11 @@ function Set-GiteaLifecycleRecoveryMarker {
         [hashtable]$Context,
         [Parameter(Mandatory = $true)][ValidateSet("upgrade", "restore")][string]$OperationKind,
         [Parameter(Mandatory = $true)][string]$BackupId,
-        [string]$DiagnosticBackupId
+        [string]$DiagnosticBackupId,
+        [ValidateSet("backup-verified", "target-start-attempted", "restore-starting")][string]$Phase = "backup-verified",
+        [string]$GiteaContainerId,
+        [string]$PostgresContainerId,
+        [string]$RunnerContainerId
     )
 
     $markerPath = Get-GiteaLifecycleRecoveryMarkerPath -Context $Context
@@ -1968,12 +2052,43 @@ function Set-GiteaLifecycleRecoveryMarker {
     $temporaryPath = Join-Path $markerDirectory (".lifecycle-recovery-{0}.tmp" -f [Guid]::NewGuid().ToString("N"))
     try {
         Save-BackupJson -Path $temporaryPath -Value @{
-            schemaVersion = 1
+            schemaVersion = 2
             operationKind = $OperationKind
+            phase = $Phase
             backupId = $BackupId
             diagnosticBackupId = $DiagnosticBackupId
+            giteaContainerId = $GiteaContainerId
+            postgresContainerId = $PostgresContainerId
+            runnerContainerId = $RunnerContainerId
             createdAt = [DateTime]::UtcNow.ToString("o")
         }
+        Move-LongPathFile -Source $temporaryPath -Destination $markerPath -Force
+    }
+    finally {
+        if (Test-LongPath -Path $temporaryPath -PathType Leaf) {
+            Remove-LongPathEntry -Path $temporaryPath
+        }
+    }
+}
+
+function Update-GiteaLifecycleRecoveryMarkerPhase {
+    param(
+        [hashtable]$Context,
+        [Parameter(Mandatory = $true)][string]$BackupId,
+        [Parameter(Mandatory = $true)][ValidateSet("target-start-attempted")][string]$Phase
+    )
+
+    $marker = Get-GiteaLifecycleRecoveryMarker -Context $Context
+    if (-not $marker -or [string]$marker.operationKind -ne "upgrade" -or [string]$marker.backupId -ne $BackupId) {
+        throw "The expected upgrade recovery marker is missing or does not match Backup ID '$BackupId'; refusing to start the target image."
+    }
+    $marker.phase = $Phase
+    $marker.updatedAt = [DateTime]::UtcNow.ToString("o")
+    $markerPath = Get-GiteaLifecycleRecoveryMarkerPath -Context $Context
+    $markerDirectory = Get-LongPathParent -Path $markerPath
+    $temporaryPath = Join-Path $markerDirectory (".lifecycle-recovery-{0}.tmp" -f [Guid]::NewGuid().ToString("N"))
+    try {
+        Save-BackupJson -Path $temporaryPath -Value $marker
         Move-LongPathFile -Source $temporaryPath -Destination $markerPath -Force
     }
     finally {
@@ -1993,6 +2108,84 @@ function Clear-GiteaLifecycleRecoveryMarker {
     if (Test-LongPath -Path $markerPath -PathType Leaf) {
         Remove-LongPathEntry -Path $markerPath
     }
+}
+
+function Invoke-GiteaRecoveryReconciliation {
+    param(
+        [hashtable]$Context,
+        [Parameter(Mandatory = $true)][string]$BackupId,
+        [Parameter(Mandatory = $true)][ValidatePattern('^[a-f0-9]{64}$')][string]$ExpectedGiteaContainerId,
+        [Parameter(Mandatory = $true)][ValidatePattern('^[a-f0-9]{64}$')][string]$ExpectedPostgresContainerId,
+        [Parameter(Mandatory = $true)][ValidatePattern('^[a-f0-9]{64}$')][string]$ExpectedRunnerContainerId
+    )
+
+    Assert-NativeWindowsHost
+    $Context.DockerHost = Assert-DockerDesktopReady
+    $marker = Get-GiteaLifecycleRecoveryMarker -Context $Context
+    if (-not $marker -or [string]$marker.operationKind -ne "upgrade" -or [string]$marker.backupId -ne $BackupId) {
+        throw "Recovery reconciliation requires the matching retained upgrade marker and Backup ID."
+    }
+
+    $selected = Get-GiteaBackupById -Context $Context -BackupId $BackupId
+    if ([string]$selected.Manifest.kind -ne "upgrade") {
+        throw "Recovery reconciliation requires a valid upgrade backup; no service state was changed."
+    }
+    $runtime = Get-BackupRuntime -BackupPath $selected.Path
+    Assert-BackupRuntimeMatchesContext -Context $Context -Runtime $runtime
+    if ([string]$selected.Manifest.sourceVersion -ne [string]$runtime.sourceVersion) {
+        throw "The upgrade backup manifest and runtime source versions disagree; recovery reconciliation is blocked."
+    }
+
+    $gitea = Assert-GiteaContainerIdentity -Context $Context
+    $postgres = Assert-PostgresContainerIdentity -Context $Context
+    $runner = Get-GiteaRunnerInfo -Context $Context
+    $recordedGiteaId = if ($marker.PSObject.Properties["giteaContainerId"]) { [string]$marker.giteaContainerId } else { "" }
+    $recordedPostgresId = if ($marker.PSObject.Properties["postgresContainerId"]) { [string]$marker.postgresContainerId } else { "" }
+    $recordedRunnerId = if ($marker.PSObject.Properties["runnerContainerId"]) { [string]$marker.runnerContainerId } else { "" }
+    foreach ($identity in @(
+        @{ Name = "Gitea"; Expected = $ExpectedGiteaContainerId; Actual = (Get-GiteaContainerId -Container $gitea); Recorded = $recordedGiteaId },
+        @{ Name = "PostgreSQL"; Expected = $ExpectedPostgresContainerId; Actual = (Get-GiteaContainerId -Container $postgres); Recorded = $recordedPostgresId },
+        @{ Name = "Runner"; Expected = $ExpectedRunnerContainerId; Actual = (Get-GiteaContainerId -Container $runner); Recorded = $recordedRunnerId }
+    )) {
+        if (-not $identity.Actual -or $identity.Actual -ne $identity.Expected -or
+            ($identity.Recorded -and $identity.Recorded -ne $identity.Expected)) {
+            throw "The current $($identity.Name) container ID does not match the explicitly confirmed original ID; recovery marker remains."
+        }
+    }
+    if ([string]$gitea.State.Status -ne "running" -or [string]$gitea.Image -ne [string]$runtime.imageId -or
+        [string]$gitea.Config.Image -ne [string]$runtime.originalImageReference) {
+        throw "The current Gitea container is not the captured source image in a running state; recovery marker remains."
+    }
+    $expectedRunnerStatus = if ([bool]$selected.Manifest.runnerWasRunning) { "running" } else { "exited" }
+    if ([string]$runner.State.Status -ne $expectedRunnerStatus) {
+        throw "The shared Runner state differs from the captured upgrade source; recovery marker remains."
+    }
+
+    $postgresTopology = Read-LongPathText -Path (Join-Path $selected.Path "payload\private\postgres-topology.json") | ConvertFrom-Json
+    Assert-PostgresRestoreCompatibility -BackupTopology $postgresTopology -CurrentContainer $postgres -Context $Context
+    Assert-GiteaDatabaseTarget -GiteaContainer $gitea -PostgresContainer $postgres -Context $Context
+    Assert-GiteaApiVersion -Context $Context -ExpectedVersion ([string]$runtime.sourceVersion)
+
+    $expectedConfirmation = "RECONCILE $BackupId GITEA $ExpectedGiteaContainerId POSTGRES $ExpectedPostgresContainerId RUNNER $ExpectedRunnerContainerId DATABASE VERIFIED"
+    Confirm-GiteaLifecycleOperation -Prompt "Confirm the original container IDs are unchanged, the source version is healthy, and the current database is valid; no database restore will run. Type '$expectedConfirmation'" -ExpectedText $expectedConfirmation
+
+    New-GiteaOperationRecord -Context $Context -Record @{
+        schemaVersion = 1
+        operationId = "$BackupId-recovery-reconciled"
+        result = "reconciled-original-source-without-restore"
+        completedAt = [DateTime]::UtcNow.ToString("o")
+        backupId = $BackupId
+        sourceVersion = [string]$runtime.sourceVersion
+        sourceImageDigest = [string]$runtime.imageReference
+        giteaContainerId = $ExpectedGiteaContainerId
+        postgresContainerId = $ExpectedPostgresContainerId
+        runnerContainerId = $ExpectedRunnerContainerId
+        operatorAttestation = $expectedConfirmation
+        databaseRestorePerformed = $false
+        markerSchemaVersion = [int]$marker.schemaVersion
+    }
+    Clear-GiteaLifecycleRecoveryMarker -Context $Context
+    Write-Host "Recovery marker reconciled after verifying the original Gitea, PostgreSQL, and Runner containers. No database restore or service restart was performed. Backup '$BackupId' was retained."
 }
 
 function Assert-GiteaConfigCanBePinned {
@@ -2214,6 +2407,7 @@ function Invoke-GiteaUpgrade {
     $runner = Get-GiteaRunnerInfo -Context $Context
     $runnerWasRunning = [string]$runner.State.Status -eq "running"
     $sourceVersion = Get-GiteaReportedVersion -Container $gitea
+    $sourceRuntime = Get-RuntimeSnapshot -Context $Context -Container $gitea -SourceVersion $sourceVersion
     Assert-SupportedGiteaVersionStep -CurrentVersion $sourceVersion -TargetVersion $GiteaVersion
     Assert-NoActiveGiteaActions -Context $Context
     $capacity = Assert-BackupCapacity -Context $Context
@@ -2242,7 +2436,7 @@ function Invoke-GiteaUpgrade {
     }
 
     try {
-        $backup = New-GiteaBackupSet -Context $Context -Kind upgrade -GiteaContainer $gitea -PostgresContainer $postgres -SourceVersion $sourceVersion -RunnerWasRunning $runnerWasRunning -Capacity $capacity
+        $backup = New-GiteaBackupSet -Context $Context -Kind upgrade -GiteaContainer $gitea -PostgresContainer $postgres -SourceVersion $sourceVersion -RunnerWasRunning $runnerWasRunning -Capacity $capacity -RuntimeSnapshot $sourceRuntime
     }
     catch {
         # No new Image has started, so the unchanged source container is safe to resume.
@@ -2256,7 +2450,7 @@ function Invoke-GiteaUpgrade {
     }
 
     try {
-        Set-GiteaLifecycleRecoveryMarker -Context $Context -OperationKind upgrade -BackupId $backup.BackupId
+        Set-GiteaLifecycleRecoveryMarker -Context $Context -OperationKind upgrade -BackupId $backup.BackupId -Phase "backup-verified" -GiteaContainerId (Get-GiteaContainerId -Container $gitea) -PostgresContainerId (Get-GiteaContainerId -Container $postgres) -RunnerContainerId (Get-GiteaContainerId -Container $runner)
     }
     catch {
         try {
@@ -2270,6 +2464,7 @@ function Invoke-GiteaUpgrade {
 
     $oldContainerName = "$($Context.GiteaContainerName)-preupgrade-$($backup.BackupId)"
     [void](Invoke-GiteaDocker -Arguments @("rename", $Context.GiteaContainerName, $oldContainerName))
+    Update-GiteaLifecycleRecoveryMarkerPhase -Context $Context -BackupId $backup.BackupId -Phase "target-start-attempted"
     try {
         $runtime = Get-BackupRuntime -BackupPath $backup.Path
         New-GiteaContainerFromRuntime -Context $Context -Runtime $runtime -ImageReference $targetImage
@@ -2363,6 +2558,7 @@ function Invoke-GiteaRestore {
     }
 
     $targetImage = [string]$runtime.imageReference
+    Assert-GiteaImmutableImageReference -Reference $targetImage
     if ($targetImage -match '^docker\.gitea\.com/gitea@sha256:') {
         [void](Invoke-GiteaDocker -Arguments @("pull", $targetImage))
     }
@@ -2371,6 +2567,19 @@ function Invoke-GiteaRestore {
     }
     $capacity = Assert-BackupCapacity -Context $Context
     Confirm-GiteaLifecycleOperation -Prompt "Type RESTORE $BackupId TO agent-sdlc-gitea:43000 to overwrite the current instance" -ExpectedText "RESTORE $BackupId TO agent-sdlc-gitea:43000"
+
+    $diagnosticVersion = "unavailable"
+    $diagnosticRuntime = $null
+    if ($gitea) {
+        if ($apiHealth.IsHealthy -and $apiHealth.Version) {
+            $diagnosticVersion = [string]$apiHealth.Version
+        }
+        else {
+            try { $diagnosticVersion = Get-GiteaReportedVersion -Container $gitea }
+            catch { $diagnosticVersion = "unavailable" }
+        }
+        $diagnosticRuntime = Get-RuntimeSnapshot -Context $Context -Container $gitea -SourceVersion $diagnosticVersion
+    }
 
     if ($runnerWasRunningNow) {
         Stop-GiteaRunner -Name $Context.GiteaRunnerContainerName
@@ -2388,13 +2597,8 @@ function Invoke-GiteaRestore {
         [void](Invoke-GiteaDocker -Arguments @("stop", "--time", "60", $Context.GiteaContainerName))
     }
 
-    $diagnosticVersion = "unavailable"
-    if ($gitea) {
-        try { $diagnosticVersion = Get-GiteaReportedVersion -Container $gitea }
-        catch { $diagnosticVersion = "unavailable" }
-    }
     try {
-        $diagnostic = New-GiteaBackupSet -Context $Context -Kind pre-restore-diagnostic -GiteaContainer $gitea -PostgresContainer $postgres -SourceVersion $diagnosticVersion -RunnerWasRunning $runnerWasRunningNow -Capacity $capacity
+        $diagnostic = New-GiteaBackupSet -Context $Context -Kind pre-restore-diagnostic -GiteaContainer $gitea -PostgresContainer $postgres -SourceVersion $diagnosticVersion -RunnerWasRunning $runnerWasRunningNow -Capacity $capacity -RuntimeSnapshot $diagnosticRuntime
     }
     catch {
         try {
@@ -2411,7 +2615,7 @@ function Invoke-GiteaRestore {
     }
 
     try {
-        Set-GiteaLifecycleRecoveryMarker -Context $Context -OperationKind restore -BackupId $BackupId -DiagnosticBackupId $diagnostic.BackupId
+        Set-GiteaLifecycleRecoveryMarker -Context $Context -OperationKind restore -BackupId $BackupId -DiagnosticBackupId $diagnostic.BackupId -Phase "restore-starting" -GiteaContainerId (Get-GiteaContainerId -Container $gitea) -PostgresContainerId (Get-GiteaContainerId -Container $postgres) -RunnerContainerId (Get-GiteaContainerId -Container $runner)
     }
     catch {
         try {
@@ -2473,10 +2677,13 @@ function Invoke-GiteaRestore {
 function Invoke-GiteaLifecycle {
     [CmdletBinding()]
     param(
-        [Parameter(Mandatory = $true)][ValidateSet("upgrade", "backup-list", "restore")][string]$Action,
+        [Parameter(Mandatory = $true)][ValidateSet("upgrade", "backup-list", "restore", "reconcile-recovery")][string]$Action,
         [Parameter(Mandatory = $true)][hashtable]$Context,
         [string]$GiteaVersion,
-        [string]$BackupId
+        [string]$BackupId,
+        [string]$ExpectedGiteaContainerId,
+        [string]$ExpectedPostgresContainerId,
+        [string]$ExpectedRunnerContainerId
     )
 
     switch ($Action) {
@@ -2491,6 +2698,12 @@ function Invoke-GiteaLifecycle {
         "restore" {
             if (-not $BackupId) { throw "The restore command requires -BackupId <id>." }
             Invoke-GiteaRestore -Context $Context -BackupId $BackupId
+        }
+        "reconcile-recovery" {
+            if (-not $BackupId -or -not $ExpectedGiteaContainerId -or -not $ExpectedPostgresContainerId -or -not $ExpectedRunnerContainerId) {
+                throw "Recovery reconciliation requires -BackupId and the verified full Gitea, PostgreSQL, and Runner container IDs."
+            }
+            Invoke-GiteaRecoveryReconciliation -Context $Context -BackupId $BackupId -ExpectedGiteaContainerId $ExpectedGiteaContainerId -ExpectedPostgresContainerId $ExpectedPostgresContainerId -ExpectedRunnerContainerId $ExpectedRunnerContainerId
         }
     }
 }
