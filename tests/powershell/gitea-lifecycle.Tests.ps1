@@ -571,11 +571,42 @@ Describe "Gitea lifecycle safety helpers" {
             Mock Assert-NoPendingGiteaRecovery {}
             Mock Ensure-BackupRoot {}
             Mock Assert-GiteaConfigCanBePinned {}
-            Mock Assert-GiteaContainerIdentity { return [pscustomobject]@{ Name = "/agent-sdlc-gitea"; Args = @($script:upgradeGiteaArgs); Config = [pscustomobject]@{ Env = @($script:upgradeGiteaEnvironment); Cmd = @() } } }
-            Mock Assert-PostgresContainerIdentity { return [pscustomobject]@{ Name = "/agent-sdlc-gitea-db" } }
-            Mock Get-GiteaRunnerInfo { return [pscustomobject]@{ State = [pscustomobject]@{ Status = "running" } } }
+            Mock Assert-GiteaContainerIdentity {
+                return [pscustomobject]@{
+                    Id = "1111111111111111111111111111111111111111111111111111111111111111"
+                    Name = "/agent-sdlc-gitea"
+                    Image = "sha256:$('a' * 64)"
+                    State = [pscustomobject]@{ Status = "running" }
+                    Args = @($script:upgradeGiteaArgs)
+                    Config = [pscustomobject]@{
+                        Image = "docker.gitea.com/gitea:1.25.5-rootless"
+                        Env = @($script:upgradeGiteaEnvironment)
+                        Cmd = @()
+                    }
+                }
+            }
+            Mock Assert-PostgresContainerIdentity {
+                return [pscustomobject]@{
+                    Id = "2222222222222222222222222222222222222222222222222222222222222222"
+                    Name = "/agent-sdlc-gitea-db"
+                    State = [pscustomobject]@{ Status = "running" }
+                }
+            }
+            Mock Get-GiteaRunnerInfo {
+                return [pscustomobject]@{
+                    Id = "3333333333333333333333333333333333333333333333333333333333333333"
+                    State = [pscustomobject]@{ Status = "running" }
+                }
+            }
             Mock Get-GiteaReportedVersion { return "1.25.5" }
-            Mock Get-RuntimeSnapshot { return [pscustomobject]@{ imageReference = "docker.gitea.com/gitea@sha256:$('a' * 64)"; containerId = "a" } }
+            Mock Get-RuntimeSnapshot {
+                return [pscustomobject]@{
+                    imageReference = "docker.gitea.com/gitea@sha256:$('a' * 64)"
+                    originalImageReference = "docker.gitea.com/gitea:1.25.5-rootless"
+                    imageId = "sha256:$('a' * 64)"
+                    containerId = "1111111111111111111111111111111111111111111111111111111111111111"
+                }
+            }
             Mock Assert-GiteaDatabaseTarget {}
             Mock Assert-NoActiveGiteaActions {}
             Mock Assert-BackupCapacity { return [pscustomobject]@{ SourceBytes = 10; RequiredFreeBytes = 1024; AvailableFreeBytes = 4096 } }
@@ -853,6 +884,7 @@ Describe "Gitea lifecycle safety helpers" {
             Mock Get-GiteaLifecycleRecoveryMarker { return $script:upgradeRecoveryMarker }
             Mock Assert-NoActiveGiteaActions {
                 $script:actionsCheckCount += 1
+                $script:lifecycleActions.Add("assert-actions-$script:actionsCheckCount")
                 if ($script:actionsCheckCount -eq 3) { throw "post-marker-root-cause" }
             }
             Mock New-GiteaOperationRecord {
@@ -865,8 +897,12 @@ Describe "Gitea lifecycle safety helpers" {
 
             $script:upgradeTerminalRecord.operationKind | Should -BeExactly "upgrade"
             $script:upgradeTerminalRecord.result | Should -BeExactly "interrupted-upgrade-prepared"
+            $script:upgradeTerminalRecord.errorSummary | Should -Match "post-marker-root-cause"
             $script:lifecycleActions | Should -Contain "set-recovery-marker"
+            $script:lifecycleActions | Should -Contain "assert-actions-3"
             $script:lifecycleActions | Should -Contain "operation-record"
+            $script:lifecycleActions.IndexOf("set-recovery-marker") | Should -BeLessThan $script:lifecycleActions.IndexOf("assert-actions-3")
+            $script:lifecycleActions.IndexOf("assert-actions-3") | Should -BeLessThan $script:lifecycleActions.IndexOf("operation-record")
         }
 
         It "surfaces the safe image-pin stage, exception type, and masked cause after health checks" {
