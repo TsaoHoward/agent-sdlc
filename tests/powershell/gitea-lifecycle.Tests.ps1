@@ -668,6 +668,28 @@ Describe "Gitea lifecycle safety helpers" {
             Should -Invoke Ensure-BackupRoot -Times 0 -Exactly
         }
 
+        It "accepts an empty container Environment during Upgrade preflight" {
+            $script:upgradeGiteaEnvironment = @()
+            Mock Assert-BackupCapacity { throw "empty-environment-preflight-reached" }
+
+            { Invoke-GiteaLifecycle -Action upgrade -Context $script:upgradeContext -GiteaVersion "1.26.4" } | Should -Throw "empty-environment-preflight-reached"
+
+            $script:lifecycleActions | Should -Not -Contain "stop-runner"
+            $script:lifecycleActions | Should -Not -Contain "backup"
+            $script:lifecycleActions | Should -Not -Contain "set-recovery-marker"
+        }
+
+        It "parses storage Environment overrides before proceeding with Upgrade preflight" {
+            $script:upgradeGiteaEnvironment = @("GITEA__picture__AVATAR_UPLOAD_PATH=data/avatars")
+            Mock Assert-BackupCapacity { throw "storage-environment-preflight-reached" }
+
+            { Invoke-GiteaLifecycle -Action upgrade -Context $script:upgradeContext -GiteaVersion "1.26.4" } | Should -Throw "storage-environment-preflight-reached"
+
+            $script:lifecycleActions | Should -Not -Contain "stop-runner"
+            $script:lifecycleActions | Should -Not -Contain "backup"
+            $script:lifecycleActions | Should -Not -Contain "set-recovery-marker"
+        }
+
         It "blocks an explicit app.ini command override outside the mounted config before service changes" {
             $script:upgradeGiteaArgs = @("web", "--config", "/tmp/external-app.ini")
 
@@ -781,6 +803,70 @@ Describe "Gitea lifecycle safety helpers" {
             $script:lifecycleActions | Should -Not -Contain "stop-runner"
             $script:lifecycleActions | Should -Not -Contain "pin-image"
             $script:lifecycleActions | Should -Not -Contain "create-gitea"
+        }
+
+        It "preserves a pre-marker Upgrade failure when an Operation Record write would fail" {
+            $script:markerReadCount = 0
+            Mock Get-GiteaLifecycleRecoveryMarker {
+                $script:markerReadCount += 1
+                if ($script:markerReadCount -gt 1) {
+                    return [pscustomobject]@{
+                        operationId = "aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa"
+                        operationKind = "upgrade"
+                        phase = "upgrade-prepared"
+                        backupId = "20261110T000000Z-bbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbb"
+                        createdAt = "2026-11-10T00:00:00.0000000Z"
+                    }
+                }
+                return $null
+            }
+            Mock Assert-NativeWindowsHost { throw "preflight-root-cause" }
+            Mock New-GiteaOperationRecord { throw "operation-record-write-failed" }
+
+            $failureMessage = $null
+            try {
+                Invoke-GiteaLifecycle -Action upgrade -Context $script:upgradeContext -GiteaVersion "1.26.4"
+            }
+            catch {
+                $failureMessage = $_.Exception.Message
+            }
+
+            $failureMessage | Should -BeExactly "preflight-root-cause"
+            Should -Invoke New-GiteaOperationRecord -Times 0 -Exactly
+        }
+
+        It "writes the interrupted Operation Record after a verified Recovery Marker exists" {
+            $script:actionsCheckCount = 0
+            $script:upgradeRecoveryMarker = $null
+            $script:upgradeTerminalRecord = $null
+            Mock Set-GiteaLifecycleRecoveryMarker {
+                param($Context, $OperationKind, $BackupId, $Phase, $OperationId, $NextAction)
+                $script:upgradeRecoveryMarker = [pscustomobject]@{
+                    operationId = $OperationId
+                    operationKind = $OperationKind
+                    phase = $Phase
+                    backupId = $BackupId
+                    createdAt = "2026-11-10T00:00:00.0000000Z"
+                }
+                $script:lifecycleActions.Add("set-recovery-marker")
+            }
+            Mock Get-GiteaLifecycleRecoveryMarker { return $script:upgradeRecoveryMarker }
+            Mock Assert-NoActiveGiteaActions {
+                $script:actionsCheckCount += 1
+                if ($script:actionsCheckCount -eq 3) { throw "post-marker-root-cause" }
+            }
+            Mock New-GiteaOperationRecord {
+                param($Context, $Record)
+                $script:upgradeTerminalRecord = $Record
+                $script:lifecycleActions.Add("operation-record")
+            }
+
+            { Invoke-GiteaLifecycle -Action upgrade -Context $script:upgradeContext -GiteaVersion "1.26.4" } | Should -Throw "post-marker-root-cause"
+
+            $script:upgradeTerminalRecord.operationKind | Should -BeExactly "upgrade"
+            $script:upgradeTerminalRecord.result | Should -BeExactly "interrupted-upgrade-prepared"
+            $script:lifecycleActions | Should -Contain "set-recovery-marker"
+            $script:lifecycleActions | Should -Contain "operation-record"
         }
 
         It "surfaces the safe image-pin stage, exception type, and masked cause after health checks" {
