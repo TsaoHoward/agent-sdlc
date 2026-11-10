@@ -571,11 +571,42 @@ Describe "Gitea lifecycle safety helpers" {
             Mock Assert-NoPendingGiteaRecovery {}
             Mock Ensure-BackupRoot {}
             Mock Assert-GiteaConfigCanBePinned {}
-            Mock Assert-GiteaContainerIdentity { return [pscustomobject]@{ Name = "/agent-sdlc-gitea"; Args = @($script:upgradeGiteaArgs); Config = [pscustomobject]@{ Env = @($script:upgradeGiteaEnvironment); Cmd = @() } } }
-            Mock Assert-PostgresContainerIdentity { return [pscustomobject]@{ Name = "/agent-sdlc-gitea-db" } }
-            Mock Get-GiteaRunnerInfo { return [pscustomobject]@{ State = [pscustomobject]@{ Status = "running" } } }
+            Mock Assert-GiteaContainerIdentity {
+                return [pscustomobject]@{
+                    Id = "1111111111111111111111111111111111111111111111111111111111111111"
+                    Name = "/agent-sdlc-gitea"
+                    Image = "sha256:$('a' * 64)"
+                    State = [pscustomobject]@{ Status = "running" }
+                    Args = @($script:upgradeGiteaArgs)
+                    Config = [pscustomobject]@{
+                        Image = "docker.gitea.com/gitea:1.25.5-rootless"
+                        Env = @($script:upgradeGiteaEnvironment)
+                        Cmd = @()
+                    }
+                }
+            }
+            Mock Assert-PostgresContainerIdentity {
+                return [pscustomobject]@{
+                    Id = "2222222222222222222222222222222222222222222222222222222222222222"
+                    Name = "/agent-sdlc-gitea-db"
+                    State = [pscustomobject]@{ Status = "running" }
+                }
+            }
+            Mock Get-GiteaRunnerInfo {
+                return [pscustomobject]@{
+                    Id = "3333333333333333333333333333333333333333333333333333333333333333"
+                    State = [pscustomobject]@{ Status = "running" }
+                }
+            }
             Mock Get-GiteaReportedVersion { return "1.25.5" }
-            Mock Get-RuntimeSnapshot { return [pscustomobject]@{ imageReference = "docker.gitea.com/gitea@sha256:$('a' * 64)"; containerId = "a" } }
+            Mock Get-RuntimeSnapshot {
+                return [pscustomobject]@{
+                    imageReference = "docker.gitea.com/gitea@sha256:$('a' * 64)"
+                    originalImageReference = "docker.gitea.com/gitea:1.25.5-rootless"
+                    imageId = "sha256:$('a' * 64)"
+                    containerId = "1111111111111111111111111111111111111111111111111111111111111111"
+                }
+            }
             Mock Assert-GiteaDatabaseTarget {}
             Mock Assert-NoActiveGiteaActions {}
             Mock Assert-BackupCapacity { return [pscustomobject]@{ SourceBytes = 10; RequiredFreeBytes = 1024; AvailableFreeBytes = 4096 } }
@@ -666,6 +697,28 @@ Describe "Gitea lifecycle safety helpers" {
             $script:lifecycleActions | Should -Not -Contain "backup"
             $script:lifecycleActions | Should -Not -Contain "set-recovery-marker"
             Should -Invoke Ensure-BackupRoot -Times 0 -Exactly
+        }
+
+        It "accepts an empty container Environment during Upgrade preflight" {
+            $script:upgradeGiteaEnvironment = @()
+            Mock Assert-BackupCapacity { throw "empty-environment-preflight-reached" }
+
+            { Invoke-GiteaLifecycle -Action upgrade -Context $script:upgradeContext -GiteaVersion "1.26.4" } | Should -Throw "empty-environment-preflight-reached"
+
+            $script:lifecycleActions | Should -Not -Contain "stop-runner"
+            $script:lifecycleActions | Should -Not -Contain "backup"
+            $script:lifecycleActions | Should -Not -Contain "set-recovery-marker"
+        }
+
+        It "parses storage Environment overrides before proceeding with Upgrade preflight" {
+            $script:upgradeGiteaEnvironment = @("GITEA__picture__AVATAR_UPLOAD_PATH=data/avatars")
+            Mock Assert-BackupCapacity { throw "storage-environment-preflight-reached" }
+
+            { Invoke-GiteaLifecycle -Action upgrade -Context $script:upgradeContext -GiteaVersion "1.26.4" } | Should -Throw "storage-environment-preflight-reached"
+
+            $script:lifecycleActions | Should -Not -Contain "stop-runner"
+            $script:lifecycleActions | Should -Not -Contain "backup"
+            $script:lifecycleActions | Should -Not -Contain "set-recovery-marker"
         }
 
         It "blocks an explicit app.ini command override outside the mounted config before service changes" {
@@ -781,6 +834,140 @@ Describe "Gitea lifecycle safety helpers" {
             $script:lifecycleActions | Should -Not -Contain "stop-runner"
             $script:lifecycleActions | Should -Not -Contain "pin-image"
             $script:lifecycleActions | Should -Not -Contain "create-gitea"
+        }
+
+        It "preserves a pre-marker Upgrade failure when an Operation Record write would fail" {
+            $script:markerReadCount = 0
+            Mock Get-GiteaLifecycleRecoveryMarker {
+                $script:markerReadCount += 1
+                if ($script:markerReadCount -gt 1) {
+                    return [pscustomobject]@{
+                        operationId = "aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa"
+                        operationKind = "upgrade"
+                        phase = "upgrade-prepared"
+                        backupId = "20261110T000000Z-bbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbb"
+                        createdAt = "2026-11-10T00:00:00.0000000Z"
+                    }
+                }
+                return $null
+            }
+            Mock Assert-NativeWindowsHost { throw "preflight-root-cause" }
+            Mock New-GiteaOperationRecord { throw "operation-record-write-failed" }
+
+            $failureMessage = $null
+            try {
+                Invoke-GiteaLifecycle -Action upgrade -Context $script:upgradeContext -GiteaVersion "1.26.4"
+            }
+            catch {
+                $failureMessage = $_.Exception.Message
+            }
+
+            $failureMessage | Should -BeExactly "preflight-root-cause"
+            Should -Invoke New-GiteaOperationRecord -Times 0 -Exactly
+        }
+
+        It "writes the interrupted Operation Record after a verified Recovery Marker exists" {
+            $script:actionsCheckCount = 0
+            $script:upgradeRecoveryMarker = $null
+            $script:upgradeTerminalRecord = $null
+            $script:upgradeAttemptOperationId = $null
+            Mock Set-GiteaLifecycleRecoveryMarker {
+                param(
+                    $Context, $OperationKind, $BackupId, $DiagnosticBackupId, $Phase, $OperationId,
+                    $NextAction, $LastCompletedStage, $GiteaContainerId, $TargetContainerId,
+                    $PostgresContainerId, $RunnerContainerId, $SourceImageId, $SourceImageReference,
+                    $SourceOriginalImageReference, $SourceVersion, $TargetImageDigest, $TargetVersion,
+                    $GiteaState, $PostgresState, $RunnerState, $SupersedesOperationId,
+                    $PriorDiagnosticBackupIds, $ReplaceExisting
+                )
+                $script:upgradeAttemptOperationId = $OperationId
+                $createdAt = "2026-11-10T00:00:00.0000000Z"
+                $script:upgradeRecoveryMarker = [pscustomobject]@{
+                    schemaVersion = 3
+                    operationId = $OperationId
+                    operationKind = $OperationKind
+                    phase = $Phase
+                    backupId = $BackupId
+                    diagnosticBackupId = $DiagnosticBackupId
+                    revision = 1
+                    createdAt = $createdAt
+                    updatedAt = $createdAt
+                    lastCompletedStage = $LastCompletedStage
+                    nextAction = $NextAction
+                    giteaContainerId = $GiteaContainerId
+                    targetContainerId = $TargetContainerId
+                    postgresContainerId = $PostgresContainerId
+                    runnerContainerId = $RunnerContainerId
+                    sourceImageId = $SourceImageId
+                    sourceImageReference = $SourceImageReference
+                    sourceOriginalImageReference = $SourceOriginalImageReference
+                    sourceVersion = $SourceVersion
+                    targetImageDigest = $TargetImageDigest
+                    targetVersion = $TargetVersion
+                    giteaState = $GiteaState
+                    postgresState = $PostgresState
+                    runnerState = $RunnerState
+                    supersedesOperationId = $SupersedesOperationId
+                    priorDiagnosticBackupIds = @($PriorDiagnosticBackupIds)
+                }
+                $script:lifecycleActions.Add("set-recovery-marker:$OperationId")
+            }
+            Mock Get-GiteaLifecycleRecoveryMarker { return $script:upgradeRecoveryMarker }
+            Mock Assert-NoActiveGiteaActions {
+                $script:actionsCheckCount += 1
+                $script:lifecycleActions.Add("assert-actions-$script:actionsCheckCount")
+                if ($script:actionsCheckCount -eq 3) {
+                    $script:lifecycleActions.Add("injected-fault:$($script:upgradeRecoveryMarker.operationId)")
+                    throw "post-marker-root-cause"
+                }
+            }
+            Mock New-GiteaOperationRecord {
+                param($Context, $Record)
+                $script:upgradeTerminalRecord = $Record
+                $script:lifecycleActions.Add("operation-record:$($Record.operationId)")
+            }
+
+            $failureMessage = $null
+            try {
+                Invoke-GiteaLifecycle -Action upgrade -Context $script:upgradeContext -GiteaVersion "1.26.4"
+            }
+            catch {
+                $failureMessage = $_.Exception.Message
+            }
+
+            $failureMessage | Should -Match "post-marker-root-cause"
+
+            $marker = $script:upgradeRecoveryMarker
+            $markerPropertyNames = [string[]]$marker.PSObject.Properties.Name
+            foreach ($requiredMarkerProperty in @(
+                "schemaVersion", "operationId", "operationKind", "phase", "backupId", "diagnosticBackupId",
+                "revision", "createdAt", "updatedAt", "lastCompletedStage", "nextAction", "giteaContainerId",
+                "targetContainerId", "postgresContainerId", "runnerContainerId", "sourceImageId",
+                "sourceImageReference", "sourceOriginalImageReference", "sourceVersion", "targetImageDigest",
+                "targetVersion", "giteaState", "postgresState", "runnerState", "supersedesOperationId",
+                "priorDiagnosticBackupIds"
+            )) {
+                $markerPropertyNames | Should -Contain $requiredMarkerProperty
+            }
+
+            $marker.schemaVersion | Should -Be 3
+            $marker.diagnosticBackupId | Should -BeNullOrEmpty
+            $marker.operationId | Should -BeExactly $script:upgradeAttemptOperationId
+            $marker.operationId | Should -Match "^[0-9a-f]{32}$"
+            $script:upgradeTerminalRecord.operationKind | Should -BeExactly "upgrade"
+            $script:upgradeTerminalRecord.result | Should -BeExactly "interrupted-upgrade-prepared"
+            $script:upgradeTerminalRecord.errorSummary | Should -Match "post-marker-root-cause"
+            $script:upgradeTerminalRecord.operationId | Should -BeExactly $marker.operationId
+            $script:upgradeTerminalRecord.backupId | Should -BeExactly $marker.backupId
+
+            $markerEvent = "set-recovery-marker:$($script:upgradeAttemptOperationId)"
+            $faultEvent = "injected-fault:$($script:upgradeAttemptOperationId)"
+            $recordEvent = "operation-record:$($script:upgradeAttemptOperationId)"
+            $script:lifecycleActions | Should -Contain $markerEvent
+            $script:lifecycleActions | Should -Contain $faultEvent
+            $script:lifecycleActions | Should -Contain $recordEvent
+            $script:lifecycleActions.IndexOf($markerEvent) | Should -BeLessThan $script:lifecycleActions.IndexOf($faultEvent)
+            $script:lifecycleActions.IndexOf($faultEvent) | Should -BeLessThan $script:lifecycleActions.IndexOf($recordEvent)
         }
 
         It "surfaces the safe image-pin stage, exception type, and masked cause after health checks" {

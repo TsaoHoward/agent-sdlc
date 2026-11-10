@@ -219,7 +219,39 @@ if ($passExitCode -ne 0 -or $failExitCode -eq 0 -or $noTestsExitCode -eq 0 -or $
 
 Expected Pester output is retained, including Passed/Failed/Skipped counts. The pass fixture should report one Passed test and ExitCode 0; the intentional-failure fixture should report one Failed test and a nonzero ExitCode; the no-tests and missing-path cases must also return nonzero. The missing-path case intentionally selects a nonexistent test file to verify that a run which cannot execute does not return success. Run from a native Windows checkout with Node.js/npm, Windows PowerShell 5.1, and Pester 5 or 6.2.0.
 
-Current WSL attempt is not Windows acceptance evidence. Windows PowerShell `5.1.26100.9711` and Pester `6.2.0` were visible through interop, but Pester discovery from the workspace UNC path `\\wsl.localhost\...` stopped in `FindRepoRoot` with `NotSupportedException` before tests were discovered; the old inline `Invoke-Pester` command returned process ExitCode 0. A later npm attempt through WSL interop failed before PowerShell started (`UtilBindVsockAnyPort:307: socket failed 1`) and npm returned 1. Native Windows execution of all four focused cases remains pending.
+The initial WSL attempts were not Windows acceptance evidence. Windows PowerShell `5.1.26100.9711` and Pester `6.2.0` were visible through interop, but Pester discovery from the workspace UNC path `\\wsl.localhost\...` stopped in `FindRepoRoot` with `NotSupportedException` before tests were discovered; the old inline `Invoke-Pester` command returned process ExitCode 0. A later npm attempt through WSL interop failed before PowerShell started (`UtilBindVsockAnyPort:307: socket failed 1`) and npm returned 1. Subsequent native Windows acceptance for A0 is recorded below; this evidence applies only to the A0 harness.
+
+Native Windows PowerShell 5.1/Pester 6.2.0 accepted the A0 harness on PR #7 commit `7e45d4a`: pass=0, intentional failure=1, no-tests=1, missing-path=1. The Lifecycle suite remained 49 passed / 24 failed / 0 skipped and now returned npm ExitCode 1. This did not accept Lifecycle implementation behavior.
+
+## A1 — PowerShell 5.1 Runtime and Upgrade Failure Handling
+
+A1 is an independent repair based on PR #6 source-branch checkpoint `ab14c9d`. Its scope is limited to three reported Runtime problems:
+
+- Empty environment collections are valid inputs for the container environment map and temporary environment file helpers; their mandatory `string[]` parameters now explicitly allow empty collections.
+- Storage override parsing now uses `[System.Text.RegularExpressions.RegexOptions]::IgnoreCase`, which resolves under Windows PowerShell 5.1.
+- Upgrade tracks whether the initial Recovery Marker write completed and verified. A pre-Marker failure rethrows the original failure without reading or writing a terminal Operation Record. After Marker creation, the persisted marker must match the current Upgrade operation before the immutable interrupted record is appended. A record failure retains the marker and reports both the operation failure and record failure.
+
+Four focused Pester regressions were added for empty Environment, storage override parsing, avoiding a pre-Marker record write while preserving the preflight error, and writing the terminal interrupted record after a verified Marker.
+
+### A1 verification evidence
+
+- Frozen pre-A1 Windows PowerShell 5.1/Pester baseline at PR #6 head `a1ebbe9`: the non-Docker lifecycle suite reported **49 passed / 24 failed / 0 skipped**. After A0, the same result correctly propagated as npm ExitCode 1. The observed Runtime clusters included empty `Environment`, unresolved `[RegexOptions]`, and Upgrade pre-Marker exception/Operation Record handling.
+- Native Windows PowerShell 5.1/Pester 6.2.0 focused A1 acceptance on PR #8 head `788b9b0`: **3 passed / 1 failed / 0 skipped**. The sole failure was `writes the interrupted Operation Record after a verified Recovery Marker exists`; the injected failure occurred before Marker creation because the shared `Get-RuntimeSnapshot` mock omitted `imageId`/`originalImageReference`, and the Gitea/PostgreSQL/Runner mocks omitted fields read when creating the Marker.
+- The fixture has now been corrected with the required runtime snapshot fields and container `Id`/`State` fields. The regression logs and orders its injected third Actions preflight failure after `set-recovery-marker` and before `operation-record`, and asserts the interrupted record retains the injected root cause. No post-correction Windows result is available.
+- This session attempted `npm run test:gitea-lifecycle`; it exited **127** before Pester startup because WSL has no `powershell` command. A direct `powershell.exe -NoLogo -NoProfile -Command '$PSVersionTable.PSVersion.ToString()'` attempt failed before PowerShell startup with `UtilBindVsockAnyPort:307: socket failed 1`.
+- Therefore there is **no post-correction Pester count** and no native Windows PowerShell 5.1 acceptance claim for this head. Re-run all four focused A1 cases and the full non-Docker suite on Windows; A2 fixtures remain untouched.
+
+### Known pre-A1 failures not resolved by current evidence
+
+No current post-A1 failure count is available. The last exact report is the pre-A1 Windows baseline; these known items still need a fresh run to determine what remains:
+
+- Full non-Docker Lifecycle suite: **24 failed** within 73 cases. The frozen report grouped failures around A1 Runtime issues plus A2 fixture/contract drift: read-only `backup-list` versus ACL fixture root creation; recovery reconciliation fixtures; Marker-directory expectations; PostgreSQL schema/identity fixtures or expected messages. A1 does not change those fixtures.
+- `test:gitea-lifecycle:process-argv`: **0/1 passed**, reporting 9 expected arguments versus 1 actual. This is outside the requested A1 fixes.
+- `test:gitea-lifecycle:acl`: **0/1 passed** on the frozen baseline; the prior WSL interop cause was `whoami.exe /priv` returning no output. This was not rerun.
+- `test:gitea-lifecycle:bootstrap-pin`: **4/5 passed** on the frozen baseline; no post-A1 result is available.
+- `test:gitea-lifecycle:long-path`: **3/3 passed** on the frozen baseline; no post-A1 result is available.
+
+Run the focused A1 cases and full non-Docker suite from a native Windows checkout with PowerShell 5.1/Pester 5 or 6.2.0. Do not treat the frozen pre-A1 counts as results for the A1 head.
 
 ## Cleanup
 
@@ -258,3 +290,5 @@ The preview must identify the expected GUID path, matching ownership marker, cur
 - 2026-11-08: Ran the non-Docker suite under Windows PowerShell 5.1/Pester 6.2.0: 45/46 passed, with only the known WSL interop `WindowsAcl` precondition failing; rerun excluding that tag passed 45/45. The GUID-owned Windows temp copy was removed; no service was accessed.
 - 2026-11-08: Recorded the RepoDigest array-concatenation root cause, pre-stop Upgrade/Restore validation, and operator-attested Recovery Marker reconciliation. Pester passed 55/55 excluding the WSL interop ACL prerequisite; Docker E2E awaits native Docker Desktop.
 - 2026-11-08: Added schema-1 triple-digest reconciliation compatibility, a strict Restore rejection assertion, and an isolated E2E that mutates only its owned backup fixture. Updated-head native Pester and Docker E2E remain pending per maintainer direction.
+- 2026-11-10: Added the A1 PowerShell 5.1 Runtime/error-handling repair and four regression cases from `ab14c9d`. The WSL Pester run could not start (`powershell` missing; Windows launcher interop fails before startup); retained the pre-A1 failure counts and categorized known unresolved A2/argv/ACL/Bootstrap-pin checks without claiming current-head results.
+- 2026-11-10: Recorded native Windows focused A1 results of 3/4 on head `788b9b0`, traced the sole failure to incomplete shared Runtime Snapshot/container mocks, and corrected the fixture and assertion ordering. Current WSL cannot rerun Pester; post-correction native acceptance remains pending.

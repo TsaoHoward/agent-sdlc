@@ -830,7 +830,7 @@ function Assert-PortBinding {
 }
 
 function ConvertTo-ContainerEnvironmentMap {
-    param([Parameter(Mandatory = $true)][string[]]$Environment)
+    param([Parameter(Mandatory = $true)][AllowEmptyCollection()][string[]]$Environment)
 
     $map = @{}
     foreach ($item in $Environment) {
@@ -916,7 +916,7 @@ function Assert-GiteaLocalStorageOnly {
         $name = $item.Substring(0, $separator)
         if ($name -notmatch '^GITEA__(.+)$') { continue }
         $parts = $Matches[1].Split(@('__'), [StringSplitOptions]::None)
-        if ($parts.Count -lt 2 -or -not [Regex]::IsMatch($parts[-1], '^(?:.*storage_type|.*(?:path|dir|directory|root))$', [RegexOptions]::IgnoreCase)) { continue }
+        if ($parts.Count -lt 2 -or -not [Regex]::IsMatch($parts[-1], '^(?:.*storage_type|.*(?:path|dir|directory|root))$', [System.Text.RegularExpressions.RegexOptions]::IgnoreCase)) { continue }
         $key = $parts[-1].ToLowerInvariant()
         $section = ($parts[0..($parts.Count - 2)] -join '.').ToLowerInvariant()
         if (-not $sections.ContainsKey($section)) { $sections[$section] = @{} }
@@ -2197,7 +2197,7 @@ function Assert-BackupRuntimeMatchesContext {
 function Write-TemporaryEnvironmentFile {
     param(
         [hashtable]$Context,
-        [Parameter(Mandatory = $true)][string[]]$Environment
+        [Parameter(Mandatory = $true)][AllowEmptyCollection()][string[]]$Environment
     )
 
     foreach ($entry in $Environment) {
@@ -3173,7 +3173,8 @@ function Resume-GiteaUpgradeSource {
 function Invoke-GiteaUpgradeAttempt {
     param(
         [hashtable]$Context,
-        [Parameter(Mandatory = $true)][string]$GiteaVersion
+        [Parameter(Mandatory = $true)][string]$GiteaVersion,
+        [hashtable]$OperationState
     )
 
     Assert-NativeWindowsHost
@@ -3210,6 +3211,10 @@ function Invoke-GiteaUpgradeAttempt {
     $operationId = [Guid]::NewGuid().ToString("N")
     $backupId = New-GiteaBackupId
     Set-GiteaLifecycleRecoveryMarker -Context $Context -OperationKind upgrade -BackupId $backupId -OperationId $operationId -Phase "upgrade-prepared" -NextAction "stop-runner" -LastCompletedStage "preflight" -GiteaContainerId (Get-GiteaContainerId -Container $gitea) -PostgresContainerId (Get-GiteaContainerId -Container $postgres) -RunnerContainerId (Get-GiteaContainerId -Container $runner) -SourceImageId ([string]$sourceRuntime.imageId) -SourceImageReference ([string]$sourceRuntime.imageReference) -SourceOriginalImageReference ([string]$sourceRuntime.originalImageReference) -SourceVersion $sourceVersion -TargetImageDigest $targetImage -TargetVersion $GiteaVersion -GiteaState ([string]$gitea.State.Status) -PostgresState ([string]$postgres.State.Status) -RunnerState ([string]$runner.State.Status)
+    if ($OperationState) {
+        $OperationState.RecoveryMarkerCreated = $true
+        $OperationState.OperationId = $operationId
+    }
 
     # Close the window for new work before stopping Gitea. Any queued or active run blocks the snapshot.
     Assert-NoActiveGiteaActions -Context $Context
@@ -3297,21 +3302,28 @@ function Invoke-GiteaUpgrade {
         [hashtable]$Context,
         [Parameter(Mandatory = $true)][string]$GiteaVersion
     )
-    $previousOperationId = $null
-    try { $previousOperationId = [string](Get-GiteaLifecycleRecoveryMarker -Context $Context).operationId } catch { }
+    $operationState = @{
+        RecoveryMarkerCreated = $false
+        OperationId = $null
+    }
     try {
-        Invoke-GiteaUpgradeAttempt -Context $Context -GiteaVersion $GiteaVersion
+        Invoke-GiteaUpgradeAttempt -Context $Context -GiteaVersion $GiteaVersion -OperationState $operationState
     }
     catch {
         $failure = $_
+        if (-not $operationState.RecoveryMarkerCreated) {
+            throw $failure
+        }
         try {
             $marker = Get-GiteaLifecycleRecoveryMarker -Context $Context
-            if ($marker -and [string]$marker.operationKind -eq "upgrade" -and [string]$marker.operationId -cne $previousOperationId) {
-                Write-GiteaInterruptedOperationRecord -Context $Context -Marker $marker -ErrorMessage $failure.Exception.Message
+            if (-not $marker -or [string]$marker.operationKind -cne "upgrade" -or
+                [string]$marker.operationId -cne [string]$operationState.OperationId) {
+                throw "The persisted Recovery Marker does not match this Upgrade attempt; no terminal Operation Record was written."
             }
+            Write-GiteaInterruptedOperationRecord -Context $Context -Marker $marker -ErrorMessage $failure.Exception.Message
         }
         catch {
-            throw "Upgrade failed and its immutable terminal record could not be verified or written. The Recovery Marker and retained state remain; inspect them before any retry. Original error: $($failure.Exception.Message) Record error: $($_.Exception.Message)"
+            throw "Upgrade failed after its Recovery Marker was created and its immutable terminal record could not be verified or written. The Recovery Marker and retained state remain; inspect them before any retry. Original error: $($failure.Exception.Message) Record error: $($_.Exception.Message)"
         }
         throw $failure
     }
