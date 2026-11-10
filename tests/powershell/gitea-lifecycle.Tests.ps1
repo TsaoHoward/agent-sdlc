@@ -561,6 +561,9 @@ Describe "Gitea lifecycle safety helpers" {
             $script:failGiteaHealth = $false
             $script:upgradeRecoveryMarker = $null
             $script:upgradeTerminalRecord = $null
+            $script:upgradeCreatedBackupId = $null
+            $script:upgradeMarkerBackupId = $null
+            $script:upgradeMarkerOperationId = $null
             $script:upgradeGiteaEnvironment = @()
             $script:upgradeGiteaArgs = @()
             $script:upgradeContext = @{
@@ -715,10 +718,16 @@ Describe "Gitea lifecycle safety helpers" {
             }
             Mock Get-ImageDigestReference { return ("docker.gitea.com/gitea@sha256:" + ("a" * 64)) }
             Mock Stop-GiteaRunner { $script:lifecycleActions.Add("stop-runner") }
+            Mock New-GiteaBackupId { return $script:upgradeBackupId }
             Mock New-GiteaBackupSet {
+                param($BackupId)
+                if ([string]$BackupId -cne [string]$script:upgradeBackupId) {
+                    throw "The Upgrade Backup ID did not match the isolated fixture."
+                }
+                $script:upgradeCreatedBackupId = [string]$BackupId
                 $script:lifecycleActions.Add("backup")
                 return [pscustomobject]@{
-                    BackupId = $script:upgradeBackupId
+                    BackupId = $BackupId
                     Path = $script:upgradeBackupPath
                     Manifest = [pscustomobject]$script:upgradeManifest
                 }
@@ -772,6 +781,8 @@ Describe "Gitea lifecycle safety helpers" {
                     supersedesOperationId = $SupersedesOperationId
                     priorDiagnosticBackupIds = @($PriorDiagnosticBackupIds)
                 }
+                $script:upgradeMarkerBackupId = [string]$BackupId
+                $script:upgradeMarkerOperationId = [string]$OperationId
                 $script:lifecycleActions.Add("set-recovery-marker")
             }
             Mock Get-GiteaLifecycleRecoveryMarker { return $script:upgradeRecoveryMarker }
@@ -922,14 +933,33 @@ Describe "Gitea lifecycle safety helpers" {
                 return [pscustomobject]@{ State = [pscustomobject]@{ Status = "running" } }
             }
 
-            { Invoke-GiteaLifecycle -Action upgrade -Context $script:upgradeContext -GiteaVersion "1.26.0" } | Should -Throw "active-run-detected"
+            $failureMessage = $null
+            try {
+                Invoke-GiteaLifecycle -Action upgrade -Context $script:upgradeContext -GiteaVersion "1.26.0"
+            }
+            catch {
+                $failureMessage = $_.Exception.Message
+            }
+
+            $failureMessage | Should -Match "active-run-detected"
 
             $script:lifecycleActions | Should -Contain "stop-runner"
             $script:lifecycleActions | Should -Contain "set-recovery-marker"
+            $script:lifecycleActions | Should -Not -Contain "clear-recovery-marker"
             $script:lifecycleActions | Should -Not -Contain "health"
             $script:lifecycleActions | Should -Not -Contain "start-runner"
+            $script:lifecycleActions | Should -Not -Contain "docker start agent-sdlc-gitea"
             $script:lifecycleActions | Should -Not -Contain "backup"
             $script:lifecycleActions | Should -Not -Contain "create-gitea"
+
+            $marker = $script:upgradeRecoveryMarker
+            $marker.schemaVersion | Should -Be 3
+            $marker.operationId | Should -BeExactly $script:upgradeMarkerOperationId
+            $script:upgradeTerminalRecord.operationKind | Should -BeExactly "upgrade"
+            $script:upgradeTerminalRecord.result | Should -BeExactly "interrupted-upgrade-prepared"
+            $script:upgradeTerminalRecord.errorSummary | Should -Match "active-run-detected"
+            $script:upgradeTerminalRecord.operationId | Should -BeExactly $marker.operationId
+            $script:upgradeTerminalRecord.backupId | Should -BeExactly $marker.backupId
         }
 
         It "rejects backup roots inside the repository or overlapping live data" {
@@ -992,7 +1022,10 @@ Describe "Gitea lifecycle safety helpers" {
             $script:upgradeTerminalRecord.operationKind | Should -BeExactly "upgrade"
             $script:upgradeTerminalRecord.operationId | Should -Match "^[0-9a-f]{32}$"
             $script:upgradeTerminalRecord.startedAt | Should -Not -BeNullOrEmpty
-            $script:upgradeTerminalRecord.backupId | Should -BeExactly $script:upgradeBackupId
+            $script:upgradeMarkerBackupId | Should -BeExactly $script:upgradeCreatedBackupId
+            $script:upgradeCreatedBackupId | Should -BeExactly $script:upgradeBackupId
+            $script:upgradeTerminalRecord.operationId | Should -BeExactly $script:upgradeMarkerOperationId
+            $script:upgradeTerminalRecord.backupId | Should -BeExactly $script:upgradeMarkerBackupId
             $script:upgradeTerminalRecord.result | Should -BeExactly "healthy-manual-smoke-required"
         }
 
@@ -1191,15 +1224,34 @@ Describe "Gitea lifecycle safety helpers" {
                 return [pscustomobject]@{ ExitCode = 0; StdOut = ""; StdErr = "" }
             }
 
-            { Invoke-GiteaLifecycle -Action upgrade -Context $script:upgradeContext -GiteaVersion "1.26.0" } | Should -Throw "simulated-stop-failure"
+            $failureMessage = $null
+            try {
+                Invoke-GiteaLifecycle -Action upgrade -Context $script:upgradeContext -GiteaVersion "1.26.0"
+            }
+            catch {
+                $failureMessage = $_.Exception.Message
+            }
+
+            $failureMessage | Should -Match "simulated-stop-failure"
 
             $script:lifecycleActions | Should -Contain "set-recovery-marker"
+            $script:lifecycleActions | Should -Not -Contain "clear-recovery-marker"
             $script:lifecycleActions | Should -Not -Contain "docker start agent-sdlc-gitea"
             $script:lifecycleActions | Should -Not -Contain "health"
             $script:lifecycleActions | Should -Not -Contain "start-runner"
             $script:lifecycleActions | Should -Not -Contain "backup"
             $script:lifecycleActions | Should -Not -Contain "pin-image"
             $script:lifecycleActions | Should -Not -Contain "create-gitea"
+
+            $marker = $script:upgradeRecoveryMarker
+            $marker.schemaVersion | Should -Be 3
+            $marker.operationId | Should -BeExactly $script:upgradeMarkerOperationId
+            $marker.backupId | Should -BeExactly $script:upgradeMarkerBackupId
+            $script:upgradeTerminalRecord.operationKind | Should -BeExactly "upgrade"
+            $script:upgradeTerminalRecord.result | Should -BeExactly "interrupted-upgrade-prepared"
+            $script:upgradeTerminalRecord.errorSummary | Should -Match "simulated-stop-failure"
+            $script:upgradeTerminalRecord.operationId | Should -BeExactly $marker.operationId
+            $script:upgradeTerminalRecord.backupId | Should -BeExactly $marker.backupId
         }
 
         It "retains the backup and does not automatically roll back after a health failure" {
@@ -1341,6 +1393,9 @@ Describe "Gitea recovery marker reconciliation" {
         }
 
         It "records explicit unchanged-container confirmation before clearing a legacy marker without restoring data" {
+            $script:reconcileMarker.PSObject.Properties.Name | Should -Not -Contain "runnerState"
+            $script:reconcileBackup.Manifest.runnerWasRunning | Should -BeTrue
+
             Invoke-GiteaLifecycle -Action reconcile-recovery -Context $script:reconcileContext -BackupId $script:reconcileBackupId -ExpectedGiteaContainerId $script:reconcileGiteaId -ExpectedPostgresContainerId $script:reconcilePostgresId -ExpectedRunnerContainerId $script:reconcileRunnerId
 
             $script:reconcileActions | Should -Contain "confirm-with-full-container-ids"
@@ -1351,6 +1406,18 @@ Describe "Gitea recovery marker reconciliation" {
             $script:reconcileRecord.giteaContainerId | Should -Be $script:reconcileGiteaId
             $script:reconcileRecord.operatorAttestation | Should -Match "DATABASE VERIFIED"
             $script:reconcileRecord.legacyImageReferenceReconciled | Should -BeFalse
+        }
+
+        It "keeps legacy Runner-state validation fail-closed using the verified backup Manifest" {
+            $script:reconcileMarker.PSObject.Properties.Name | Should -Not -Contain "runnerState"
+            $script:reconcileBackup.Manifest.runnerWasRunning | Should -BeTrue
+            $script:reconcileRunner.State.Status = "exited"
+
+            { Invoke-GiteaLifecycle -Action reconcile-recovery -Context $script:reconcileContext -BackupId $script:reconcileBackupId -ExpectedGiteaContainerId $script:reconcileGiteaId -ExpectedPostgresContainerId $script:reconcilePostgresId -ExpectedRunnerContainerId $script:reconcileRunnerId } | Should -Throw "*shared Runner state differs from the captured upgrade source*"
+
+            $script:reconcileActions | Should -Not -Contain "confirm-with-full-container-ids"
+            $script:reconcileActions | Should -Not -Contain "write-operation-record"
+            $script:reconcileActions | Should -Not -Contain "clear-recovery-marker"
         }
 
         It "reconciles the exact schema-1 incident reference through the real runtime topology validator without using it as an image" {

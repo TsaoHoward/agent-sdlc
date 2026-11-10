@@ -2865,7 +2865,28 @@ function Invoke-GiteaRecoveryReconciliation {
             throw "The current $($identity.Name) container ID does not match the explicitly confirmed original ID; recovery marker remains."
         }
     }
-    $expectedVersion = if ($Mode -eq "original-source") { [string]$runtime.sourceVersion } elseif ($Mode -eq "healthy-target") { [string]$marker.targetVersion } else { [string]$runtime.sourceVersion }
+    if ($Mode -eq "healthy-target") {
+        if ([int]$marker.schemaVersion -ne 3) {
+            throw "Healthy-target closeout requires a schema-3 Recovery Marker; recovery marker remains."
+        }
+        foreach ($requiredField in @("targetVersion", "targetImageDigest", "runnerState")) {
+            $property = $marker.PSObject.Properties[$requiredField]
+            if (-not $property -or -not $property.Value) {
+                throw "Healthy-target closeout requires the Recovery Marker '$requiredField' value; recovery marker remains."
+            }
+        }
+    }
+    $diagnosticBackupIdProperty = $marker.PSObject.Properties["diagnosticBackupId"]
+    if ($Mode -eq "restore-complete" -and
+        ([int]$marker.schemaVersion -ne 3 -or
+         -not $diagnosticBackupIdProperty -or
+         -not $diagnosticBackupIdProperty.Value)) {
+        throw "Restore closeout requires a schema-3 Recovery Marker with a retained diagnostic Backup ID; the marker remains."
+    }
+
+    $markerRunnerStateProperty = $marker.PSObject.Properties["runnerState"]
+    $markerRunnerState = if ($markerRunnerStateProperty) { [string]$markerRunnerStateProperty.Value } else { "" }
+    $expectedVersion = if ($Mode -eq "original-source") { [string]$runtime.sourceVersion } elseif ($Mode -eq "healthy-target") { [string]$marker.PSObject.Properties["targetVersion"].Value } else { [string]$runtime.sourceVersion }
     if ($Mode -eq "original-source") {
         if ([string]$gitea.State.Status -ne "running" -or [string]$gitea.Image -ne [string]$runtime.imageId -or
             [string]$gitea.Config.Image -ne [string]$runtime.originalImageReference) {
@@ -2877,14 +2898,14 @@ function Invoke-GiteaRecoveryReconciliation {
         [string]$gitea.Config.Image -cne $(if ($Mode -eq "healthy-target") { [string]$marker.targetImageDigest } else { [string]$runtime.imageReference })) {
         throw "The current Gitea container is not the verified $Mode target image in a running state; recovery marker remains."
     }
-    $expectedRunnerStatus = if ($Mode -eq "original-source" -and $marker.runnerState) {
-        [string]$marker.runnerState
+    $expectedRunnerStatus = if ($Mode -eq "original-source" -and $markerRunnerState) {
+        $markerRunnerState
     }
     elseif ($selected -and [bool]$selected.Manifest.runnerWasRunning) { "running" }
     else { "exited" }
     if ($Mode -eq "healthy-target") {
-        $expectedRunnerStatus = if ([string]$marker.runnerState -eq "running") { "running" } else { "exited" }
-        Assert-GiteaBootstrapImagePin -Context $Context -ExpectedImageReference ([string]$marker.targetImageDigest)
+        $expectedRunnerStatus = if ($markerRunnerState -eq "running") { "running" } else { "exited" }
+        Assert-GiteaBootstrapImagePin -Context $Context -ExpectedImageReference ([string]$marker.PSObject.Properties["targetImageDigest"].Value)
     }
     elseif ($Mode -eq "restore-complete") {
         Assert-GiteaBootstrapImagePin -Context $Context -ExpectedImageReference ([string]$runtime.imageReference)
@@ -2904,7 +2925,7 @@ function Invoke-GiteaRecoveryReconciliation {
         if (-not $marker.diagnosticBackupId) {
             throw "Restore closeout requires the retained diagnostic Backup ID; the marker remains."
         }
-        $diagnostic = Get-GiteaBackupById -Context $Context -BackupId ([string]$marker.diagnosticBackupId)
+        $diagnostic = Get-GiteaBackupById -Context $Context -BackupId ([string]$diagnosticBackupIdProperty.Value)
         if ([string]$diagnostic.Manifest.kind -cne "pre-restore-diagnostic") {
             throw "Restore closeout's diagnostic Backup ID does not identify a valid pre-restore diagnostic backup."
         }
