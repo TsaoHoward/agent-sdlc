@@ -468,9 +468,9 @@ jobs:
         }
         $legacyIntegrity.IsValid | Should -BeTrue
         [string]$legacyIntegrity.Manifest.sourceImageDigest | Should -Be $legacyDigestReference
-        InModuleScope gitea-lifecycle -Parameters @{ BackupPath = $legacyBackupPath } {
-            param($BackupPath)
-            { Get-BackupRuntime -BackupPath $BackupPath } | Should -Throw "*immutable*"
+        InModuleScope gitea-lifecycle -Parameters @{ BackupPath = $legacyBackupPath; Manifest = $legacyIntegrity.Manifest } {
+            param($BackupPath, $Manifest)
+            { Get-BackupRuntime -BackupPath $BackupPath -Manifest $Manifest } | Should -Throw "*immutable*"
         }
 
         $blocker = Get-GiteaLifecycleE2EContainer -ContainerId $fault.BlockerId
