@@ -292,11 +292,12 @@ The code and fixtures were changed without relaxing fail-closed checks, storage 
 
 ## A2 Verification Status
 
-- Base: PR #6 source-branch head `49d19f7702ce9cf5ce08e29531767f24f2122170`; independent branch targets `codex/issue-3-repodigest-recovery`.
+- PR: [#9](https://github.com/TsaoHoward/agent-sdlc/pull/9) is open for review from `codex/issue-3-a2-lifecycle-fixtures` into `codex/issue-3-repodigest-recovery`; base is PR #6 source-branch head `49d19f7702ce9cf5ce08e29531767f24f2122170`.
 - Native full non-Docker Pester 6.2.0: **pending**. Do not report 0 failures until run from native Windows PowerShell 5.1.
 - Local `npm run test:gitea-lifecycle`: **ExitCode 127**, `powershell: not found`; no Pester process started.
 - `git diff --check`: passed.
 - A0/A1 regression coverage stays present. Docker E2E and AC-16 were not run; formal Gitea 43000, any existing Recovery Marker/backup, and #29 were not accessed.
+- Review: Standards found no documented-rule violations. Spec review found no scope expansion or safety-contract relaxation; exact Upgrade error-test attribution and native argv/ACL/bootstrap-pin acceptance remain open.
 
 ## Cleanup
 
@@ -337,3 +338,4 @@ The preview must identify the expected GUID path, matching ownership marker, cur
 - 2026-11-08: Added schema-1 triple-digest reconciliation compatibility, a strict Restore rejection assertion, and an isolated E2E that mutates only its owned backup fixture. Updated-head native Pester and Docker E2E remain pending per maintainer direction.
 - 2026-11-10: Added the A1 PowerShell 5.1 Runtime/error-handling repair and four regression cases from `ab14c9d`. The WSL Pester run could not start (`powershell` missing; Windows launcher interop fails before startup); retained the pre-A1 failure counts and categorized known unresolved A2/argv/ACL/Bootstrap-pin checks without claiming current-head results.
 - 2026-11-10: Recorded native Windows focused A1 results of 3/4 on head `788b9b0`, traced the sole failure to incomplete shared Runtime Snapshot/container mocks, and corrected the fixture and assertion ordering. Current WSL cannot rerun Pester; post-correction native acceptance remains pending.
+- 2026-11-10: Added A2's 16-slot failure classification and fix map, valid integrity-checked Upgrade fixture, serialized topology fixtures, state/phase corrections, real argv quoting repair, pure-read ACL assertion, and temporary-file cleanup checks. Opened PR #9 for review; native Windows Pester remains pending because PowerShell is unavailable in WSL.
