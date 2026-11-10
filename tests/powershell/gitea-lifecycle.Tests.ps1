@@ -870,39 +870,104 @@ Describe "Gitea lifecycle safety helpers" {
             $script:actionsCheckCount = 0
             $script:upgradeRecoveryMarker = $null
             $script:upgradeTerminalRecord = $null
+            $script:upgradeAttemptOperationId = $null
             Mock Set-GiteaLifecycleRecoveryMarker {
-                param($Context, $OperationKind, $BackupId, $Phase, $OperationId, $NextAction)
+                param(
+                    $Context, $OperationKind, $BackupId, $DiagnosticBackupId, $Phase, $OperationId,
+                    $NextAction, $LastCompletedStage, $GiteaContainerId, $TargetContainerId,
+                    $PostgresContainerId, $RunnerContainerId, $SourceImageId, $SourceImageReference,
+                    $SourceOriginalImageReference, $SourceVersion, $TargetImageDigest, $TargetVersion,
+                    $GiteaState, $PostgresState, $RunnerState, $SupersedesOperationId,
+                    $PriorDiagnosticBackupIds, $ReplaceExisting
+                )
+                $script:upgradeAttemptOperationId = $OperationId
+                $createdAt = "2026-11-10T00:00:00.0000000Z"
                 $script:upgradeRecoveryMarker = [pscustomobject]@{
+                    schemaVersion = 3
                     operationId = $OperationId
                     operationKind = $OperationKind
                     phase = $Phase
                     backupId = $BackupId
-                    createdAt = "2026-11-10T00:00:00.0000000Z"
+                    diagnosticBackupId = $DiagnosticBackupId
+                    revision = 1
+                    createdAt = $createdAt
+                    updatedAt = $createdAt
+                    lastCompletedStage = $LastCompletedStage
+                    nextAction = $NextAction
+                    giteaContainerId = $GiteaContainerId
+                    targetContainerId = $TargetContainerId
+                    postgresContainerId = $PostgresContainerId
+                    runnerContainerId = $RunnerContainerId
+                    sourceImageId = $SourceImageId
+                    sourceImageReference = $SourceImageReference
+                    sourceOriginalImageReference = $SourceOriginalImageReference
+                    sourceVersion = $SourceVersion
+                    targetImageDigest = $TargetImageDigest
+                    targetVersion = $TargetVersion
+                    giteaState = $GiteaState
+                    postgresState = $PostgresState
+                    runnerState = $RunnerState
+                    supersedesOperationId = $SupersedesOperationId
+                    priorDiagnosticBackupIds = @($PriorDiagnosticBackupIds)
                 }
-                $script:lifecycleActions.Add("set-recovery-marker")
+                $script:lifecycleActions.Add("set-recovery-marker:$OperationId")
             }
             Mock Get-GiteaLifecycleRecoveryMarker { return $script:upgradeRecoveryMarker }
             Mock Assert-NoActiveGiteaActions {
                 $script:actionsCheckCount += 1
                 $script:lifecycleActions.Add("assert-actions-$script:actionsCheckCount")
-                if ($script:actionsCheckCount -eq 3) { throw "post-marker-root-cause" }
+                if ($script:actionsCheckCount -eq 3) {
+                    $script:lifecycleActions.Add("injected-fault:$($script:upgradeRecoveryMarker.operationId)")
+                    throw "post-marker-root-cause"
+                }
             }
             Mock New-GiteaOperationRecord {
                 param($Context, $Record)
                 $script:upgradeTerminalRecord = $Record
-                $script:lifecycleActions.Add("operation-record")
+                $script:lifecycleActions.Add("operation-record:$($Record.operationId)")
             }
 
-            { Invoke-GiteaLifecycle -Action upgrade -Context $script:upgradeContext -GiteaVersion "1.26.4" } | Should -Throw "post-marker-root-cause"
+            $failureMessage = $null
+            try {
+                Invoke-GiteaLifecycle -Action upgrade -Context $script:upgradeContext -GiteaVersion "1.26.4"
+            }
+            catch {
+                $failureMessage = $_.Exception.Message
+            }
 
+            $failureMessage | Should -Match "post-marker-root-cause"
+
+            $marker = $script:upgradeRecoveryMarker
+            $markerPropertyNames = [string[]]$marker.PSObject.Properties.Name
+            foreach ($requiredMarkerProperty in @(
+                "schemaVersion", "operationId", "operationKind", "phase", "backupId", "diagnosticBackupId",
+                "revision", "createdAt", "updatedAt", "lastCompletedStage", "nextAction", "giteaContainerId",
+                "targetContainerId", "postgresContainerId", "runnerContainerId", "sourceImageId",
+                "sourceImageReference", "sourceOriginalImageReference", "sourceVersion", "targetImageDigest",
+                "targetVersion", "giteaState", "postgresState", "runnerState", "supersedesOperationId",
+                "priorDiagnosticBackupIds"
+            )) {
+                $markerPropertyNames | Should -Contain $requiredMarkerProperty
+            }
+
+            $marker.schemaVersion | Should -Be 3
+            $marker.diagnosticBackupId | Should -BeNullOrEmpty
+            $marker.operationId | Should -BeExactly $script:upgradeAttemptOperationId
+            $marker.operationId | Should -Match "^[0-9a-f]{32}$"
             $script:upgradeTerminalRecord.operationKind | Should -BeExactly "upgrade"
             $script:upgradeTerminalRecord.result | Should -BeExactly "interrupted-upgrade-prepared"
             $script:upgradeTerminalRecord.errorSummary | Should -Match "post-marker-root-cause"
-            $script:lifecycleActions | Should -Contain "set-recovery-marker"
-            $script:lifecycleActions | Should -Contain "assert-actions-3"
-            $script:lifecycleActions | Should -Contain "operation-record"
-            $script:lifecycleActions.IndexOf("set-recovery-marker") | Should -BeLessThan $script:lifecycleActions.IndexOf("assert-actions-3")
-            $script:lifecycleActions.IndexOf("assert-actions-3") | Should -BeLessThan $script:lifecycleActions.IndexOf("operation-record")
+            $script:upgradeTerminalRecord.operationId | Should -BeExactly $marker.operationId
+            $script:upgradeTerminalRecord.backupId | Should -BeExactly $marker.backupId
+
+            $markerEvent = "set-recovery-marker:$($script:upgradeAttemptOperationId)"
+            $faultEvent = "injected-fault:$($script:upgradeAttemptOperationId)"
+            $recordEvent = "operation-record:$($script:upgradeAttemptOperationId)"
+            $script:lifecycleActions | Should -Contain $markerEvent
+            $script:lifecycleActions | Should -Contain $faultEvent
+            $script:lifecycleActions | Should -Contain $recordEvent
+            $script:lifecycleActions.IndexOf($markerEvent) | Should -BeLessThan $script:lifecycleActions.IndexOf($faultEvent)
+            $script:lifecycleActions.IndexOf($faultEvent) | Should -BeLessThan $script:lifecycleActions.IndexOf($recordEvent)
         }
 
         It "surfaces the safe image-pin stage, exception type, and masked cause after health checks" {
