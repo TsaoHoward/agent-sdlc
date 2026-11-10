@@ -3,6 +3,121 @@ BeforeDiscovery {
     Import-Module (Resolve-Path $modulePath) -Force
 }
 
+Describe "Native Windows PowerShell 5.1 ProcessStartInfo argv boundary" -Tag "WindowsProcessArgv" -Skip:($env:OS -ne "Windows_NT" -or $PSVersionTable.PSVersion.Major -ne 5) {
+    InModuleScope gitea-lifecycle -Parameters @{ TestDrive = $TestDrive; PSHome = $PSHOME } {
+        param($TestDrive, $PSHome)
+        It "round-trips empty, spaced, Unicode, quote, and leading/trailing slash arguments through a real child process" {
+        $childPath = Join-Path $TestDrive "argv echo.ps1"
+        $childScript = '[Console]::OutputEncoding = New-Object System.Text.UTF8Encoding($false); ConvertTo-Json -InputObject @($args) -Compress'
+        [System.IO.File]::WriteAllText($childPath, $childScript, [System.Text.UTF8Encoding]::new($false))
+        $expected = @("", "two words", "雪貓 café", 'quote"inside', "leading space", "trailing space ", "path with space\", '\\server\share\', 'slashes \\" around')
+        $powershellPath = Join-Path $PSHOME "powershell.exe"
+        $startInfo = New-Object System.Diagnostics.ProcessStartInfo
+        $startInfo.FileName = $powershellPath
+        $startInfo.UseShellExecute = $false
+        $startInfo.RedirectStandardOutput = $true
+        $startInfo.RedirectStandardError = $true
+        $startInfo.CreateNoWindow = $true
+        $startInfo.StandardOutputEncoding = [System.Text.Encoding]::UTF8
+        $startInfo.Arguments = ConvertTo-ProcessArgumentString -Arguments (@("-NoProfile", "-NonInteractive", "-File", $childPath) + $expected)
+        $process = New-Object System.Diagnostics.Process
+        $process.StartInfo = $startInfo
+        [void]$process.Start()
+        $stdout = $process.StandardOutput.ReadToEnd()
+        $stderr = $process.StandardError.ReadToEnd()
+        $process.WaitForExit()
+
+        $process.ExitCode | Should -Be 0 -Because $stderr
+        $actual = @(ConvertFrom-Json -InputObject $stdout -ErrorAction Stop)
+        $actual.Count | Should -Be $expected.Count
+        for ($index = 0; $index -lt $expected.Count; $index += 1) {
+            [string]$actual[$index] | Should -BeExactly $expected[$index]
+        }
+        }
+    }
+}
+
+Describe "Gitea lifecycle read-only status" {
+    InModuleScope gitea-lifecycle -Parameters @{ TestDrive = $TestDrive } {
+        param($TestDrive)
+        It "does not create lifecycle state while reading an empty status" {
+            $repoRoot = Join-Path $TestDrive "status-read-only"
+            New-Item -ItemType Directory -Path $repoRoot -Force | Out-Null
+            $context = @{ RepoRoot = $repoRoot }
+
+            $status = Get-GiteaLifecycleStatus -Context $context
+
+            $status.RecoveryPending | Should -BeFalse
+            $status.Marker | Should -BeNullOrEmpty
+            $status.LatestOperationRecord | Should -BeNullOrEmpty
+            Test-Path -LiteralPath (Join-Path $repoRoot ".agent-sdlc\dev-env\gitea") | Should -BeFalse
+        }
+
+        It "fails closed on an invalid marker without changing it" {
+            $repoRoot = Join-Path $TestDrive "status-invalid-marker"
+            $markerDirectory = Join-Path $repoRoot ".agent-sdlc\dev-env\gitea"
+            New-Item -ItemType Directory -Path $markerDirectory -Force | Out-Null
+            $markerPath = Join-Path $markerDirectory "lifecycle-recovery.json"
+            [System.IO.File]::WriteAllText($markerPath, "{ invalid json", [System.Text.UTF8Encoding]::new($false))
+            $before = [Convert]::ToBase64String([System.IO.File]::ReadAllBytes($markerPath))
+
+            { Get-GiteaLifecycleStatus -Context @{ RepoRoot = $repoRoot } } | Should -Throw "*unreadable*"
+
+            [Convert]::ToBase64String([System.IO.File]::ReadAllBytes($markerPath)) | Should -BeExactly $before
+        }
+    }
+}
+
+Describe "Gitea lifecycle append-only operation records" {
+    InModuleScope gitea-lifecycle -Parameters @{ TestDrive = $TestDrive } {
+        param($TestDrive)
+
+        It "accepts an identical retry and rejects replacement content without changing terminal evidence" {
+            $context = @{ RepoRoot = (Join-Path $TestDrive "append-only-records") }
+            $record = @{
+                schemaVersion = 2
+                operationId = "aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa"
+                operationKind = "upgrade"
+                result = "interrupted-target-start-attempted"
+                completedAt = "2026-11-10T00:00:00.0000000Z"
+                backupId = "20261110T000000Z-bbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbb"
+            }
+
+            New-GiteaOperationRecord -Context $context -Record $record | Out-Null
+            $recordPath = Get-GiteaOperationRecordPath -Context $context -OperationId $record.operationId
+            $originalBytes = [Convert]::ToBase64String([System.IO.File]::ReadAllBytes($recordPath))
+            New-GiteaOperationRecord -Context $context -Record $record | Should -Not -BeNullOrEmpty
+
+            $conflict = @{} + $record
+            $conflict.result = "reconciled-original-source-without-restore"
+            { New-GiteaOperationRecord -Context $context -Record $conflict } | Should -Throw "*append-only*"
+            [Convert]::ToBase64String([System.IO.File]::ReadAllBytes($recordPath)) | Should -BeExactly $originalBytes
+        }
+
+        It "clears a schema-3 marker only after its matching terminal record is reloadable" {
+            $context = @{ RepoRoot = (Join-Path $TestDrive "terminal-marker") }
+            $operationId = "cccccccccccccccccccccccccccccccc"
+            $backupId = "20261110T000000Z-dddddddddddddddddddddddddddddddd"
+            Set-GiteaLifecycleRecoveryMarker -Context $context -OperationKind restore -BackupId $backupId -OperationId $operationId -Phase "restore-prepared" -NextAction "stop-runner"
+            $markerPath = Get-GiteaLifecycleRecoveryMarkerPath -Context $context
+
+            { Clear-GiteaLifecycleRecoveryMarker -Context $context -OperationId $operationId } | Should -Throw "*terminal Operation Record*"
+            Test-LongPath -Path $markerPath -PathType Leaf | Should -BeTrue
+
+            New-GiteaOperationRecord -Context $context -Record @{
+                schemaVersion = 2
+                operationId = $operationId
+                operationKind = "restore"
+                result = "interrupted-restore-prepared"
+                completedAt = [DateTime]::UtcNow.ToString("o")
+                backupId = $backupId
+            } | Out-Null
+            Clear-GiteaLifecycleRecoveryMarker -Context $context -OperationId $operationId
+            Test-LongPath -Path $markerPath | Should -BeFalse
+        }
+    }
+}
+
 Describe "Gitea lifecycle isolated Docker failure diagnostics" {
     BeforeAll {
         . (Join-Path $PSScriptRoot "gitea-lifecycle.DockerE2E.Helpers.ps1")
@@ -439,19 +554,24 @@ Describe "Gitea lifecycle safety helpers" {
         BeforeEach {
             $script:lifecycleActions = [System.Collections.Generic.List[string]]::new()
             $script:failGiteaHealth = $false
+            $script:upgradeGiteaEnvironment = @()
+            $script:upgradeGiteaArgs = @()
             $script:upgradeContext = @{
                 GiteaContainerName = "agent-sdlc-gitea"
                 GiteaRunnerContainerName = "agent-sdlc-gitea-runner"
                 GiteaPostgresContainerName = "agent-sdlc-gitea-db"
+                GiteaConfigDir = (Join-Path $TestRoot "upgrade-config")
                 GiteaRootUrl = "http://localhost:43000/"
             }
+            New-Item -ItemType Directory -Path $script:upgradeContext.GiteaConfigDir -Force | Out-Null
+            [System.IO.File]::WriteAllText((Join-Path $script:upgradeContext.GiteaConfigDir "app.ini"), "[storage]`r`nSTORAGE_TYPE = local`r`n[attachment]`r`nPATH = data/attachments`r`n[lfs]`r`nPATH = data/lfs`r`n", [System.Text.UTF8Encoding]::new($false))
 
             Mock Assert-NativeWindowsHost {}
             Mock Assert-DockerDesktopReady { return @{ id = "isolated-test-engine" } }
             Mock Assert-NoPendingGiteaRecovery {}
             Mock Ensure-BackupRoot {}
             Mock Assert-GiteaConfigCanBePinned {}
-            Mock Assert-GiteaContainerIdentity { return [pscustomobject]@{ Name = "/agent-sdlc-gitea" } }
+            Mock Assert-GiteaContainerIdentity { return [pscustomobject]@{ Name = "/agent-sdlc-gitea"; Args = @($script:upgradeGiteaArgs); Config = [pscustomobject]@{ Env = @($script:upgradeGiteaEnvironment); Cmd = @() } } }
             Mock Assert-PostgresContainerIdentity { return [pscustomobject]@{ Name = "/agent-sdlc-gitea-db" } }
             Mock Get-GiteaRunnerInfo { return [pscustomobject]@{ State = [pscustomobject]@{ Status = "running" } } }
             Mock Get-GiteaReportedVersion { return "1.25.5" }
@@ -517,6 +637,41 @@ Describe "Gitea lifecycle safety helpers" {
             $script:lifecycleActions | Should -Not -Contain "create-gitea"
         }
 
+        It "blocks external storage selected by app.ini before backup-root or service changes" {
+            [System.IO.File]::WriteAllText((Join-Path $script:upgradeContext.GiteaConfigDir "app.ini"), "[storage]`r`nSTORAGE_TYPE = local`r`n[attachment]`r`nSTORAGE_TYPE = minio`r`n", [System.Text.UTF8Encoding]::new($false))
+
+            { Invoke-GiteaLifecycle -Action upgrade -Context $script:upgradeContext -GiteaVersion "1.26.4" } | Should -Throw "*outside the backup payload*"
+
+            $script:lifecycleActions | Should -Not -Contain "stop-runner"
+            $script:lifecycleActions | Should -Not -Contain "backup"
+            $script:lifecycleActions | Should -Not -Contain "set-recovery-marker"
+            Should -Invoke Ensure-BackupRoot -Times 0 -Exactly
+        }
+
+        It "blocks storage environment overrides and uncovered paths before service changes" {
+            $script:upgradeGiteaEnvironment = @("GITEA__storage__STORAGE_TYPE=s3")
+            { Invoke-GiteaLifecycle -Action upgrade -Context $script:upgradeContext -GiteaVersion "1.26.4" } | Should -Throw "*outside the backup payload*"
+
+            $script:upgradeGiteaEnvironment = @()
+            [System.IO.File]::WriteAllText((Join-Path $script:upgradeContext.GiteaConfigDir "app.ini"), "[storage]`r`nSTORAGE_TYPE = local`r`n[attachment]`r`nPATH = /mnt/external/attachments`r`n", [System.Text.UTF8Encoding]::new($false))
+            { Invoke-GiteaLifecycle -Action upgrade -Context $script:upgradeContext -GiteaVersion "1.26.4" } | Should -Throw "*outside the captured*"
+
+            $script:lifecycleActions | Should -Not -Contain "stop-runner"
+            $script:lifecycleActions | Should -Not -Contain "backup"
+            $script:lifecycleActions | Should -Not -Contain "set-recovery-marker"
+            Should -Invoke Ensure-BackupRoot -Times 0 -Exactly
+        }
+
+        It "blocks an explicit app.ini command override outside the mounted config before service changes" {
+            $script:upgradeGiteaArgs = @("web", "--config", "/tmp/external-app.ini")
+
+            { Invoke-GiteaLifecycle -Action upgrade -Context $script:upgradeContext -GiteaVersion "1.26.4" } | Should -Throw "*outside the captured /etc/gitea payload*"
+
+            $script:lifecycleActions | Should -Not -Contain "stop-runner"
+            $script:lifecycleActions | Should -Not -Contain "set-recovery-marker"
+            Should -Invoke Ensure-BackupRoot -Times 0 -Exactly
+        }
+
         It "validates the source image reference before stopping Gitea or Runner" {
             Mock Get-RuntimeSnapshot { throw "source RepoDigests are malformed" }
 
@@ -527,7 +682,7 @@ Describe "Gitea lifecycle safety helpers" {
             $script:lifecycleActions | Should -Not -Contain "docker stop --time 60 agent-sdlc-gitea"
         }
 
-        It "resumes the original Runner when new Actions work is detected after it stops" {
+        It "retains the Recovery Marker and does not auto-resume when Actions work appears after Runner stop" {
             $script:actionsCheckCount = 0
             Mock Assert-NoActiveGiteaActions {
                 $script:actionsCheckCount += 1
@@ -540,8 +695,9 @@ Describe "Gitea lifecycle safety helpers" {
             { Invoke-GiteaLifecycle -Action upgrade -Context $script:upgradeContext -GiteaVersion "1.26.0" } | Should -Throw "active-run-detected"
 
             $script:lifecycleActions | Should -Contain "stop-runner"
-            $script:lifecycleActions | Should -Contain "health"
-            $script:lifecycleActions | Should -Contain "start-runner"
+            $script:lifecycleActions | Should -Contain "set-recovery-marker"
+            $script:lifecycleActions | Should -Not -Contain "health"
+            $script:lifecycleActions | Should -Not -Contain "start-runner"
             $script:lifecycleActions | Should -Not -Contain "backup"
             $script:lifecycleActions | Should -Not -Contain "create-gitea"
         }
@@ -578,6 +734,7 @@ Describe "Gitea lifecycle safety helpers" {
             $manifest = @{
                 schemaVersion = 1
                 backupId = "fixture"
+                sizeBytes = [long](Get-Item -LiteralPath $payloadFile).Length
                 files = @(@{
                     path = "payload/private/restore-context.json"
                     sizeBytes = [long](Get-Item -LiteralPath $payloadFile).Length
@@ -614,8 +771,8 @@ Describe "Gitea lifecycle safety helpers" {
 
             { Invoke-GiteaLifecycle -Action upgrade -Context $script:upgradeContext -GiteaVersion "1.26.0" } | Should -Throw "marker-write-failed"
 
-            $script:lifecycleActions | Should -Contain "backup"
-            $script:lifecycleActions | Should -Contain "start-runner"
+            $script:lifecycleActions | Should -Not -Contain "backup"
+            $script:lifecycleActions | Should -Not -Contain "stop-runner"
             $script:lifecycleActions | Should -Not -Contain "pin-image"
             $script:lifecycleActions | Should -Not -Contain "create-gitea"
         }
@@ -648,7 +805,7 @@ Describe "Gitea lifecycle safety helpers" {
             $script:lifecycleActions | Should -Not -Contain "start-runner"
         }
 
-        It "resumes the unchanged source service and original Runner when stopping Gitea fails" {
+        It "fails closed without auto-resuming the source service or Runner when stopping Gitea fails" {
             $script:sourceContainerStopped = $false
             Mock Get-GiteaContainerInfo {
                 $status = if ($script:sourceContainerStopped) { "exited" } else { "running" }
@@ -667,9 +824,10 @@ Describe "Gitea lifecycle safety helpers" {
 
             { Invoke-GiteaLifecycle -Action upgrade -Context $script:upgradeContext -GiteaVersion "1.26.0" } | Should -Throw "simulated-stop-failure"
 
-            $script:lifecycleActions | Should -Contain "docker start agent-sdlc-gitea"
-            $script:lifecycleActions | Should -Contain "health"
-            $script:lifecycleActions | Should -Contain "start-runner"
+            $script:lifecycleActions | Should -Contain "set-recovery-marker"
+            $script:lifecycleActions | Should -Not -Contain "docker start agent-sdlc-gitea"
+            $script:lifecycleActions | Should -Not -Contain "health"
+            $script:lifecycleActions | Should -Not -Contain "start-runner"
             $script:lifecycleActions | Should -Not -Contain "backup"
             $script:lifecycleActions | Should -Not -Contain "pin-image"
             $script:lifecycleActions | Should -Not -Contain "create-gitea"
@@ -705,7 +863,7 @@ Describe "Gitea recovery marker reconciliation" {
                 GiteaRunnerContainerName = "agent-sdlc-gitea-runner"
                 GiteaNetworkName = "agent-sdlc-gitea-network"
                 GiteaDataDir = "C:\isolated-repo\.agent-sdlc\dev-env\gitea\data"
-                GiteaConfigDir = "C:\isolated-repo\.agent-sdlc\dev-env\gitea\config"
+                GiteaConfigDir = (Join-Path (Get-PSDrive -Name TestDrive).Root "reconcile-config")
                 GiteaPostgresDataDir = "C:\isolated-repo\.agent-sdlc\dev-env\gitea\postgres-data"
                 PortBindAddress = "127.0.0.1"
                 GiteaHttpPort = 43000
@@ -713,7 +871,10 @@ Describe "Gitea recovery marker reconciliation" {
                 GiteaPostgresHostPort = 43001
                 GiteaPostgresDbName = "gitea"
                 GiteaPostgresUser = "gitea"
+                BackupRoot = "C:\isolated-backups"
             }
+            New-Item -ItemType Directory -Path $script:reconcileContext.GiteaConfigDir -Force | Out-Null
+            [System.IO.File]::WriteAllText((Join-Path $script:reconcileContext.GiteaConfigDir "app.ini"), "[storage]`r`nSTORAGE_TYPE = local`r`n", [System.Text.UTF8Encoding]::new($false))
             $script:reconcileMarker = [pscustomobject]@{
                 schemaVersion = 1
                 operationKind = "upgrade"
@@ -751,7 +912,8 @@ Describe "Gitea recovery marker reconciliation" {
                 Id = $script:reconcileGiteaId
                 Name = "/agent-sdlc-gitea"
                 Image = $script:reconcileRuntime.imageId
-                Config = [pscustomobject]@{ Image = $script:reconcileRuntime.originalImageReference }
+                Args = @()
+                Config = [pscustomobject]@{ Image = $script:reconcileRuntime.originalImageReference; Env = @(); Cmd = @() }
                 State = [pscustomobject]@{ Status = "running" }
             }
             $script:reconcilePostgres = [pscustomobject]@{
@@ -767,6 +929,12 @@ Describe "Gitea recovery marker reconciliation" {
             Mock Assert-DockerDesktopReady { return @{ id = "isolated-test-engine" } }
             Mock Get-GiteaLifecycleRecoveryMarker { return $script:reconcileMarker }
             Mock Get-GiteaBackupById { return $script:reconcileBackup }
+            Mock Test-LongPath {
+                param($Path, $PathType)
+                if ([string]$Path -ceq (Join-Path $script:reconcileContext.BackupRoot $script:reconcileBackupId) -and [string]$PathType -ceq "Container") { return $true }
+                return $false
+            }
+            Mock Test-GiteaBackupIntegrity { return [pscustomobject]@{ IsValid = $true; Manifest = $script:reconcileBackup.Manifest } }
             Mock Assert-GiteaContainerIdentity { return $script:reconcileGitea }
             Mock Assert-PostgresContainerIdentity { return $script:reconcilePostgres }
             Mock Get-GiteaRunnerInfo { return $script:reconcileRunner }
@@ -780,6 +948,7 @@ Describe "Gitea recovery marker reconciliation" {
             Mock Assert-PostgresRestoreCompatibility { $script:reconcileActions.Add("validate-postgres-topology") }
             Mock Assert-GiteaDatabaseTarget { $script:reconcileActions.Add("validate-database-target") }
             Mock Assert-GiteaApiVersion { $script:reconcileActions.Add("validate-api-version") }
+            Mock Assert-GiteaBootstrapImagePin {}
             Mock Confirm-GiteaLifecycleOperation { $script:reconcileActions.Add("confirm-with-full-container-ids") }
             Mock New-GiteaOperationRecord {
                 param($Context, $Record)
@@ -866,6 +1035,17 @@ Describe "Gitea recovery marker reconciliation" {
             $script:reconcileActions | Should -Not -Contain "clear-recovery-marker"
         }
 
+        It "forbids original-source closeout once target startup may have begun" {
+            $script:reconcileMarker.schemaVersion = 3
+            $script:reconcileMarker.phase = "target-start-attempted"
+
+            { Invoke-GiteaLifecycle -Action reconcile-recovery -Context $script:reconcileContext -BackupId $script:reconcileBackupId -ExpectedGiteaContainerId $script:reconcileGiteaId -ExpectedPostgresContainerId $script:reconcilePostgresId -ExpectedRunnerContainerId $script:reconcileRunnerId } | Should -Throw "*target create/start stage may have begun*"
+
+            $script:reconcileActions | Should -Not -Contain "validate-api-version"
+            $script:reconcileActions | Should -Not -Contain "write-operation-record"
+            $script:reconcileActions | Should -Not -Contain "clear-recovery-marker"
+        }
+
         It "does not reconcile markers created by a restore operation" {
             $script:reconcileMarker.operationKind = "restore"
 
@@ -933,7 +1113,10 @@ Describe "Gitea lifecycle operator restore command" {
 
             $script:restorePayloadPath = Join-Path $TestRoot "selected-backup"
             $privatePath = Join-Path $script:restorePayloadPath "payload/private"
+            $giteaConfigPath = Join-Path $script:restorePayloadPath "payload/gitea-config"
             New-Item -ItemType Directory -Path $privatePath -Force | Out-Null
+            New-Item -ItemType Directory -Path $giteaConfigPath -Force | Out-Null
+            [System.IO.File]::WriteAllText((Join-Path $giteaConfigPath "app.ini"), "[storage]`r`nSTORAGE_TYPE = local`r`n", [System.Text.UTF8Encoding]::new($false))
             [System.IO.File]::WriteAllText((Join-Path $privatePath "postgres-topology.json"), "{}")
             $script:restoreRuntime = [pscustomobject]@{
                 containerName = "agent-sdlc-gitea"
@@ -975,6 +1158,10 @@ Describe "Gitea lifecycle operator restore command" {
                 return [pscustomobject]@{ BackupId = "20261105T000001Z-0123456789abcdef0123456789abcdef"; Path = "C:\isolated-backups\diagnostic" }
             }
             Mock Set-GiteaLifecycleRecoveryMarker { $script:restoreActions.Add("set-recovery-marker") }
+            Mock Update-GiteaLifecycleRecoveryMarkerPhase {
+                param($Context, $BackupId, $Phase, $NextAction, $LastCompletedStage, $DiagnosticBackupId, $OperationId)
+                $script:restoreActions.Add("marker-next:$NextAction")
+            }
             Mock Invoke-GiteaPostgresRestore {
                 param($Context, $DumpPath)
                 $script:restoreActions.Add("restore-postgres:$DumpPath")
@@ -999,6 +1186,16 @@ Describe "Gitea lifecycle operator restore command" {
 
         It "rejects a restore without a valid Backup ID before service or data operations" {
             { Invoke-GiteaLifecycle -Action restore -Context $script:restoreContext -BackupId "bad-id" } | Should -Throw
+            $script:restoreActions | Should -BeNullOrEmpty
+        }
+
+        It "rejects an external-storage backup before confirmation, Marker creation, or service changes" {
+            $backupId = "20261105T000001Z-0123456789abcdef0123456789abcdef"
+            [System.IO.File]::WriteAllText((Join-Path $script:restorePayloadPath "payload/gitea-config/app.ini"), "[storage]`r`nSTORAGE_TYPE = minio`r`n", [System.Text.UTF8Encoding]::new($false))
+            Mock Get-GiteaBackupById { return $script:selectedBackup }
+
+            { Invoke-GiteaLifecycle -Action restore -Context $script:restoreContext -BackupId $backupId } | Should -Throw "*outside the backup payload*"
+
             $script:restoreActions | Should -BeNullOrEmpty
         }
 
@@ -1045,7 +1242,7 @@ Describe "Gitea lifecycle operator restore command" {
             @($script:restoreActions | Where-Object { $_ -like "restore-operator-state:*" }) | Should -BeNullOrEmpty
         }
 
-        It "creates a diagnostic backup before restoring matching PostgreSQL and Gitea state" {
+        It "writes the Recovery Marker before stopping services or creating diagnostic data" {
             Mock Get-GiteaBackupById { return $script:selectedBackup }
 
             Invoke-GiteaLifecycle -Action restore -Context $script:restoreContext -BackupId "20261105T000000Z-0123456789abcdef0123456789abcdef"
@@ -1066,7 +1263,7 @@ Describe "Gitea lifecycle operator restore command" {
                 $script:restoreActions | Should -Contain $expectedAction
             }
 
-            $script:restoreActions.IndexOf("backup-pre-restore-diagnostic") | Should -BeLessThan $script:restoreActions.IndexOf("set-recovery-marker")
+            $script:restoreActions.IndexOf("set-recovery-marker") | Should -BeLessThan $script:restoreActions.IndexOf("backup-pre-restore-diagnostic")
             $script:restoreActions.IndexOf("set-recovery-marker") | Should -BeLessThan $script:restoreActions.IndexOf("restore-postgres:$($script:restorePayloadPath)\payload\postgres.dump")
             $script:restoreActions.IndexOf("restore-postgres:$($script:restorePayloadPath)\payload\postgres.dump") | Should -BeLessThan $script:restoreActions.IndexOf("replace-data:$($script:restorePayloadPath)\payload\gitea-data->$($script:restoreContext.GiteaDataDir)")
             $script:restoreActions.IndexOf("replace-data:$($script:restorePayloadPath)\payload\gitea-data->$($script:restoreContext.GiteaDataDir)") | Should -BeLessThan $script:restoreActions.IndexOf("replace-data:$($script:restorePayloadPath)\payload\gitea-config->$($script:restoreContext.GiteaConfigDir)")
@@ -1085,6 +1282,7 @@ Describe "Gitea lifecycle operator restore command" {
 
             $script:restoreActions | Should -Contain "backup-pre-restore-diagnostic"
             $script:restoreActions | Should -Contain "set-recovery-marker"
+            $script:restoreActions | Should -Contain "operation-record"
             $script:restoreActions | Should -Not -Contain "clear-recovery-marker"
             $script:restoreActions | Should -Not -Contain "create-gitea:$($script:restoreRuntime.imageReference)"
         }
@@ -1444,6 +1642,7 @@ Describe "Gitea lifecycle backup long paths on real NTFS" -Tag "WindowsLongPath"
                 Save-BackupJson -Path (Join-Path $backupPath "manifest.json") -Value @{
                     schemaVersion = 1
                     backupId = Get-LongPathLeaf -Path $backupPath
+                    sizeBytes = [long]$entries[0].sizeBytes
                     files = $entries
                 }
                 $validation = Test-GiteaBackupIntegrity -BackupPath $backupPath

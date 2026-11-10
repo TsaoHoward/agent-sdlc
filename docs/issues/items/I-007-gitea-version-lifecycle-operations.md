@@ -3,7 +3,7 @@
 ## Metadata
 - Issue ID: I-007
 - Status: In Progress
-- Last Updated: 2026-11-08
+- Last Updated: 2026-11-10
 - Owner: Project Maintainer
 - Related Docs / WBS: GitHub issue #3; `docs/roadmap.md` Phase 1 follow-up; WBS `3.12`; `docs/testing/items/TC-011-gitea-version-lifecycle-operations.md`
 - Source Dashboard: docs/issues/issue-dashboard.md
@@ -27,6 +27,12 @@ Recovery Marker closeout is a separate safe path from restore. Never delete the 
 
 The issue identifies Gitea 28.3.0-rootless as a candidate. Official upgrade guidance supports upgrading directly to the latest release in the next series after a full backup. Gitea 28.0.0 documents that the historical `1.` prefix was dropped, and 28.3.0 is the third maintenance release of the 28 series. Based on that rule, the candidate path from the issue's 1.25.5 baseline is 1.26.4 -> 1.27.3 -> 28.3.0; skipping 28.0.0 is an inference from the documented next-series rule and the new version naming, not a published Gitea-specific migration matrix. Review each release changelog and confirm the actual source version before any separately authorized live maintenance. No live upgrade is authorized by this implementation request.
 
+### Implementation update — 2026-11-10
+
+PR #6 now contains schema-2 manifest metadata and file-set validation, schema-3 Recovery Marker write-ahead transitions, immutable per-attempt terminal records, same-Backup-ID Restore handoff/retry, read-only `status`/`backup-list`, and marker-aware `up`/`down` guards. Recovery closeout distinguishes original-source, healthy-target, and restore-complete modes; original-source closeout refuses phases where target create/start may have begun and checks the bootstrap pin. Upgrade, Restore, and recovery closeout also parse effective `app.ini` and Gitea environment overrides, then block external/custom storage selectors or paths beyond the captured data/config mounts. Tests now include local/external storage preflight cases, native child-process argument echo, a real host-label Runner with two jobs around a restart, Git clone/fetch/push, ORAS 1.3.5 Registry operations, adjacent-hop backup/restore consumers, and real Docker rename/network fault injection with fresh-process marker reload.
+
+Current-head validation remains pending: `npm run validate:platform` passed; typecheck could not start because `node_modules/typescript` is missing; Pester could not start because WSL has no `powershell` executable; Docker Desktop context `info` failed with `protocol not available`. No WSL substitute was used. AC-16 remains partial because only the pre-target rename and post-create network failure paths are encoded; the full U0–U9/R0–R9/C1–C2 interruption matrix is still outstanding. No formal Gitea, Recovery Marker, backup, Upgrade, Restore, Reconcile, or #29 operation was performed.
+
 ## Dependencies And Constraints
 
 - Preserve the Gitea/PostgreSQL/Runner identities, configured mounts, host port, network, and local settings.
@@ -44,6 +50,7 @@ Archive after implementation review and authorized Windows Host acceptance are c
 
 ## Next Actions
 
+- Run the current PR head using native Windows PowerShell 5.1 and isolated Docker Desktop; write the AC-01–AC-16 result matrix to Issue #3 and PR #6. Complete the missing AC-16 injection points before claiming implementation acceptance. Keep formal operations and #29 outside this scope.
 - The latest failure is explained by a direct Windows PowerShell 5.1/.NET Framework NTFS probe: `File.Replace` with a null backup path fails with `ArgumentException` / HRESULT `0x80070057`, including for extended-length paths; a unique same-directory backup path succeeds. `Move-LongPathFile -Force` now supplies that backup and rolls the replacement back if backup cleanup fails. Direct image-pin and Recovery Marker coverage was added under `WindowsBootstrapPin`; the upgrade catch preserves sanitized stage/type/cause details. Focused real-NTFS Pester passed 5/5. Combined non-Docker Pester was 43/44; the sole failure was `whoami.exe /priv` returning no output in this WSL Windows-interop session, so native-host full-suite status remains to be confirmed. The post-fix Docker E2E has not been rerun.
 - Next verification: Native Windows bootstrap-pin 5/5, full Pester 44/44 and isolated Docker E2E 3/3 have passed on commit `071cb08`. Only the separately authorized real 43000 upgrade and API/Git/Registry/Actions/Runner/Run Attempt smoke acceptance remain; retain Issue #3 active until that evidence is recorded.
 - Actions preflight compatibility follow-up (2026-11-08): Windows PowerShell 5.1/Pester 6.2.0 ran 45/46 tests; the only failure was the existing WSL interop `WindowsAcl` precondition because `whoami.exe /priv` returned no output. The same suite excluding that tag passed 45/45. Coverage includes the reported `completed` / `failure` / RFC 3339 timestamp shape plus valid/invalid conclusions, timestamps, missing fields, legacy terminal values, active/unknown states and incomplete pagination. The GUID-owned Windows temp copy was removed. The formal Gitea, PostgreSQL, Runner, backup and upgrade surfaces were not accessed.
@@ -67,3 +74,4 @@ Archive after implementation review and authorized Windows Host acceptance are c
 - 2026-11-06: Confirmed `File.Replace(..., $null)` fails on Windows PowerShell 5.1/.NET Framework for ordinary and extended paths; changed replacement to use a unique same-directory backup with rollback on cleanup failure and added direct real-NTFS image-pin/recovery-marker cases with safe diagnostics. Focused Pester passed 5/5; combined non-Docker Pester was 43/44 due to the WSL interop `whoami` precondition; post-fix Docker E2E remains pending.
 - 2026-11-06: Native Windows image-pin 5/5, full Pester 44/44, and GUID-isolated Docker E2E 3/3 passed. Fixture cleanup confirmed; production 43000 acceptance deferred pending explicit authorization.
 - 2026-11-08: Recorded the instance-wide Actions Run #95 compatibility regression, guarded `completed`/conclusion/completion-time handling, and Pester results (45/46 full; 45/45 excluding the WSL interop ACL precondition); formal 43000 acceptance remains separate and unauthorized.
+- 2026-11-10: Added fail-closed local-storage coverage validation across Upgrade, Restore, and recovery closeout, plus app.ini/environment/path regression cases. Current-head native PowerShell and Docker Desktop acceptance remains pending; AC-16 remains incomplete.

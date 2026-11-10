@@ -114,20 +114,32 @@ Describe "Gitea bootstrap image pin on real NTFS" -Tag "WindowsBootstrapPin" {
         $entries[0].Name | Should -Be "gitea-bootstrap.json"
     }
 
-    It "replaces an existing recovery marker without leaving replacement files" {
+    It "supersedes a terminal interrupted attempt for the same Backup ID without leaving replacement files" {
         $context = @{ RepoRoot = $script:pinFixtureRoot }
         InModuleScope gitea-lifecycle -Parameters @{ Context = $context } {
             param($Context)
-            Set-GiteaLifecycleRecoveryMarker -Context $Context -OperationKind upgrade -BackupId "backup-first"
-            Set-GiteaLifecycleRecoveryMarker -Context $Context -OperationKind restore -BackupId "backup-second" -DiagnosticBackupId "backup-diagnostic"
+            $backupId = "20261105T000000Z-0123456789abcdef0123456789abcdef"
+            $firstOperationId = "aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa"
+            $secondOperationId = "bbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbb"
+            Set-GiteaLifecycleRecoveryMarker -Context $Context -OperationKind upgrade -BackupId $backupId -OperationId $firstOperationId -Phase "target-start-attempted" -NextAction "verify-source-or-restore"
+            New-GiteaOperationRecord -Context $Context -Record @{
+                schemaVersion = 2
+                operationId = $firstOperationId
+                operationKind = "upgrade"
+                result = "interrupted-target-start-attempted"
+                completedAt = [DateTime]::UtcNow.ToString("o")
+                backupId = $backupId
+            } | Out-Null
+            Set-GiteaLifecycleRecoveryMarker -Context $Context -OperationKind restore -BackupId $backupId -OperationId $secondOperationId -SupersedesOperationId $firstOperationId -Phase "restore-prepared" -NextAction "stop-runner" -ReplaceExisting
         }
 
         $markerDirectory = Join-Path $script:pinFixtureRoot ".agent-sdlc\dev-env\gitea"
         $markerPath = Join-Path $markerDirectory "lifecycle-recovery.json"
         $marker = [System.IO.File]::ReadAllText("\\?\$markerPath") | ConvertFrom-Json
         $marker.operationKind | Should -Be "restore"
-        $marker.backupId | Should -Be "backup-second"
-        $marker.diagnosticBackupId | Should -Be "backup-diagnostic"
+        $marker.backupId | Should -Be "20261105T000000Z-0123456789abcdef0123456789abcdef"
+        $marker.operationId | Should -Be "bbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbb"
+        $marker.supersedesOperationId | Should -Be "aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa"
 
         $entries = @(InModuleScope gitea-lifecycle -Parameters @{ Directory = $markerDirectory } {
             param($Directory)

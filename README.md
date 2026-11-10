@@ -148,6 +148,7 @@ npm run dev:env:status
 npm run dev:env:down
 npm run dev:env:backup-list
 npm run test:gitea-lifecycle:acl
+npm run test:gitea-lifecycle:process-argv
 npm run test:gitea-lifecycle:long-path
 npm run test:gitea-lifecycle
 ```
@@ -155,7 +156,7 @@ npm run test:gitea-lifecycle
 `dev:env:up` now also starts the default task-intake and review-follow-up webhook listeners from template/local config, and the default local Gitea repo bootstrap path now ensures both issue-comment and review-follow-up webhooks are configured against that repo.
 The npm `dev:env:init` and `dev:env:up*` commands ensure the ignored local Gitea bootstrap config before starting; run `npm run dev:gitea-bootstrap-config` once first when using the direct PowerShell `up` command without password environment variables.
 
-The Gitea lifecycle commands run only from native Windows PowerShell and target the legacy PostgreSQL-backed instance on port `43000`. Generate the ignored local config first, clear `AGENT_SDLC_GITEA_IMAGE`, set `gitea.backup.root` to a local fixed-drive path or accept the default under `%USERPROFILE%\Backups\agent-sdlc\gitea`, and review the actual supported source-to-target Gitea upgrade path before using an explicit fixed version. The command creates a checksum-verified backup before replacing only the Gitea container; it does not operate on the separate Compose instance on port `46300`. Restore requires a Backup ID and typed confirmation. Live service maintenance requires separate authorization and the TC-011 manual smoke checks.
+The Gitea lifecycle commands run only from native Windows PowerShell and target the legacy PostgreSQL-backed instance on port `43000`. Generate the ignored local config first, clear `AGENT_SDLC_GITEA_IMAGE`, set `gitea.backup.root` to a local fixed-drive path or accept the default under `%USERPROFILE%\Backups\agent-sdlc\gitea`, and review the actual supported source-to-target Gitea upgrade path before using an explicit fixed version. The command creates a checksum-verified backup before replacing only the Gitea container; it does not operate on the separate Compose instance on port `46300`. Upgrade, Restore, and recovery closeout fail closed unless effective Gitea storage selectors and paths are covered by the captured `/var/lib/gitea` and `/etc/gitea` payloads; external/custom storage backends and uncovered paths are blocked. Restore requires a Backup ID and typed confirmation. Live service maintenance requires separate authorization and the TC-011 manual smoke checks.
 
 Run the lifecycle checks from native Windows PowerShell with Node.js 22+, npm, Pester 5 or 6.2.0, and Docker Desktop:
 
@@ -163,6 +164,7 @@ Run the lifecycle checks from native Windows PowerShell with Node.js 22+, npm, P
 npm ci
 npm run typecheck
 npm run test:gitea-lifecycle:acl
+npm run test:gitea-lifecycle:process-argv
 npm run test:gitea-lifecycle:long-path
 npm run test:gitea-lifecycle
 $env:AGENT_SDLC_GITEA_DOCKER_E2E = "1"
@@ -174,19 +176,19 @@ The NTFS ACL check must run from non-elevated Windows PowerShell. It creates a G
 
 The long-path check also runs from non-elevated Windows PowerShell and uses only a GUID-owned NTFS temp tree. It creates a backup object whose destination path exceeds 260 characters, records whether unprefixed `Copy-Item` fails while the source and destination parent still exist, then checks extended-path copy, SHA256 manifest generation/validation, restore replacement, content equality, and ownership-verified cleanup. It does not change Windows long-path policy or use the configured backup directory.
 
-The Docker E2E creates only GUID-named disposable fixtures, uses separate bind mounts and a private network, and binds to `127.0.0.2` so the existing `127.0.0.1:43000` service is outside its target. It checks pre-existing container identities and states before cleanup. It uses an inert fixture Runner and does not validate real Actions dispatch or Runner execution. If teardown leaves a temp directory, use the standalone GUID/marker/owner/path/reparse-verified cleanup procedure in `docs/testing/items/TC-011-gitea-version-lifecycle-operations.md`; it requires a WhatIf review and explicit same-Run-ID confirmation.
+The Docker E2E creates only GUID-named disposable Gitea, PostgreSQL, and real host-label Runner fixtures, uses separate bind mounts and a private network, and binds to `127.0.0.2` so the existing `127.0.0.1:43000` service is outside its target. It exercises Git push/fetch, Actions dispatch/run/job/log APIs, Runner restart, ORAS 1.3.5 Registry flows, backup/restore, and selected real Docker fault injection. Every image-declared volume must map to an owned bind mount; cleanup verifies pre-existing container identities and states. The full native Windows PowerShell 5.1 and Docker Desktop suite has not run for the current PR head, so these cases are not yet acceptance evidence. If teardown leaves a temp directory, use the standalone GUID/marker/owner/path/reparse-verified cleanup procedure in `docs/testing/items/TC-011-gitea-version-lifecycle-operations.md`; it requires a WhatIf review and explicit same-Run-ID confirmation.
 
-If an upgrade or restore stops before its health checks complete, the local bootstrap `up` command stays blocked by a recovery marker. Do not delete the marker or restore the database only to clear it. If the original Gitea, PostgreSQL, and Runner containers have been returned to their captured IDs, the source Gitea image/version/API is healthy, the retained backup and topology validate, and the operator has independently verified current database health, use the explicit `reconcile-recovery` command below. It records the verification and clears only the marker; it does not restart/recreate services, restore the database, or delete the backup. For legacy schema 1 markers, container IDs are not recorded in the marker, so compare all three full IDs with authoritative pre-operation evidence. If any identity, source health, backup, topology, or database state is uncertain—or the marker is for a restore—leave the marker in place. Use the separately confirmed Restore flow only when data actually needs reverting.
+If an upgrade or restore stops before its health checks complete, the local bootstrap `up` command stays blocked by a Recovery Marker. `status` and `backup-list` remain read-only. Do not delete the marker or restore the database only to clear it. Every attempt has one immutable terminal operation record; retries use a new operation ID and retain prior diagnostic Backup IDs. A Restore handoff from a failed upgrade must use that same Backup ID. Restore writes its marker before stopping services or creating a diagnostic backup, and it never automatically resumes or rolls back after a failure.
 
 ```powershell
 $backupId = Read-Host "Enter the matching upgrade Backup ID"
 $giteaId = Read-Host "Enter the verified original full Gitea container ID"
 $postgresId = Read-Host "Enter the verified original full PostgreSQL container ID"
 $runnerId = Read-Host "Enter the verified original full Runner container ID"
-powershell -File scripts/dev/manage-dev-environment.ps1 -Command reconcile-recovery -BackupId $backupId -ExpectedGiteaContainerId $giteaId -ExpectedPostgresContainerId $postgresId -ExpectedRunnerContainerId $runnerId
+powershell -File scripts/dev/manage-dev-environment.ps1 -Command reconcile-recovery -RecoveryMode original-source -BackupId $backupId -ExpectedGiteaContainerId $giteaId -ExpectedPostgresContainerId $postgresId -ExpectedRunnerContainerId $runnerId
 ```
 
-The command independently checks the matching upgrade marker and checksum-verified backup, container IDs, source image and API version, Runner state, and PostgreSQL topology, then requires a typed confirmation ending in `DATABASE VERIFIED`. That phrase is the operator's attestation that the live database itself was checked; it is not a substitute for doing that check. For compatibility, reconciliation alone accepts the precisely identified schema-1 upgrade backup defect: two identical `docker.gitea.com/gitea@sha256:<SHA>` references and one `gitea/gitea@sha256:<same SHA>` reference concatenated with single spaces, after confirming matching manifest fields. It records that legacy form without using it as an image reference. The Restore path continues to reject it.
+The `original-source`, `healthy-target`, and `restore-complete` modes verify the current state against the matching Recovery Marker and checksum-verified backup; all require full Gitea, PostgreSQL, and Runner IDs, image/API/database/topology checks, and typed operator confirmation. They only record verified state and clear the marker; they do not restart services, restore the database, or delete backups. `reconcile-recovery` is also available as `npm run dev:env:reconcile-recovery -- -RecoveryMode original-source ...`. For compatibility, `original-source` reconciliation alone accepts the precisely identified schema-1 upgrade backup defect: two identical `docker.gitea.com/gitea@sha256:<SHA>` references and one `gitea/gitea@sha256:<same SHA>` reference concatenated with single spaces, after confirming matching manifest fields. It records that legacy form without using it as an image reference. Restore remains strict.
 
 For an upgrade, enter the next supported release series one step at a time:
 

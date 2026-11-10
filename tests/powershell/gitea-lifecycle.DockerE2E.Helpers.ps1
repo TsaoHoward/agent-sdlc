@@ -14,6 +14,36 @@ function Get-GiteaLifecycleE2EDockerSubcommand {
     }
 }
 
+function ConvertTo-GiteaLifecycleE2EArgumentString {
+    param([string[]]$Arguments)
+
+    $quoted = foreach ($argument in $Arguments) {
+        if ($null -eq $argument) { $argument = "" }
+        if ($argument.Length -gt 0 -and $argument -notmatch '[\s"]') {
+            $argument
+            continue
+        }
+        $builder = New-Object System.Text.StringBuilder
+        [void]$builder.Append('"')
+        $backslashes = 0
+        foreach ($character in $argument.ToCharArray()) {
+            if ($character -eq [char]92) { $backslashes += 1; continue }
+            if ($character -eq [char]34) {
+                if ($backslashes -gt 0) { [void]$builder.Append(('\' * ($backslashes * 2))) }
+                [void]$builder.Append('\"')
+                $backslashes = 0
+                continue
+            }
+            if ($backslashes -gt 0) { [void]$builder.Append(('\' * $backslashes)); $backslashes = 0 }
+            [void]$builder.Append($character)
+        }
+        if ($backslashes -gt 0) { [void]$builder.Append(('\' * ($backslashes * 2))) }
+        [void]$builder.Append('"')
+        $builder.ToString()
+    }
+    return [string]::Join(" ", $quoted)
+}
+
 function Get-GiteaLifecycleE2EDockerStage {
     param([Parameter(Mandatory = $true)][string[]]$Arguments)
 
@@ -37,7 +67,7 @@ function Get-GiteaLifecycleE2EDockerStage {
             if ($nameIndex -ge 0 -and $nameIndex + 1 -lt $Arguments.Count) {
                 $fixtureName = [string]$Arguments[$nameIndex + 1]
                 if ($fixtureName -match "-db$") { return "start the disposable PostgreSQL fixture" }
-                if ($fixtureName -match "-runner$") { return "start the inert disposable Runner fixture" }
+                if ($fixtureName -match "-runner$") { return "start the real disposable host-label Runner fixture" }
                 if ($fixtureName -match "-gitea(?:-|$)") { return "start the disposable Gitea fixture" }
             }
             return "start a disposable fixture container"
@@ -193,6 +223,215 @@ function Get-GiteaLifecycleE2EContainer {
     return ($json | ConvertFrom-Json)
 }
 
+function Assert-GiteaLifecycleE2ENoAnonymousVolumes {
+    param([Parameter(Mandatory = $true)][string]$ContainerName)
+
+    $container = Get-GiteaLifecycleE2EContainer -ContainerId $ContainerName
+    $declaredPaths = @()
+    if ($container.Config.Volumes) { $declaredPaths = @($container.Config.Volumes.PSObject.Properties.Name) }
+    $mounts = @($container.Mounts)
+    foreach ($declaredPath in $declaredPaths) {
+        $matchingMounts = @($mounts | Where-Object { [string]$_.Destination -ceq [string]$declaredPath })
+        if ($matchingMounts.Count -ne 1 -or [string]$matchingMounts[0].Type -cne "bind") {
+            throw "Fixture container '$ContainerName' has an image-declared volume without exactly one owned bind mount at '$declaredPath'; fixture cleanup is blocked."
+        }
+    }
+    if (@($mounts | Where-Object { [string]$_.Type -ceq "volume" }).Count -gt 0) {
+        throw "Fixture container '$ContainerName' has a Docker volume outside the GUID-owned fixture tree; fixture cleanup is blocked."
+    }
+    return $container
+}
+
+function Invoke-GiteaLifecycleE2EUpgradeWithDetachedTargetFault {
+    param(
+        [Parameter(Mandatory = $true)][hashtable]$Context,
+        [Parameter(Mandatory = $true)][string]$GiteaVersion,
+        [Parameter(Mandatory = $true)][string]$ModulePath,
+        [Parameter(Mandatory = $true)][string]$FixtureGiteaName,
+        [Parameter(Mandatory = $true)][string]$FixtureNetworkName,
+        [Parameter(Mandatory = $true)][int]$TimeoutSeconds = 300
+    )
+
+    $markerPath = Join-Path $Context.RepoRoot ".agent-sdlc\dev-env\gitea\lifecycle-recovery.json"
+    $job = Start-Job -ScriptBlock {
+        param($LifecycleContext, $TargetVersion, $LifecycleModulePath)
+        Import-Module $LifecycleModulePath -Force -ErrorAction Stop
+        function Read-Host {
+            param([string]$Prompt)
+            $confirmation = "UPGRADE $TargetVersion ON agent-sdlc-gitea:43000"
+            if ($Prompt -like "*UPGRADE $TargetVersion ON agent-sdlc-gitea:43000*") { return $confirmation }
+            throw "Unexpected lifecycle prompt in the isolated E2E child process."
+        }
+        try {
+            Invoke-GiteaLifecycle -Action upgrade -Context $LifecycleContext -GiteaVersion $TargetVersion
+            return [pscustomobject]@{ Result = "completed"; Error = "" }
+        }
+        catch {
+            return [pscustomobject]@{ Result = "failed"; Error = [string]$_.Exception.Message }
+        }
+    } -ArgumentList @($Context, $GiteaVersion, $ModulePath)
+
+    $faultInjected = $false
+    $deadline = (Get-Date).AddSeconds($TimeoutSeconds)
+    while ((Get-Date) -lt $deadline -and $job.State -eq "Running") {
+        if (Test-Path -LiteralPath $markerPath -PathType Leaf) {
+            try {
+                $marker = Get-Content -LiteralPath $markerPath -Raw | ConvertFrom-Json -ErrorAction Stop
+                if ([string]$marker.operationKind -eq "upgrade" -and [string]$marker.nextAction -eq "create-and-start-target") {
+                    $target = Invoke-GiteaLifecycleE2EDocker -Arguments @("inspect", $FixtureGiteaName, "--format", "{{.Id}}") -AllowFailure
+                    if ($script:dockerE2ELastExitCode -eq 0 -and [string]$target -and [string]$target -cne [string]$marker.giteaContainerId) {
+                        Invoke-GiteaLifecycleE2EDocker -Arguments @("network", "disconnect", "--force", $FixtureNetworkName, $FixtureGiteaName) -Stage "inject a real Docker network fault into the disposable target" | Out-Null
+                        $faultInjected = $true
+                        break
+                    }
+                }
+            }
+            catch {
+                if ($faultInjected) { throw }
+            }
+        }
+        Start-Sleep -Milliseconds 100
+    }
+
+    if ($faultInjected) {
+        Wait-Job -Job $job -Timeout $TimeoutSeconds | Out-Null
+    }
+    elseif ($job.State -eq "Running") {
+        Stop-Job -Job $job -ErrorAction SilentlyContinue
+    }
+    $result = Receive-Job -Job $job -ErrorAction SilentlyContinue | Where-Object { $_.PSObject.Properties["Result"] } | Select-Object -Last 1
+    Remove-Job -Job $job -Force -ErrorAction SilentlyContinue
+    return [pscustomobject]@{
+        FaultInjected = $faultInjected
+        Result = if ($result) { [string]$result.Result } else { "no-result" }
+        Error = if ($result) { [string]$result.Error } else { "" }
+        MarkerPath = $markerPath
+    }
+}
+
+function Invoke-GiteaLifecycleE2EUpgradeWithReservedRenameFault {
+    param(
+        [Parameter(Mandatory = $true)][hashtable]$Context,
+        [Parameter(Mandatory = $true)][string]$GiteaVersion,
+        [Parameter(Mandatory = $true)][string]$ModulePath,
+        [Parameter(Mandatory = $true)][string]$FixtureGiteaName,
+        [Parameter(Mandatory = $true)][string]$FixtureNetworkName,
+        [Parameter(Mandatory = $true)][string]$FixtureRunId,
+        [Parameter(Mandatory = $true)][string]$GiteaDataPath,
+        [Parameter(Mandatory = $true)][string]$GiteaConfigPath,
+        [Parameter(Mandatory = $true)][int]$TimeoutSeconds = 300
+    )
+
+    $markerPath = Join-Path $Context.RepoRoot ".agent-sdlc\dev-env\gitea\lifecycle-recovery.json"
+    $sourceImageReference = [string](Invoke-GiteaLifecycleE2EDocker -Arguments @("inspect", $FixtureGiteaName, "--format", "{{.Config.Image}}"))
+    $job = Start-Job -ScriptBlock {
+        param($LifecycleContext, $TargetVersion, $LifecycleModulePath)
+        Import-Module $LifecycleModulePath -Force -ErrorAction Stop
+        function Read-Host {
+            param([string]$Prompt)
+            $confirmation = "UPGRADE $TargetVersion ON agent-sdlc-gitea:43000"
+            if ($Prompt -like "*UPGRADE $TargetVersion ON agent-sdlc-gitea:43000*") { return $confirmation }
+            throw "Unexpected lifecycle prompt in the isolated E2E child process."
+        }
+        try {
+            Invoke-GiteaLifecycle -Action upgrade -Context $LifecycleContext -GiteaVersion $TargetVersion
+            return [pscustomobject]@{ Result = "completed"; Error = "" }
+        }
+        catch {
+            return [pscustomobject]@{ Result = "failed"; Error = [string]$_.Exception.Message }
+        }
+    } -ArgumentList @($Context, $GiteaVersion, $ModulePath)
+
+    $faultInjected = $false
+    $blockerName = $null
+    $blockerId = $null
+    $deadline = (Get-Date).AddSeconds($TimeoutSeconds)
+    while ((Get-Date) -lt $deadline -and $job.State -eq "Running") {
+        if (-not $faultInjected -and (Test-Path -LiteralPath $markerPath -PathType Leaf)) {
+            try {
+                $marker = Get-Content -LiteralPath $markerPath -Raw | ConvertFrom-Json -ErrorAction Stop
+                if ([string]$marker.operationKind -eq "upgrade" -and
+                    [string]$marker.phase -in @("upgrade-prepared", "backup-in-progress", "backup-verified") -and
+                    [string]$marker.backupId -match '^\d{8}T\d{6}Z-[0-9a-f]{32}$') {
+                    $blockerName = "$FixtureGiteaName-preupgrade-$($marker.backupId)"
+                    $createdId = Invoke-GiteaLifecycleE2EDocker -Arguments @(
+                        "create", "--name", $blockerName,
+                        "--network", $FixtureNetworkName,
+                        "--label", "agent-sdlc.lifecycle-e2e.run-id=$FixtureRunId",
+                        "--mount", "type=bind,source=$GiteaDataPath,target=/var/lib/gitea",
+                        "--mount", "type=bind,source=$GiteaConfigPath,target=/etc/gitea",
+                        $sourceImageReference
+                    ) -Stage "reserve the disposable pre-upgrade container name to fail the real Docker rename" -AllowFailure
+                    if ($script:dockerE2ELastExitCode -eq 0) {
+                        $blockerId = [string](@($createdId)[0]).Trim()
+                        $faultInjected = $true
+                    }
+                    else {
+                        $existing = Invoke-GiteaLifecycleE2EDocker -Arguments @("inspect", $blockerName, "--format", "{{.Id}}|{{.State.Status}}|{{.Config.Labels.agent-sdlc.lifecycle-e2e.run-id}}") -AllowFailure
+                        if ($script:dockerE2ELastExitCode -eq 0) {
+                            $parts = [string]$existing -split '\|'
+                            if ($parts.Count -eq 3 -and $parts[1] -ceq "created" -and $parts[2] -ceq $FixtureRunId) {
+                                $blockerId = $parts[0]
+                                $faultInjected = $true
+                            }
+                        }
+                    }
+                }
+            }
+            catch {
+                if ($faultInjected) { throw }
+            }
+        }
+        Start-Sleep -Milliseconds 100
+    }
+
+    if ($faultInjected) {
+        Wait-Job -Job $job -Timeout $TimeoutSeconds | Out-Null
+    }
+    elseif ($job.State -eq "Running") {
+        Stop-Job -Job $job -ErrorAction SilentlyContinue
+    }
+    if ($job.State -eq "Running") {
+        Stop-Job -Job $job -ErrorAction SilentlyContinue
+    }
+    $result = Receive-Job -Job $job -ErrorAction SilentlyContinue | Where-Object { $_.PSObject.Properties["Result"] } | Select-Object -Last 1
+    Remove-Job -Job $job -Force -ErrorAction SilentlyContinue
+    return [pscustomobject]@{
+        FaultInjected = $faultInjected
+        BlockerName = $blockerName
+        BlockerId = $blockerId
+        Result = if ($result) { [string]$result.Result } else { "no-result" }
+        Error = if ($result) { [string]$result.Error } else { "" }
+        MarkerPath = $markerPath
+    }
+}
+
+function Get-GiteaLifecycleE2EFreshProcessStatus {
+    param(
+        [Parameter(Mandatory = $true)][hashtable]$Context,
+        [Parameter(Mandatory = $true)][string]$ModulePath
+    )
+
+    $job = Start-Job -ScriptBlock {
+        param($LifecycleContext, $LifecycleModulePath)
+        Import-Module $LifecycleModulePath -Force -ErrorAction Stop
+        Get-GiteaLifecycleStatus -Context $LifecycleContext
+    } -ArgumentList @($Context, $ModulePath)
+    try {
+        Wait-Job -Job $job -Timeout 30 | Out-Null
+        if ($job.State -eq "Running") {
+            Stop-Job -Job $job -ErrorAction SilentlyContinue
+            throw "A new PowerShell process did not reload the isolated Recovery Marker within 30 seconds."
+        }
+        $status = Receive-Job -Job $job -ErrorAction Stop | Select-Object -Last 1
+        if (-not $status) { throw "A new PowerShell process returned no lifecycle status evidence." }
+        return $status
+    }
+    finally {
+        Remove-Job -Job $job -Force -ErrorAction SilentlyContinue
+    }
+}
+
 function Test-GiteaLifecycleE2EPathEqual {
     param([string]$Left, [string]$Right)
 
@@ -226,11 +465,16 @@ function Get-GiteaLifecycleE2EOwnedContainerKind {
     }
 
     if ($name -eq $state.RunnerName -and $isOnFixtureNetwork -and $runIdLabel -eq [string]$state.RunId) {
-        return "runner"
+        $runnerMount = @($Container.Mounts | Where-Object { [string]$_.Destination -eq "/data" -and [string]$_.Type -eq "bind" })
+        if ($runnerMount.Count -eq 1 -and (Test-GiteaLifecycleE2EPathEqual -Left ([string]$runnerMount[0].Source) -Right ([string]$state.RunnerDataPath))) {
+            return "runner"
+        }
+        return $null
     }
 
     $giteaNamePattern = "^{0}(?:-(?:preupgrade|failed)-[A-Za-z0-9T-]+)?$" -f [Regex]::Escape([string]$state.GiteaName)
-    if ($name -match $giteaNamePattern -and $isOnFixtureNetwork) {
+    $onlyOnFixtureOrDetached = $isOnFixtureNetwork -or $networkNames.Count -eq 0
+    if ($name -match $giteaNamePattern -and $runIdLabel -eq [string]$state.RunId -and $onlyOnFixtureOrDetached) {
         $mounts = @($Container.Mounts)
         $dataMount = @($mounts | Where-Object { [string]$_.Destination -eq "/var/lib/gitea" })
         $configMount = @($mounts | Where-Object { [string]$_.Destination -eq "/etc/gitea" })
@@ -407,6 +651,7 @@ function Initialize-GiteaLifecycleE2EFixture {
     $dataPath = Join-Path $testRoot "volumes\gitea-data"
     $configPath = Join-Path $testRoot "volumes\gitea-config"
     $postgresPath = Join-Path $testRoot "volumes\postgres-data"
+    $runnerDataPath = Join-Path $testRoot "volumes\runner-data"
     $backupRoot = Join-Path $testRoot "backups"
     $networkName = "$prefix-network"
     $giteaName = "$prefix-gitea"
@@ -442,6 +687,7 @@ function Initialize-GiteaLifecycleE2EFixture {
         GiteaName = $giteaName
         PostgresName = $postgresName
         RunnerName = $runnerName
+        RunnerDataPath = $runnerDataPath
         DataPath = $dataPath
         ConfigPath = $configPath
         PostgresPath = $postgresPath
@@ -464,7 +710,7 @@ function Initialize-GiteaLifecycleE2EFixture {
         (@{ runId = $runId; prefix = $prefix } | ConvertTo-Json -Compress),
         [System.Text.UTF8Encoding]::new($false)
     )
-    New-Item -ItemType Directory -Path @($repoRoot, $dataPath, $configPath, $postgresPath, $backupRoot) -Force -ErrorAction Stop | Out-Null
+    New-Item -ItemType Directory -Path @($repoRoot, $dataPath, $configPath, $postgresPath, $runnerDataPath, $backupRoot) -Force -ErrorAction Stop | Out-Null
     $configDirectory = Join-Path $repoRoot "config\dev"
     $operatorDirectory = Join-Path $repoRoot ".agent-sdlc\dev-env\gitea"
     New-Item -ItemType Directory -Path @($configDirectory, $operatorDirectory) -Force -ErrorAction Stop | Out-Null
@@ -502,10 +748,12 @@ function Initialize-GiteaLifecycleE2EFixture {
             GiteaPostgresUser = "gitea"
             GiteaAdminUsername = "e2e-admin"
             GiteaAdminPassword = $adminPassword
+            GiteaLifecycleE2ERunId = $runId
     }
 
     Invoke-GiteaLifecycleE2EDocker -Arguments @("pull", "postgres:16") -Stage "pull disposable PostgreSQL fixture image" | Out-Null
-    Invoke-GiteaLifecycleE2EDocker -Arguments @("pull", "alpine:3.20") -Stage "pull inert Runner fixture image" | Out-Null
+    $runnerImage = "docker.io/gitea/act_runner:0.2.13"
+    Invoke-GiteaLifecycleE2EDocker -Arguments @("pull", $runnerImage) -Stage "pull pinned Gitea Runner fixture image" | Out-Null
     Invoke-GiteaLifecycleE2EDocker -Arguments @("pull", $imageTag) -Stage "pull disposable Gitea fixture image" | Out-Null
     $networkId = [string]((Invoke-GiteaLifecycleE2EDocker -Arguments @("network", "create", "--label", "agent-sdlc.lifecycle-e2e.run-id=$runId", $networkName) -Stage "create isolated fixture network" | Select-Object -First 1)).Trim()
     $script:dockerE2EState.NetworkCreated = $true
@@ -518,15 +766,11 @@ function Initialize-GiteaLifecycleE2EFixture {
         "-p", "127.0.0.2:45432:5432", "-e", "POSTGRES_DB=gitea", "-e", "POSTGRES_USER=gitea",
         "-e", "POSTGRES_PASSWORD=$dbPassword", "postgres:16"
     ) | Out-Null
+    [void](Assert-GiteaLifecycleE2ENoAnonymousVolumes -ContainerName $postgresName)
     Wait-GiteaLifecycleE2EPostgres -ContainerName $postgresName -DatabasePassword $dbPassword
     Invoke-GiteaLifecycleE2EPsql -ContainerName $postgresName -DatabaseName "postgres" -Sql "CREATE DATABASE e2e_unrelated" | Out-Null
     Invoke-GiteaLifecycleE2EPsql -ContainerName $postgresName -DatabaseName "e2e_unrelated" -Sql "CREATE TABLE public.restore_sentinel (value text NOT NULL); INSERT INTO public.restore_sentinel (value) VALUES ('preserve-me')" | Out-Null
 
-    Invoke-GiteaLifecycleE2EDocker -Stage "start inert disposable Runner fixture" -Arguments @(
-        "run", "-d", "--name", $runnerName, "--network", $networkName, "--restart", "unless-stopped",
-        "--label", "agent-sdlc.lifecycle-e2e.run-id=$runId", "--entrypoint", "sh", "alpine:3.20", "-c", "sleep infinity"
-    ) | Out-Null
-    $script:dockerE2EState.RunnerContainerId = Invoke-GiteaLifecycleE2EDocker -Arguments @("inspect", $runnerName, "--format", "{{.Id}}")
     $script:dockerE2EState.PostgresContainerId = Invoke-GiteaLifecycleE2EDocker -Arguments @("inspect", $postgresName, "--format", "{{.Id}}")
 
     Invoke-GiteaLifecycleE2EDocker -Stage "start disposable Gitea fixture" -Arguments @(
@@ -541,6 +785,7 @@ function Initialize-GiteaLifecycleE2EFixture {
         "-e", "GITEA__server__HTTP_PORT=3000", "-e", "GITEA__server__SSH_PORT=2222",
         "-e", "GITEA__security__INSTALL_LOCK=true", "-e", "GITEA__actions__ENABLED=true", $imageTag
     ) | Out-Null
+    [void](Assert-GiteaLifecycleE2ENoAnonymousVolumes -ContainerName $giteaName)
 
     Wait-GiteaLifecycleE2EHttp -Uri ($giteaUrl + "api/v1/version")
     Invoke-GiteaLifecycleE2EDocker -Stage "create disposable Gitea administrator" -Arguments @(
@@ -554,6 +799,35 @@ function Initialize-GiteaLifecycleE2EFixture {
     }
     $repoBody = @{ name = "lifecycle-e2e-sentinel"; private = $true; auto_init = $true } | ConvertTo-Json
     Invoke-RestMethod -Uri ($giteaUrl + "api/v1/user/repos") -Method Post -Headers $headers -ContentType "application/json" -Body $repoBody | Out-Null
+
+    $runnerToken = [string](Invoke-GiteaLifecycleE2EDocker -Arguments @("exec", $giteaName, "gitea", "actions", "generate-runner-token") -Stage "generate a disposable Runner registration token" | Select-Object -First 1)
+    if (-not $runnerToken -or $runnerToken -match "\s") {
+        throw "Gitea did not return one valid Runner registration token; fixture setup stopped before starting the Runner."
+    }
+    Invoke-GiteaLifecycleE2EDocker -Stage "start real host-label disposable Runner fixture" -Arguments @(
+        "run", "-d", "--name", $runnerName, "--network", $networkName, "--restart", "unless-stopped",
+        "--label", "agent-sdlc.lifecycle-e2e.run-id=$runId",
+        "--mount", "type=bind,source=$runnerDataPath,target=/data",
+        "-e", "GITEA_INSTANCE_URL=http://$giteaName:3000/",
+        "-e", "GITEA_RUNNER_REGISTRATION_TOKEN=$runnerToken",
+        "-e", "GITEA_RUNNER_NAME=$runnerName",
+        "-e", "GITEA_RUNNER_LABELS=agent-sdlc-host:host",
+        $runnerImage
+    ) | Out-Null
+    [void](Assert-GiteaLifecycleE2ENoAnonymousVolumes -ContainerName $runnerName)
+    $script:dockerE2EState.RunnerContainerId = Invoke-GiteaLifecycleE2EDocker -Arguments @("inspect", $runnerName, "--format", "{{.Id}}")
+    $runnerApi = $null
+    for ($attempt = 0; $attempt -lt 60 -and -not $runnerApi; $attempt += 1) {
+        try {
+            $runnerApi = Invoke-RestMethod -Uri ($giteaUrl + "api/v1/admin/actions/runners") -Method Get -Headers $headers -TimeoutSec 10
+            if (-not @($runnerApi.runners | Where-Object { [string]$_.name -ceq $runnerName }).Count) { $runnerApi = $null }
+        }
+        catch { $runnerApi = $null }
+        if (-not $runnerApi) { Start-Sleep -Seconds 2 }
+    }
+    if (-not $runnerApi) {
+        throw "The real isolated host-label Runner did not register through Gitea's admin Runner API."
+    }
 
     Register-GiteaLifecycleE2EOwnedContainers
 }
@@ -573,6 +847,7 @@ function Remove-GiteaLifecycleE2EFixture {
             if ([string]$container.Id -ne [string]$expected.id -or [string]$kind -ne [string]$expected.kind) {
                 throw "A fixture container no longer matches its recorded test-owned identity; refusing to remove it."
             }
+            [void](Assert-GiteaLifecycleE2ENoAnonymousVolumes -ContainerName ([string]$container.Name).TrimStart('/'))
             Invoke-GiteaLifecycleE2EDocker -Arguments @("rm", "-f", [string]$expected.id) -Stage "remove verified disposable fixture container" | Out-Null
             $state.OwnedContainers.Remove([string]$containerId)
         }
