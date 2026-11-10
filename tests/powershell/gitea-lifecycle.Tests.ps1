@@ -573,6 +573,93 @@ Describe "Gitea lifecycle safety helpers" {
             New-Item -ItemType Directory -Path $script:upgradeContext.GiteaConfigDir -Force | Out-Null
             [System.IO.File]::WriteAllText((Join-Path $script:upgradeContext.GiteaConfigDir "app.ini"), "[storage]`r`nSTORAGE_TYPE = local`r`n[attachment]`r`nPATH = data/attachments`r`n[lfs]`r`nPATH = data/lfs`r`n", [System.Text.UTF8Encoding]::new($false))
 
+            $script:upgradeBackupId = "20261105T000000Z-0123456789abcdef0123456789abcdef"
+            $script:upgradeBackupPath = Join-Path $script:upgradeContext.BackupRoot $script:upgradeBackupId
+            $script:upgradeRuntimeSnapshot = [pscustomobject]@{
+                schemaVersion = 1
+                containerName = "agent-sdlc-gitea"
+                capturedContainerName = "agent-sdlc-gitea"
+                containerId = "1111111111111111111111111111111111111111111111111111111111111111"
+                statusAtCapture = "running"
+                sourceVersion = "1.25.5"
+                originalImageReference = "docker.gitea.com/gitea:1.25.5-rootless"
+                imageReference = "docker.gitea.com/gitea@sha256:$('a' * 64)"
+                imageId = "sha256:$('a' * 64)"
+                networkMode = "agent-sdlc-gitea-network"
+                restartPolicy = "unless-stopped"
+                ports = @(
+                    [pscustomobject]@{ containerPort = "3000/tcp"; hostIp = "127.0.0.1"; hostPort = "43000" }
+                    [pscustomobject]@{ containerPort = "2222/tcp"; hostIp = "127.0.0.1"; hostPort = "43022" }
+                )
+                mounts = @(
+                    [pscustomobject]@{ type = "bind"; source = $script:upgradeContext.GiteaDataDir; destination = "/var/lib/gitea"; readWrite = $true }
+                    [pscustomobject]@{ type = "bind"; source = $script:upgradeContext.GiteaConfigDir; destination = "/etc/gitea"; readWrite = $true }
+                )
+                environment = @()
+                configSource = "template"
+                configPath = $script:upgradeContext.ConfigPath
+            }
+
+            $backupPrivatePath = Join-Path $script:upgradeBackupPath "payload/private"
+            $backupDataPath = Join-Path $script:upgradeBackupPath "payload/gitea-data"
+            $backupConfigPath = Join-Path $script:upgradeBackupPath "payload/gitea-config"
+            $backupOperatorPath = Join-Path $script:upgradeBackupPath "payload/operator-state"
+            foreach ($directory in @($backupPrivatePath, $backupDataPath, $backupConfigPath, $backupOperatorPath)) {
+                New-Item -ItemType Directory -Path $directory -Force | Out-Null
+            }
+            [System.IO.File]::WriteAllBytes((Join-Path $script:upgradeBackupPath "payload/postgres.dump"), [System.Text.Encoding]::ASCII.GetBytes("PGDMP-fixture"))
+            [System.IO.File]::WriteAllText((Join-Path $backupDataPath "fixture-data.txt"), "isolated backup data", [System.Text.UTF8Encoding]::new($false))
+            [System.IO.File]::WriteAllText((Join-Path $backupConfigPath "app.ini"), [System.IO.File]::ReadAllText((Join-Path $script:upgradeContext.GiteaConfigDir "app.ini")), [System.Text.UTF8Encoding]::new($false))
+            Save-BackupJson -Path (Join-Path $backupPrivatePath "gitea-runtime.json") -Value $script:upgradeRuntimeSnapshot
+            Save-BackupJson -Path (Join-Path $backupPrivatePath "postgres-topology.json") -Value @{
+                schemaVersion = 1
+                containerName = "agent-sdlc-gitea-db"
+                containerId = "2222222222222222222222222222222222222222222222222222222222222222"
+                originalImageReference = "postgres:16"
+                imageId = "sha256:$('f' * 64)"
+                networkMode = "agent-sdlc-gitea-network"
+                networkAliases = @("db")
+                databaseName = "gitea"
+                databaseUser = "gitea"
+                ports = @(@{ containerPort = "5432/tcp"; hostIp = "127.0.0.1"; hostPort = "43001" })
+                mounts = @(@{ type = "bind"; source = $script:upgradeContext.GiteaPostgresDataDir; destination = "/var/lib/postgresql/data"; readWrite = $true })
+            }
+            Save-BackupJson -Path (Join-Path $backupPrivatePath "restore-context.json") -Value @{
+                schemaVersion = 1
+                configPath = $script:upgradeContext.ConfigPath
+                configSource = "template"
+                databaseName = "gitea"
+                databaseUser = "gitea"
+                runnerWasRunning = $true
+            }
+            Save-BackupJson -Path (Join-Path $backupOperatorPath "bootstrap-config.json") -Value @{ gitea = @{ image = "docker.gitea.com/gitea:1.25.5-rootless" } }
+            $script:upgradeManifest = [ordered]@{
+                schemaVersion = 2
+                format = "agent-sdlc-gitea-backup"
+                backupId = $script:upgradeBackupId
+                operationId = "aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa"
+                kind = "upgrade"
+                createdAt = "2026-11-05T00:00:00.0000000Z"
+                sourceVersion = "1.25.5"
+                sourceImage = "docker.gitea.com/gitea:1.25.5-rootless"
+                sourceImageDigest = "docker.gitea.com/gitea@sha256:$('a' * 64)"
+                dockerHost = "isolated-test-engine"
+                hostPort = 43000
+                network = "agent-sdlc-gitea-network"
+                runnerWasRunning = $true
+                sourceBytes = [long]10
+                availableBytesBeforeBackup = [long]4096
+                requiredComponents = @("postgres-dump", "gitea-data", "gitea-config", "operator-state", "runtime-snapshot", "postgres-topology", "restore-context")
+                sizeBytes = [long]0
+                files = @()
+            }
+            $script:upgradeManifest.files = @(Get-BackupFileEntries -BackupPath $script:upgradeBackupPath)
+            $script:upgradeManifest.sizeBytes = Measure-BackupFileEntriesSize -Entries $script:upgradeManifest.files
+            $script:upgradeManifest.metadataSha256 = Get-GiteaBackupManifestDigest -Manifest ([pscustomobject]$script:upgradeManifest)
+            Save-BackupJson -Path (Join-Path $script:upgradeBackupPath "manifest.json") -Value $script:upgradeManifest
+            $upgradeFixtureIntegrity = Test-GiteaBackupIntegrity -BackupPath $script:upgradeBackupPath
+            $upgradeFixtureIntegrity.IsValid | Should -BeTrue -Because "the shared Upgrade fixture must have a valid manifest and complete payload ($($upgradeFixtureIntegrity.Reason))"
+
             Mock Assert-NativeWindowsHost {}
             Mock Assert-DockerDesktopReady { return @{ id = "isolated-test-engine" } }
             Mock Assert-NoPendingGiteaRecovery {}
@@ -609,32 +696,7 @@ Describe "Gitea lifecycle safety helpers" {
                 }
             }
             Mock Get-GiteaReportedVersion { return "1.25.5" }
-            Mock Get-RuntimeSnapshot {
-                return [pscustomobject]@{
-                    schemaVersion = 1
-                    containerName = "agent-sdlc-gitea"
-                    capturedContainerName = "agent-sdlc-gitea"
-                    containerId = "1111111111111111111111111111111111111111111111111111111111111111"
-                    statusAtCapture = "running"
-                    imageReference = "docker.gitea.com/gitea@sha256:$('a' * 64)"
-                    originalImageReference = "docker.gitea.com/gitea:1.25.5-rootless"
-                    imageId = "sha256:$('a' * 64)"
-                    sourceVersion = "1.25.5"
-                    networkMode = "agent-sdlc-gitea-network"
-                    restartPolicy = "unless-stopped"
-                    mounts = @(
-                        [pscustomobject]@{ type = "bind"; source = $script:upgradeContext.GiteaDataDir; destination = "/var/lib/gitea"; readWrite = $true }
-                        [pscustomobject]@{ type = "bind"; source = $script:upgradeContext.GiteaConfigDir; destination = "/etc/gitea"; readWrite = $true }
-                    )
-                    ports = @(
-                        [pscustomobject]@{ containerPort = "3000/tcp"; hostIp = "127.0.0.1"; hostPort = "43000" }
-                        [pscustomobject]@{ containerPort = "2222/tcp"; hostIp = "127.0.0.1"; hostPort = "43022" }
-                    )
-                    environment = @()
-                    configSource = "template"
-                    configPath = $script:upgradeContext.ConfigPath
-                }
-            }
+            Mock Get-RuntimeSnapshot { return $script:upgradeRuntimeSnapshot }
             Mock Assert-GiteaDatabaseTarget {}
             Mock Assert-NoActiveGiteaActions {}
             Mock Assert-BackupCapacity { return [pscustomobject]@{ SourceBytes = 10; RequiredFreeBytes = 1024; AvailableFreeBytes = 4096 } }
@@ -649,55 +711,14 @@ Describe "Gitea lifecycle safety helpers" {
             Mock New-GiteaBackupSet {
                 $script:lifecycleActions.Add("backup")
                 return [pscustomobject]@{
-                    BackupId = "20261105T000000Z-0123456789abcdef0123456789abcdef"
-                    Path = (Join-Path $script:upgradeContext.BackupRoot "20261105T000000Z-0123456789abcdef0123456789abcdef")
-                    Manifest = [pscustomobject]@{
-                        schemaVersion = 2
-                        format = "agent-sdlc-gitea-backup"
-                        backupId = "20261105T000000Z-0123456789abcdef0123456789abcdef"
-                        operationId = "aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa"
-                        kind = "upgrade"
-                        createdAt = "2026-11-05T00:00:00.0000000Z"
-                        sourceVersion = "1.25.5"
-                        sourceImage = "docker.gitea.com/gitea:1.25.5-rootless"
-                        sourceImageDigest = "docker.gitea.com/gitea@sha256:$('a' * 64)"
-                        dockerHost = "isolated-test-engine"
-                        hostPort = 43000
-                        network = "agent-sdlc-gitea-network"
-                        runnerWasRunning = $true
-                        requiredComponents = @("postgres-dump", "gitea-data", "gitea-config", "operator-state", "runtime-snapshot", "postgres-topology", "restore-context")
-                        sizeBytes = [long]0
-                        files = @()
-                        metadataSha256 = "a" * 64
-                    }
+                    BackupId = $script:upgradeBackupId
+                    Path = $script:upgradeBackupPath
+                    Manifest = [pscustomobject]$script:upgradeManifest
                 }
             }
             Mock Get-BackupRuntime {
                 $script:lifecycleActions.Add("read-runtime")
-                return [pscustomobject]@{
-                    schemaVersion = 1
-                    imageReference = "docker.gitea.com/gitea@sha256:$('a' * 64)"
-                    originalImageReference = "docker.gitea.com/gitea:1.25.5-rootless"
-                    imageId = "sha256:$('a' * 64)"
-                    containerName = "agent-sdlc-gitea"
-                    capturedContainerName = "agent-sdlc-gitea"
-                    containerId = "1111111111111111111111111111111111111111111111111111111111111111"
-                    sourceVersion = "1.25.5"
-                    statusAtCapture = "running"
-                    mounts = @(
-                        [pscustomobject]@{ type = "bind"; source = $script:upgradeContext.GiteaDataDir; destination = "/var/lib/gitea"; readWrite = $true }
-                        [pscustomobject]@{ type = "bind"; source = $script:upgradeContext.GiteaConfigDir; destination = "/etc/gitea"; readWrite = $true }
-                    )
-                    ports = @(
-                        [pscustomobject]@{ containerPort = "3000/tcp"; hostIp = "127.0.0.1"; hostPort = "43000" }
-                        [pscustomobject]@{ containerPort = "2222/tcp"; hostIp = "127.0.0.1"; hostPort = "43022" }
-                    )
-                    networkMode = "agent-sdlc-gitea-network"
-                    restartPolicy = "unless-stopped"
-                    environment = @()
-                    configSource = "template"
-                    configPath = $script:upgradeContext.ConfigPath
-                }
+                return $script:upgradeRuntimeSnapshot
             }
             Mock New-GiteaContainerFromRuntime { $script:lifecycleActions.Add("create-gitea") }
             Mock Wait-GiteaHealthy {
