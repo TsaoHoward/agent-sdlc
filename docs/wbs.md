@@ -3,7 +3,7 @@
 ## Document Metadata
 - Version: 0.1
 - Status: Draft
-- Last Updated: 2026-11-06
+- Last Updated: 2026-11-10
 - Owner: Project Maintainer
 - Source Template: docs/templates/wbs.template.md
 
@@ -326,6 +326,7 @@
 - Follow-up evidence (2026-11-08): PR #6 reconciliation now has a narrowly scoped compatibility path for the exact schema-1 upgrade backup defect: two identical official digest references plus one `gitea/gitea` alias at the same SHA, joined by single spaces, with matching manifest source fields and a valid captured image ID. Only reconciliation uses this path; Restore remains strict. The Pester reconciliation case no longer mocks the runtime topology validator; isolated E2E mutates only its owned backup and recalculates integrity. Per maintainer direction, native Windows Pester and Docker Desktop E2E for this follow-up are not yet run; the prior test evidence applies to the original PR #6 head only.
 
 - Follow-up evidence (2026-11-10): Added schema-2 manifest metadata/file-set checks, schema-3 write-ahead recovery state, immutable attempt records, same-Backup-ID Restore handoff/retry, read-only status/list and command guards. Upgrade, Restore, and recovery closeout now fail closed unless effective storage selectors and paths are covered by the captured local payload. Docker E2E now uses real Git, Actions, ORAS 1.3.5, host-label Runner, PostgreSQL and real container/network fault injection; a version-hop test produces and consumes each adjacent-step backup. Original-source closeout is blocked once target create/start may have begun and verifies the bootstrap image pin. `npm run validate:platform` passed. Current-head PowerShell/Pester could not start in WSL (`powershell` absent), typecheck could not start without `node_modules/typescript`, and Docker Desktop context `info` failed (`protocol not available`). AC-16 still lacks the full U0–U9/R0–R9/C1–C2 interruption matrix; no current-head acceptance is claimed. Formal Gitea/Marker/backup/upgrade/restore/reconcile and #29 were untouched.
+- Follow-up evidence (2026-11-10, A0): Added a shared Pester runner for every `test:gitea-lifecycle*` npm script, with fail-closed handling for failed tests, startup/discovery failures, missing result data, and zero passing tests. Focused pass/fail/no-tests npm cases are available. The WSL UNC workspace prevented Pester discovery and a later npm-launched PowerShell interop attempt failed before startup, so native Windows execution remains pending. WBS `3.12` remains In Progress; Lifecycle behavior, other Pester failures, and AC-16 scope are unchanged.
 
 ### WBS 4 — Controlled Expansion
 - Parent:

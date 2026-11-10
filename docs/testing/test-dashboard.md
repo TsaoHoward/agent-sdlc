@@ -3,7 +3,7 @@
 ## Document Metadata
 - Version: 0.1
 - Status: Active
-- Last Updated: 2026-11-08
+- Last Updated: 2026-11-10
 - Owner: Project Maintainer
 - Source Template: docs/templates/test-dashboard.template.md
 
@@ -41,7 +41,7 @@ It does not replace CI run history, forge issue or PR history, roadmap/WBS plann
 | Test ID | Title | Status | Mode | Related Docs / WBS | Next Action | Exit Path |
 |---|---|---|---|---|---|---|
 | TC-001 | CLI Replay Intake And Session Smoke | Ready | CLI replay | `docs/roadmap.md` Phase 1; WBS `3.1`, `3.2`, `3.3` | Re-run when intake or session-start behavior changes and keep the case note current if task/session fields or evidence paths move | Move out after the current validation window once the case no longer needs active dashboard attention; keep the canonical case note as the long-lived procedure |
-| TC-011 | Local Gitea Version Lifecycle Operations | In Progress | Windows PowerShell/Pester plus isolated Docker acceptance | `docs/testing/items/TC-011-gitea-version-lifecycle-operations.md`; WBS `3.12` | Run current PR #6 head on native Windows PowerShell 5.1 and Docker Desktop; complete the AC-16 U0–U9/R0–R9/C1–C2 fault matrix and record the AC-01–AC-16 result table | Move out after implementation acceptance and separately authorized Windows Host acceptance; keep the canonical case note as the long-lived procedure |
+| TC-011 | Local Gitea Version Lifecycle Operations | In Progress | Windows PowerShell/Pester plus isolated Docker acceptance | `docs/testing/items/TC-011-gitea-version-lifecycle-operations.md`; WBS `3.12` | Run the independent A0 pass, intentional-failure, and no-tests npm cases from native Windows PowerShell 5.1; then continue the staged A1/A2 baseline repair. Keep PR #6 frozen and AC-16 outside A0 | Move out after implementation acceptance and separately authorized Windows Host acceptance; keep the canonical case note as the long-lived procedure |
 
 ## Test Items
 
@@ -104,3 +104,4 @@ It does not replace CI run history, forge issue or PR history, roadmap/WBS plann
 - 2026-11-10: Updated TC-011 for real Git, Actions, ORAS 1.3.5, host-label Runner, adjacent-hop backup/restore, and real Docker fault procedures. Current-head native PowerShell and Docker Desktop execution is blocked in WSL; AC-16 remains partial and no acceptance pass is claimed.
 - 2026-11-10: Added local-storage coverage preflight cases for INI and environment-selected backends, uncovered absolute paths, and missing effective config. Current-head native PowerShell and Docker Desktop execution remain pending.
 - 2026-11-10: Extended D1 coverage to picture upload paths and config-path overrides; added schema-versioned Runtime/Topology/Restore Context checks plus PostgreSQL full-ID/database identity matching. Current-head Pester and Docker acceptance remain unrun.
+- 2026-11-10: Added the independent A0 Pester process-exit harness and rerunnable pass/fail/no-tests npm cases. Native Windows execution remains pending because the WSL workspace UNC path prevents Pester discovery and WSL interop failed before the npm-launched PowerShell process started.

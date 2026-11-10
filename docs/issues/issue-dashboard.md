@@ -3,7 +3,7 @@
 ## Document Metadata
 - Version: 0.1
 - Status: Active
-- Last Updated: 2026-11-08
+- Last Updated: 2026-11-10
 - Owner: Project Maintainer
 - Source Template: docs/templates/issue-dashboard.template.md
 
@@ -45,7 +45,7 @@ It does not replace forge issues, roadmap/WBS planning structure, the decision b
 ## Dashboard
 | Issue ID | Title | Status | Related Docs / WBS | Next Action | Exit Path |
 |---|---|---|---|---|---|
-| #3 | Add safe, repeatable version upgrades for the existing Docker Gitea | In Progress | `docs/issues/items/I-007-gitea-version-lifecycle-operations.md`; WBS `3.12`; TC-011 | Run current PR #6 head on native Windows PowerShell 5.1 and isolated Docker Desktop; complete the AC-16 fault matrix before considering implementation accepted. Keep formal 43000 operations and #29 separately authorized | Move to archive after implementation review and authorized Windows Host acceptance; keep any unresolved runtime blocker linked from the canonical test case |
+| #3 | Add safe, repeatable version upgrades for the existing Docker Gitea | In Progress | `docs/issues/items/I-007-gitea-version-lifecycle-operations.md`; WBS `3.12`; TC-011 | Review the independent A0 Pester ExitCode PR and run its pass/fail/no-tests cases from native Windows PowerShell 5.1. Continue A1/A2 and later gates separately; keep PR #6 frozen and formal 43000 operations and #29 separately authorized | Move to archive after implementation review and authorized Windows Host acceptance; keep any unresolved runtime blocker linked from the canonical test case |
 
 ## Issue Items
 ### #3 — Gitea Version Lifecycle Operations
@@ -54,7 +54,8 @@ It does not replace forge issues, roadmap/WBS planning structure, the decision b
 - Why It Matters: The existing legacy Gitea instance has persistent repositories, Actions, Registry, and shared Runner state. Replacing its image without a verified backup and restore path risks making that state unusable.
 - Current State: The accepted implementation contract separates legacy Docker Gitea on port 43000 from Compose port 46300. Upgrade remains explicit-version, backup-first, local-only, and live maintenance remains separately authorized. The current PR adds schema-2 manifest checks, schema-3 write-ahead recovery state, schema-versioned runtime/topology/restore-context artifacts with PostgreSQL full-ID/database identity, immutable attempt records, same-Backup-ID Restore retry, pure-read status/list, guarded command behavior, effective local-storage coverage checks, and real Docker/Git/Actions/ORAS/host-Runner E2E procedures. It adds native argv and no-anonymous-volume checks plus adjacent-hop Restore consumers. No current-head PowerShell or Docker Desktop tests have run.
 - Current Finding: Original-source closeout now fails closed once target create/start may have begun and verifies the bootstrap image pin. The E2E includes a real Docker rename conflict before target creation, a post-create network detach, and a fresh-process Marker reload. AC-16 still lacks the complete U0–U9/R0–R9/C1–C2 pre/post interruption matrix. `npm run validate:platform` passed; typecheck could not start without `node_modules/typescript`, Pester could not start because `powershell` is absent, and Docker Desktop context `info` failed with `protocol not available`. Earlier Pester results apply only to older commits. No formal Gitea service or data was operated.
-- Next Action: Run current PR #6 on native Windows PowerShell 5.1 with isolated Docker Desktop, complete the remaining AC-16 injections, record the AC-01–AC-16 matrix, and review the PR. Keep Issue #3 open for any unpassed implementation gates and separately authorized 43000/#29 acceptance.
+- A0 Status: The independent ExitCode runner and rerunnable pass/fail/no-tests npm cases are ready for review. Native Windows execution remains pending because Pester cannot discover the workspace through its current WSL UNC path; no Lifecycle acceptance is claimed. PR #6 remains frozen at `a1ebbe9`.
+- Next Action: Review the independent A0 PR and run its focused cases from native Windows PowerShell 5.1. Then continue the staged A1/A2 baseline work before later gates. Keep Issue #3 open for unpassed implementation gates and separately authorized 43000/#29 acceptance; do not change the frozen PR #6.
 - Exit Path: Archive after implementation and authorized Windows Host acceptance are complete; record any remaining issue as a separate follow-up.
 - Supporting Note: `docs/issues/items/I-007-gitea-version-lifecycle-operations.md`
 - Promotion Check: WBS `3.12` added; no architecture boundary or source-of-truth change is intended, so no ADR is required.
