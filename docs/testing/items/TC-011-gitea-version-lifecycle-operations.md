@@ -253,6 +253,51 @@ No current post-A1 failure count is available. The last exact report is the pre-
 
 Run the focused A1 cases and full non-Docker suite from a native Windows checkout with PowerShell 5.1/Pester 5 or 6.2.0. Do not treat the frozen pre-A1 counts as results for the A1 head.
 
+## A2 — Fixture/Contract Alignment and Remaining Failures
+
+The native Windows handoff at PR #8 head `b0e57bb` reports **61 passed / 16 failed / 0 skipped; npm ExitCode 1**. It gives the category counts and problem descriptions below, but not the individual failing Pester `It` names. The 16 rows therefore classify the reported failure slots from that handoff; they are not a claim that each row maps one-to-one to a known test name.
+
+| # | Reported failure | Classification | Disposition in A2 |
+|---:|---|---|---|
+| 1 | Upgrade fixture has no `RepoRoot` for post-Marker Operation Record | Stale fixture | Added an isolated repo root and kept the append-only record path intact. |
+| 2 | Upgrade backup mock omits `Manifest` | Stale fixture | Added a schema-2 upgrade manifest to the shared backup fixture. |
+| 3 | Upgrade `Get-BackupRuntime` mock returns an empty object | Stale fixture | Replaced it with a runtime snapshot carrying the immutable image, source version, mounts, ports, and config metadata consumed by the flow. |
+| 4 | Shared Upgrade container/runtime mock omits consumed identity/state fields | Stale fixture | Completed the Gitea, PostgreSQL, Runner, and runtime snapshot shapes while keeping the injected failure order after Marker creation. |
+| 5 | Upgrade stage/error handling expectation | Contract/behavior needs native failure detail | The handoff does not identify the exact failing assertion. Existing fail-closed wrapping and A1 pre-/post-Marker behavior are unchanged; keep this item pending native rerun rather than weakening the error contract. |
+| 6 | Reconciliation's effective `app.ini` precondition | Fixture/path precondition | The isolated Reconciliation fixture creates local-storage `app.ini` under the configured effective `GiteaConfigDir`. This is present in the A2 baseline; verify it on native rerun and preserve rejection when it is missing or redirects storage. |
+| 7 | Schema-3 Marker phase case | Stale fixture | The target-start refusal case now supplies the schema-3 revision/timestamp/action fields before setting the post-start phase. |
+| 8 | Restore-marker refusal expects different error text | Stale assertion | Updated the assertion to the current contract message that the requested mode does not match an active restore marker. |
+| 9 | Reconciliation schema-1 PostgreSQL topology lacks full ID/database identity | Stale fixture | Added schema version, full container ID, database name/user, and the captured topology fields to the serialized fixture. |
+| 10 | Reconciliation artifact's property shape differs from the JSON reader contract | Fixture/contract mismatch | The fixture is serialized and read as a `PSCustomObject`, matching the production `ConvertFrom-Json` consumer. |
+| 11 | Restore's mocked PostgreSQL container omits `State` | Stale fixture | Added a running PostgreSQL state and stable full container ID. |
+| 12 | Restore's Runner/container state fixture is incomplete | Stale fixture | Added a stable Runner ID/state and completed the PostgreSQL identity shape; no lifecycle assertion was relaxed. |
+| 13 | PostgreSQL ID mismatch test takes the legacy schema compatibility branch | Fixture representation mismatch | Round-tripped `Get-PostgresTopologySnapshot` through JSON so `PSObject.Properties` sees the same schema-versioned object shape as the real reader; the full-ID mismatch assertion remains. |
+| 14 | Native ProcessStartInfo expects 9 argv values but observes 1 | Functional defect confirmed by code inspection | Replaced PowerShell's repeated-string array expression with an explicit `System.String` constructor for Windows CRT backslash runs. The real child-process test remains unchanged. Native proof is pending. |
+| 15 | ACL test expects `backup-list` to create a missing backup root | Stale fixture; product contract is pure-read | The isolated test now provisions its own root through `Ensure-BackupRoot`, then compares entries and owner/DACL metadata around `backup-list`. The command remains non-mutating. |
+| 16 | Bootstrap pin operation leaves a second directory entry | Temporary-file cleanup defect under investigation | Replacement and caller-temp cleanup now check directory entries and verify removal, retaining the existing rollback path if the previous file cannot be safely cleaned. The exact leftover filename and fix require native NTFS rerun evidence. |
+
+The code and fixtures were changed without relaxing fail-closed checks, storage coverage, full container-ID validation, Recovery Marker phase rules, terminal Operation Record append-only behavior, or the 9-argument integration assertion. A2 does not claim these 16 failures are now passing: native Windows acceptance is required to confirm the fixtures and argv/temp cleanup behavior. This WSL session has neither `powershell` nor `pwsh`; `npm run test:gitea-lifecycle` exits **127** before Pester starts. The static `git diff --check` succeeds.
+
+### A2 failure-to-change summary
+
+| Failure group | Change |
+|---|---|
+| Upgrade (5) | Complete isolated context, Manifest, runtime and container mocks; retain stage/error behavior pending exact native failure detail. |
+| Recovery reconciliation (5) | Keep effective local `app.ini`, complete schema-3 phase fixture, align error assertion, and use full schema-1 topology serialized in the production object shape. |
+| Restore (2) | Supply PostgreSQL ID/State and stable Runner identity/state. |
+| PostgreSQL (1) | Round-trip the topology to the serialized reader shape and retain full-ID/database identity assertions. |
+| Process argv (1) | Fix repeated backslash construction; real Windows child-process test remains unchanged. |
+| NTFS ACL (1) | Provision the root in the test, then verify `backup-list` preserves the directory entries and owner/DACL. |
+| Bootstrap pin (1) | Check actual directory entries for replacement/source temp cleanup and verify removal; native confirmation remains open. |
+
+## A2 Verification Status
+
+- Base: PR #6 source-branch head `49d19f7702ce9cf5ce08e29531767f24f2122170`; independent branch targets `codex/issue-3-repodigest-recovery`.
+- Native full non-Docker Pester 6.2.0: **pending**. Do not report 0 failures until run from native Windows PowerShell 5.1.
+- Local `npm run test:gitea-lifecycle`: **ExitCode 127**, `powershell: not found`; no Pester process started.
+- `git diff --check`: passed.
+- A0/A1 regression coverage stays present. Docker E2E and AC-16 were not run; formal Gitea 43000, any existing Recovery Marker/backup, and #29 were not accessed.
+
 ## Cleanup
 
 Use disposable test directories/containers only. Do not delete backup fixtures as part of the tested lifecycle operation; test teardown may remove only the isolated temporary fixture after evidence is captured.

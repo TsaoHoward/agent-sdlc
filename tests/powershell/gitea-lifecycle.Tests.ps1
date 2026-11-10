@@ -557,10 +557,17 @@ Describe "Gitea lifecycle safety helpers" {
             $script:upgradeGiteaEnvironment = @()
             $script:upgradeGiteaArgs = @()
             $script:upgradeContext = @{
+                RepoRoot = (Join-Path $TestRoot "upgrade-repo")
+                BackupRoot = (Join-Path $TestRoot "upgrade-backups")
+                GiteaDataDir = (Join-Path $TestRoot "upgrade-live\data")
+                GiteaPostgresDataDir = (Join-Path $TestRoot "upgrade-live\postgres-data")
                 GiteaContainerName = "agent-sdlc-gitea"
                 GiteaRunnerContainerName = "agent-sdlc-gitea-runner"
                 GiteaPostgresContainerName = "agent-sdlc-gitea-db"
                 GiteaConfigDir = (Join-Path $TestRoot "upgrade-config")
+                ConfigPath = (Join-Path $TestRoot "upgrade-repo\config\dev\gitea-bootstrap.json")
+                ConfigSource = "template"
+                GiteaNetworkName = "agent-sdlc-gitea-network"
                 GiteaRootUrl = "http://localhost:43000/"
             }
             New-Item -ItemType Directory -Path $script:upgradeContext.GiteaConfigDir -Force | Out-Null
@@ -589,22 +596,43 @@ Describe "Gitea lifecycle safety helpers" {
                 return [pscustomobject]@{
                     Id = "2222222222222222222222222222222222222222222222222222222222222222"
                     Name = "/agent-sdlc-gitea-db"
+                    Image = "sha256:$('f' * 64)"
                     State = [pscustomobject]@{ Status = "running" }
+                    Config = [pscustomobject]@{ Image = "postgres:16"; Env = @("POSTGRES_DB=gitea", "POSTGRES_USER=gitea", "POSTGRES_PASSWORD=fixture-secret") }
                 }
             }
             Mock Get-GiteaRunnerInfo {
                 return [pscustomobject]@{
                     Id = "3333333333333333333333333333333333333333333333333333333333333333"
+                    Name = "/agent-sdlc-gitea-runner"
                     State = [pscustomobject]@{ Status = "running" }
                 }
             }
             Mock Get-GiteaReportedVersion { return "1.25.5" }
             Mock Get-RuntimeSnapshot {
                 return [pscustomobject]@{
+                    schemaVersion = 1
+                    containerName = "agent-sdlc-gitea"
+                    capturedContainerName = "agent-sdlc-gitea"
+                    containerId = "1111111111111111111111111111111111111111111111111111111111111111"
+                    statusAtCapture = "running"
                     imageReference = "docker.gitea.com/gitea@sha256:$('a' * 64)"
                     originalImageReference = "docker.gitea.com/gitea:1.25.5-rootless"
                     imageId = "sha256:$('a' * 64)"
-                    containerId = "1111111111111111111111111111111111111111111111111111111111111111"
+                    sourceVersion = "1.25.5"
+                    networkMode = "agent-sdlc-gitea-network"
+                    restartPolicy = "unless-stopped"
+                    mounts = @(
+                        [pscustomobject]@{ type = "bind"; source = $script:upgradeContext.GiteaDataDir; destination = "/var/lib/gitea"; readWrite = $true }
+                        [pscustomobject]@{ type = "bind"; source = $script:upgradeContext.GiteaConfigDir; destination = "/etc/gitea"; readWrite = $true }
+                    )
+                    ports = @(
+                        [pscustomobject]@{ containerPort = "3000/tcp"; hostIp = "127.0.0.1"; hostPort = "43000" }
+                        [pscustomobject]@{ containerPort = "2222/tcp"; hostIp = "127.0.0.1"; hostPort = "43022" }
+                    )
+                    environment = @()
+                    configSource = "template"
+                    configPath = $script:upgradeContext.ConfigPath
                 }
             }
             Mock Assert-GiteaDatabaseTarget {}
@@ -620,9 +648,57 @@ Describe "Gitea lifecycle safety helpers" {
             Mock Stop-GiteaRunner { $script:lifecycleActions.Add("stop-runner") }
             Mock New-GiteaBackupSet {
                 $script:lifecycleActions.Add("backup")
-                return [pscustomobject]@{ BackupId = "20261105T000000Z-0123456789abcdef0123456789abcdef"; Path = "C:\isolated-backups\fixture" }
+                return [pscustomobject]@{
+                    BackupId = "20261105T000000Z-0123456789abcdef0123456789abcdef"
+                    Path = (Join-Path $script:upgradeContext.BackupRoot "20261105T000000Z-0123456789abcdef0123456789abcdef")
+                    Manifest = [pscustomobject]@{
+                        schemaVersion = 2
+                        format = "agent-sdlc-gitea-backup"
+                        backupId = "20261105T000000Z-0123456789abcdef0123456789abcdef"
+                        operationId = "aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa"
+                        kind = "upgrade"
+                        createdAt = "2026-11-05T00:00:00.0000000Z"
+                        sourceVersion = "1.25.5"
+                        sourceImage = "docker.gitea.com/gitea:1.25.5-rootless"
+                        sourceImageDigest = "docker.gitea.com/gitea@sha256:$('a' * 64)"
+                        dockerHost = "isolated-test-engine"
+                        hostPort = 43000
+                        network = "agent-sdlc-gitea-network"
+                        runnerWasRunning = $true
+                        requiredComponents = @("postgres-dump", "gitea-data", "gitea-config", "operator-state", "runtime-snapshot", "postgres-topology", "restore-context")
+                        sizeBytes = [long]0
+                        files = @()
+                        metadataSha256 = "a" * 64
+                    }
+                }
             }
-            Mock Get-BackupRuntime { $script:lifecycleActions.Add("read-runtime"); return [pscustomobject]@{} }
+            Mock Get-BackupRuntime {
+                $script:lifecycleActions.Add("read-runtime")
+                return [pscustomobject]@{
+                    schemaVersion = 1
+                    imageReference = "docker.gitea.com/gitea@sha256:$('a' * 64)"
+                    originalImageReference = "docker.gitea.com/gitea:1.25.5-rootless"
+                    imageId = "sha256:$('a' * 64)"
+                    containerName = "agent-sdlc-gitea"
+                    capturedContainerName = "agent-sdlc-gitea"
+                    containerId = "1111111111111111111111111111111111111111111111111111111111111111"
+                    sourceVersion = "1.25.5"
+                    statusAtCapture = "running"
+                    mounts = @(
+                        [pscustomobject]@{ type = "bind"; source = $script:upgradeContext.GiteaDataDir; destination = "/var/lib/gitea"; readWrite = $true }
+                        [pscustomobject]@{ type = "bind"; source = $script:upgradeContext.GiteaConfigDir; destination = "/etc/gitea"; readWrite = $true }
+                    )
+                    ports = @(
+                        [pscustomobject]@{ containerPort = "3000/tcp"; hostIp = "127.0.0.1"; hostPort = "43000" }
+                        [pscustomobject]@{ containerPort = "2222/tcp"; hostIp = "127.0.0.1"; hostPort = "43022" }
+                    )
+                    networkMode = "agent-sdlc-gitea-network"
+                    restartPolicy = "unless-stopped"
+                    environment = @()
+                    configSource = "template"
+                    configPath = $script:upgradeContext.ConfigPath
+                }
+            }
             Mock New-GiteaContainerFromRuntime { $script:lifecycleActions.Add("create-gitea") }
             Mock Wait-GiteaHealthy {
                 $script:lifecycleActions.Add("health")
@@ -1137,11 +1213,15 @@ Describe "Gitea recovery marker reconciliation" {
                     return ($script:reconcileRuntime | ConvertTo-Json -Depth 20)
                 }
                 return (@{
+                    schemaVersion = 1
                     containerName = "agent-sdlc-gitea-db"
+                    containerId = $script:reconcilePostgresId
                     originalImageReference = "postgres:16"
                     imageId = "sha256:$('f' * 64)"
                     networkMode = "agent-sdlc-gitea-network"
                     networkAliases = @("db")
+                    databaseName = "gitea"
+                    databaseUser = "gitea"
                     ports = @(@{ containerPort = "5432/tcp"; hostIp = "127.0.0.1"; hostPort = "43001" })
                     mounts = @(@{ type = "bind"; source = "C:\isolated-repo\.agent-sdlc\dev-env\gitea\postgres-data"; destination = "/var/lib/postgresql/data"; readWrite = $true })
                 } | ConvertTo-Json -Depth 10)
@@ -1238,6 +1318,12 @@ Describe "Gitea recovery marker reconciliation" {
 
         It "forbids original-source closeout once target startup may have begun" {
             $script:reconcileMarker.schemaVersion = 3
+            $script:reconcileMarker | Add-Member -NotePropertyName operationId -NotePropertyValue ("d" * 32) -Force
+            $script:reconcileMarker | Add-Member -NotePropertyName revision -NotePropertyValue 1 -Force
+            $script:reconcileMarker | Add-Member -NotePropertyName createdAt -NotePropertyValue "2026-11-10T00:00:00.0000000Z" -Force
+            $script:reconcileMarker | Add-Member -NotePropertyName updatedAt -NotePropertyValue "2026-11-10T00:00:00.0000000Z" -Force
+            $script:reconcileMarker | Add-Member -NotePropertyName nextAction -NotePropertyValue "verify-source-or-restore" -Force
+            $script:reconcileMarker | Add-Member -NotePropertyName lastCompletedStage -NotePropertyValue "source-container-renamed" -Force
             $script:reconcileMarker.phase = "target-start-attempted"
 
             { Invoke-GiteaLifecycle -Action reconcile-recovery -Context $script:reconcileContext -BackupId $script:reconcileBackupId -ExpectedGiteaContainerId $script:reconcileGiteaId -ExpectedPostgresContainerId $script:reconcilePostgresId -ExpectedRunnerContainerId $script:reconcileRunnerId } | Should -Throw "*target create/start stage may have begun*"
@@ -1250,7 +1336,7 @@ Describe "Gitea recovery marker reconciliation" {
         It "does not reconcile markers created by a restore operation" {
             $script:reconcileMarker.operationKind = "restore"
 
-            { Invoke-GiteaLifecycle -Action reconcile-recovery -Context $script:reconcileContext -BackupId $script:reconcileBackupId -ExpectedGiteaContainerId $script:reconcileGiteaId -ExpectedPostgresContainerId $script:reconcilePostgresId -ExpectedRunnerContainerId $script:reconcileRunnerId } | Should -Throw "*upgrade marker*"
+            { Invoke-GiteaLifecycle -Action reconcile-recovery -Context $script:reconcileContext -BackupId $script:reconcileBackupId -ExpectedGiteaContainerId $script:reconcileGiteaId -ExpectedPostgresContainerId $script:reconcilePostgresId -ExpectedRunnerContainerId $script:reconcileRunnerId } | Should -Throw "*does not match the active restore marker*"
 
             $script:reconcileActions | Should -Not -Contain "clear-recovery-marker"
         }
@@ -1295,9 +1381,11 @@ Describe "Gitea backup artifact schema validation" {
         It "rejects a replacement PostgreSQL container even when its name and topology match" {
             $postgresId = "a" * 64
             $container = @'
-{"Id":"aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa","Name":"/agent-sdlc-gitea-db","Image":"sha256:bbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbb","Config":{"Image":"postgres:16","Env":["POSTGRES_DB=gitea","POSTGRES_USER=gitea"]},"HostConfig":{"PortBindings":{"5432/tcp":[{"HostIp":"127.0.0.1","HostPort":"45432"}]},"NetworkMode":"agent-sdlc-gitea-network"},"NetworkSettings":{"Networks":{"agent-sdlc-gitea-network":{"Aliases":["db"]}}},"Mounts":[{"Type":"bind","Source":"C:\\isolated\\postgres-data","Destination":"/var/lib/postgresql/data","RW":true}]}
+{"Id":"aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa","Name":"/agent-sdlc-gitea-db","Image":"sha256:bbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbb","State":{"Status":"running"},"Config":{"Image":"postgres:16","Env":["POSTGRES_DB=gitea","POSTGRES_USER=gitea"]},"HostConfig":{"PortBindings":{"5432/tcp":[{"HostIp":"127.0.0.1","HostPort":"45432"}]},"NetworkMode":"agent-sdlc-gitea-network"},"NetworkSettings":{"Networks":{"agent-sdlc-gitea-network":{"Aliases":["db"]}}},"Mounts":[{"Type":"bind","Source":"C:\\isolated\\postgres-data","Destination":"/var/lib/postgresql/data","RW":true}]}
 '@ | ConvertFrom-Json
-            $topology = Get-PostgresTopologySnapshot -Container $container
+            # The compatibility reader consumes ConvertFrom-Json PSCustomObjects from disk.
+            # Round-trip the producer result so the test exercises that same property model.
+            $topology = Get-PostgresTopologySnapshot -Container $container | ConvertTo-Json -Depth 20 | ConvertFrom-Json
             $topology.containerId = "c" * 64
             $context = @{ GiteaPostgresContainerName = "agent-sdlc-gitea-db"; GiteaPostgresDbName = "gitea"; GiteaPostgresUser = "gitea" }
 
@@ -1383,11 +1471,19 @@ Describe "Gitea lifecycle operator restore command" {
             Mock Assert-BackupRuntimeMatchesContext {}
             Mock Read-GiteaRestoreContext { return [pscustomobject]@{ databaseName = "gitea"; databaseUser = "gitea"; configSource = "template" } }
             Mock Assert-ConfigRestoreCompatibility {}
-            Mock Assert-PostgresContainerIdentity { return [pscustomobject]@{ Name = "/agent-sdlc-gitea-db" } }
+            Mock Assert-PostgresContainerIdentity {
+                return [pscustomobject]@{
+                    Id = "b" * 64
+                    Name = "/agent-sdlc-gitea-db"
+                    Image = "sha256:$('f' * 64)"
+                    State = [pscustomobject]@{ Status = "running" }
+                    Config = [pscustomobject]@{ Image = "postgres:16"; Env = @("POSTGRES_DB=gitea", "POSTGRES_USER=gitea", "POSTGRES_PASSWORD=fixture-secret") }
+                }
+            }
             Mock Assert-PostgresRestoreCompatibility {}
             Mock Assert-GiteaDatabaseTarget {}
             Mock Assert-GiteaContainerIdentity { return $null }
-            Mock Get-GiteaRunnerInfo { return [pscustomobject]@{ State = [pscustomobject]@{ Status = "exited" } } }
+            Mock Get-GiteaRunnerInfo { return [pscustomobject]@{ Id = "c" * 64; State = [pscustomobject]@{ Status = "exited" } } }
             Mock Get-GiteaApiHealth { return [pscustomobject]@{ IsHealthy = $false; Version = "" } }
             Mock Invoke-GiteaDocker {
                 param($Arguments, $AllowFailure)
@@ -1683,7 +1779,27 @@ Describe "Gitea backup ACL on real NTFS" -Tag "WindowsAcl" {
                 GiteaConfigDir = Join-Path $fixtureRoot "live-config"
                 GiteaPostgresDataDir = Join-Path $fixtureRoot "live-postgres"
             }
+            InModuleScope gitea-lifecycle -Parameters @{ Context = $context } {
+                param($Context)
+                Ensure-BackupRoot -Context $Context | Out-Null
+            }
+            $initialBackupEntries = @(InModuleScope gitea-lifecycle -Parameters @{ Path = $backupRoot } {
+                param($Path)
+                Get-LongPathDirectoryEntries -Path $Path
+            })
+            $initialBackupEntries.Count | Should -Be 0
+            $initialRootSecurity = [System.IO.Directory]::GetAccessControl($backupRoot, $sections)
+            $initialRootSecurityDescriptor = $initialRootSecurity.GetSecurityDescriptorSddlForm($sections)
             Invoke-GiteaLifecycle -Action backup-list -Context $context
+
+            (Test-Path -LiteralPath $backupRoot -PathType Container) | Should -BeTrue
+            $postListEntries = @(InModuleScope gitea-lifecycle -Parameters @{ Path = $backupRoot } {
+                param($Path)
+                Get-LongPathDirectoryEntries -Path $Path
+            })
+            $postListEntries.Count | Should -Be 0
+            $postListSecurity = [System.IO.Directory]::GetAccessControl($backupRoot, $sections)
+            $postListSecurity.GetSecurityDescriptorSddlForm($sections) | Should -BeExactly $initialRootSecurityDescriptor
 
             $rootAcl = [System.IO.Directory]::GetAccessControl($backupRoot, $sections)
             $rootAcl.GetOwner([System.Security.Principal.SecurityIdentifier]).Value | Should -Be $currentSid.Value

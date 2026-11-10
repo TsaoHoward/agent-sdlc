@@ -169,6 +169,25 @@ function Get-LongPathDirectoryEntries {
     return $entries.ToArray()
 }
 
+function Test-LongPathDirectoryEntry {
+    param(
+        [Parameter(Mandatory = $true)][string]$Directory,
+        [Parameter(Mandatory = $true)][string]$Name
+    )
+
+    $matches = @(
+        Get-LongPathDirectoryEntries -Path $Directory |
+            Where-Object { [string]$_.Name -ceq $Name }
+    )
+    foreach ($match in $matches) {
+        if ($match.PSIsContainer -or
+            (($match.Attributes -band [System.IO.FileAttributes]::ReparsePoint) -ne 0)) {
+            throw "Temporary lifecycle path '$($match.FullName)' is not a regular file."
+        }
+    }
+    return $matches.Count -gt 0
+}
+
 function Get-LongPathTreeEntries {
     param([Parameter(Mandatory = $true)][string]$Path)
 
@@ -308,9 +327,14 @@ function Move-LongPathFile {
         }
         $replacementBackupExtended = ConvertTo-ExtendedLengthPath -Path $replacementBackupPath
         [System.IO.File]::Replace($sourceExtended, $destinationExtended, $replacementBackupExtended)
-        if (Test-LongPath -Path $replacementBackupPath -PathType Leaf) {
+        $replacementBackupDirectory = Get-LongPathParent -Path $replacementBackupPath
+        $replacementBackupName = Get-LongPathLeaf -Path $replacementBackupPath
+        if (Test-LongPathDirectoryEntry -Directory $replacementBackupDirectory -Name $replacementBackupName) {
             try {
                 Remove-LongPathEntry -Path $replacementBackupPath
+                if (Test-LongPathDirectoryEntry -Directory $replacementBackupDirectory -Name $replacementBackupName) {
+                    throw "The temporary previous-file backup remains after cleanup."
+                }
             }
             catch {
                 $cleanupException = Get-GiteaLifecycleRootException -Exception $_.Exception
@@ -611,18 +635,18 @@ function ConvertTo-ProcessArgumentString {
                 continue
             }
             if ($character -eq [char]34) {
-                if ($backslashes -gt 0) { [void]$builder.Append(('\' * ($backslashes * 2))) }
+                if ($backslashes -gt 0) { [void]$builder.Append([string]::new([char]92, $backslashes * 2)) }
                 [void]$builder.Append('\"')
                 $backslashes = 0
                 continue
             }
             if ($backslashes -gt 0) {
-                [void]$builder.Append(('\' * $backslashes))
+                [void]$builder.Append([string]::new([char]92, $backslashes))
                 $backslashes = 0
             }
             [void]$builder.Append($character)
         }
-        if ($backslashes -gt 0) { [void]$builder.Append(('\' * ($backslashes * 2))) }
+        if ($backslashes -gt 0) { [void]$builder.Append([string]::new([char]92, $backslashes * 2)) }
         [void]$builder.Append('"')
         $builder.ToString()
     }
@@ -3131,7 +3155,10 @@ function Set-GiteaBootstrapImagePin {
         $failure = New-GiteaBootstrapImagePinFailure -ErrorRecord $_ -Stage $stage -SensitiveValues $sensitiveValues
     }
     finally {
-        if ($temporaryPath -and (Test-LongPath -Path $temporaryPath -PathType Leaf)) {
+        if ($temporaryPath -and (
+            (Test-LongPath -Path $temporaryPath -PathType Leaf) -or
+            (Test-LongPathDirectoryEntry -Directory (Get-LongPathParent -Path $temporaryPath) -Name (Get-LongPathLeaf -Path $temporaryPath))
+        )) {
             try {
                 Remove-LongPathEntry -Path $temporaryPath
             }
