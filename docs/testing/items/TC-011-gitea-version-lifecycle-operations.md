@@ -197,6 +197,30 @@ No current-head PowerShell/Pester or Docker Desktop acceptance result is availab
 
 AC-17 formal `43000` acceptance, production Recovery Marker/backups, and formal Upgrade/Restore/Reconcile were not touched. AC-18 `local-agent-infra#29` remains separate and was not run. The PR must remain open for review; implementation acceptance is pending native Windows PowerShell 5.1 and isolated Docker Desktop evidence, and the larger AC-16 matrix remains a known gap.
 
+## A0 — Pester ExitCode Propagation
+
+This is the independent A0 harness repair based on frozen PR #6 head `a1ebbe9`. It changes only the npm-to-PowerShell Pester invocation boundary. It does not change Lifecycle behavior, fix other Pester failures, or expand AC-16. The focused Windows cases below exercise a passing Pester run, an intentional Pester failure, a run with no tests discovered, and a missing test path:
+
+```powershell
+npm run test:gitea-lifecycle:exitcode:pass
+$passExitCode = $LASTEXITCODE
+npm run test:gitea-lifecycle:exitcode:fail
+$failExitCode = $LASTEXITCODE
+npm run test:gitea-lifecycle:exitcode:no-tests
+$noTestsExitCode = $LASTEXITCODE
+npm run test:gitea-lifecycle:exitcode:missing-path
+$missingPathExitCode = $LASTEXITCODE
+
+if ($passExitCode -ne 0 -or $failExitCode -eq 0 -or $noTestsExitCode -eq 0 -or $missingPathExitCode -eq 0) {
+    throw "Unexpected Pester ExitCodes: pass=$passExitCode, intentional-fail=$failExitCode, no-tests=$noTestsExitCode, missing-path=$missingPathExitCode"
+}
+"PASS: pass=$passExitCode; intentional-fail=$failExitCode; no-tests=$noTestsExitCode; missing-path=$missingPathExitCode"
+```
+
+Expected Pester output is retained, including Passed/Failed/Skipped counts. The pass fixture should report one Passed test and ExitCode 0; the intentional-failure fixture should report one Failed test and a nonzero ExitCode; the no-tests and missing-path cases must also return nonzero. The missing-path case intentionally selects a nonexistent test file to verify that a run which cannot execute does not return success. Run from a native Windows checkout with Node.js/npm, Windows PowerShell 5.1, and Pester 5 or 6.2.0.
+
+Current WSL attempt is not Windows acceptance evidence. Windows PowerShell `5.1.26100.9711` and Pester `6.2.0` were visible through interop, but Pester discovery from the workspace UNC path `\\wsl.localhost\...` stopped in `FindRepoRoot` with `NotSupportedException` before tests were discovered; the old inline `Invoke-Pester` command returned process ExitCode 0. A later npm attempt through WSL interop failed before PowerShell started (`UtilBindVsockAnyPort:307: socket failed 1`) and npm returned 1. Native Windows execution of all four focused cases remains pending.
+
 ## Cleanup
 
 Use disposable test directories/containers only. Do not delete backup fixtures as part of the tested lifecycle operation; test teardown may remove only the isolated temporary fixture after evidence is captured.
