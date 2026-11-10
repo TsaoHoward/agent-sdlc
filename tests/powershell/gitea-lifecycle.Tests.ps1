@@ -652,8 +652,14 @@ Describe "Gitea lifecycle safety helpers" {
             $script:upgradeGiteaEnvironment = @("GITEA__storage__STORAGE_TYPE=s3")
             { Invoke-GiteaLifecycle -Action upgrade -Context $script:upgradeContext -GiteaVersion "1.26.4" } | Should -Throw "*outside the backup payload*"
 
+            $script:upgradeGiteaEnvironment = @("GITEA_CONFIG=/tmp/external-app.ini")
+            { Invoke-GiteaLifecycle -Action upgrade -Context $script:upgradeContext -GiteaVersion "1.26.4" } | Should -Throw "*outside the captured /etc/gitea payload*"
+
+            $script:upgradeGiteaEnvironment = @("GITEA__picture__REPOSITORY_AVATAR_UPLOAD_PATH=/srv/external-avatars")
+            { Invoke-GiteaLifecycle -Action upgrade -Context $script:upgradeContext -GiteaVersion "1.26.4" } | Should -Throw "*outside the captured*"
+
             $script:upgradeGiteaEnvironment = @()
-            [System.IO.File]::WriteAllText((Join-Path $script:upgradeContext.GiteaConfigDir "app.ini"), "[storage]`r`nSTORAGE_TYPE = local`r`n[attachment]`r`nPATH = /mnt/external/attachments`r`n", [System.Text.UTF8Encoding]::new($false))
+            [System.IO.File]::WriteAllText((Join-Path $script:upgradeContext.GiteaConfigDir "app.ini"), "[storage]`r`nSTORAGE_TYPE = local`r`n[picture]`r`nAVATAR_UPLOAD_PATH = /mnt/external/avatars`r`n", [System.Text.UTF8Encoding]::new($false))
             { Invoke-GiteaLifecycle -Action upgrade -Context $script:upgradeContext -GiteaVersion "1.26.4" } | Should -Throw "*outside the captured*"
 
             $script:lifecycleActions | Should -Not -Contain "stop-runner"
@@ -943,7 +949,15 @@ Describe "Gitea recovery marker reconciliation" {
                 if ([string]$Path -like "*gitea-runtime.json") {
                     return ($script:reconcileRuntime | ConvertTo-Json -Depth 20)
                 }
-                return "{}"
+                return (@{
+                    containerName = "agent-sdlc-gitea-db"
+                    originalImageReference = "postgres:16"
+                    imageId = "sha256:$('f' * 64)"
+                    networkMode = "agent-sdlc-gitea-network"
+                    networkAliases = @("db")
+                    ports = @(@{ containerPort = "5432/tcp"; hostIp = "127.0.0.1"; hostPort = "43001" })
+                    mounts = @(@{ type = "bind"; source = "C:\isolated-repo\.agent-sdlc\dev-env\gitea\postgres-data"; destination = "/var/lib/postgresql/data"; readWrite = $true })
+                } | ConvertTo-Json -Depth 10)
             }
             Mock Assert-PostgresRestoreCompatibility { $script:reconcileActions.Add("validate-postgres-topology") }
             Mock Assert-GiteaDatabaseTarget { $script:reconcileActions.Add("validate-database-target") }
@@ -1071,7 +1085,39 @@ Describe "Gitea Restore runtime image reference validation" {
             }
             Mock Read-LongPathText { return ($script:restoreStrictRuntime | ConvertTo-Json -Depth 10) }
 
-            { Get-BackupRuntime -BackupPath "C:\isolated-backups\20261108T053419Z-a5737137148a41a9bc45d6f7a78485df" } | Should -Throw "*valid immutable*"
+            { Get-BackupRuntime -BackupPath "C:\isolated-backups\20261108T053419Z-a5737137148a41a9bc45d6f7a78485df" -Manifest ([pscustomobject]@{ schemaVersion = 1 }) } | Should -Throw "*valid immutable*"
+        }
+    }
+}
+
+Describe "Gitea backup artifact schema validation" {
+    InModuleScope gitea-lifecycle {
+        It "rejects an unknown Gitea runtime snapshot schema" {
+            Mock Read-LongPathText { return (@{ schemaVersion = 2; imageReference = "sha256:$('a' * 64)"; mounts = @(@{ destination = "/var/lib/gitea" }); ports = @(@{ containerPort = "3000/tcp" }) } | ConvertTo-Json -Depth 10) }
+
+            { Get-BackupRuntime -BackupPath "C:\isolated-backups\fixture" -Manifest ([pscustomobject]@{ schemaVersion = 2 }) } | Should -Throw "*unsupported schemaVersion*"
+        }
+
+        It "rejects unknown Restore Context and PostgreSQL topology schemas" {
+            Mock Read-LongPathText { return (@{ schemaVersion = 7 } | ConvertTo-Json -Depth 10) }
+
+            { Read-GiteaRestoreContext -BackupPath "C:\isolated-backups\fixture" -Manifest ([pscustomobject]@{ schemaVersion = 2 }) } | Should -Throw "*unsupported schemaVersion*"
+            { Get-GiteaPostgresTopology -BackupPath "C:\isolated-backups\fixture" -Manifest ([pscustomobject]@{ schemaVersion = 2 }) } | Should -Throw "*unreadable or incomplete*"
+        }
+
+        It "rejects a replacement PostgreSQL container even when its name and topology match" {
+            $postgresId = "a" * 64
+            $container = @'
+{"Id":"aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa","Name":"/agent-sdlc-gitea-db","Image":"sha256:bbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbb","Config":{"Image":"postgres:16","Env":["POSTGRES_DB=gitea","POSTGRES_USER=gitea"]},"HostConfig":{"PortBindings":{"5432/tcp":[{"HostIp":"127.0.0.1","HostPort":"45432"}]},"NetworkMode":"agent-sdlc-gitea-network"},"NetworkSettings":{"Networks":{"agent-sdlc-gitea-network":{"Aliases":["db"]}}},"Mounts":[{"Type":"bind","Source":"C:\\isolated\\postgres-data","Destination":"/var/lib/postgresql/data","RW":true}]}
+'@ | ConvertFrom-Json
+            $topology = Get-PostgresTopologySnapshot -Container $container
+            $topology.containerId = "c" * 64
+            $context = @{ GiteaPostgresContainerName = "agent-sdlc-gitea-db"; GiteaPostgresDbName = "gitea"; GiteaPostgresUser = "gitea" }
+
+            { Assert-PostgresRestoreCompatibility -BackupTopology $topology -CurrentContainer $container -Context $context -ManifestSchemaVersion 2 } | Should -Throw "*full container ID*"
+            $topology.containerId = $postgresId
+            $topology.databaseName = "other"
+            { Assert-PostgresRestoreCompatibility -BackupTopology $topology -CurrentContainer $container -Context $context -ManifestSchemaVersion 2 } | Should -Throw "*full container ID or database identity*"
         }
     }
 }
@@ -1117,7 +1163,19 @@ Describe "Gitea lifecycle operator restore command" {
             New-Item -ItemType Directory -Path $privatePath -Force | Out-Null
             New-Item -ItemType Directory -Path $giteaConfigPath -Force | Out-Null
             [System.IO.File]::WriteAllText((Join-Path $giteaConfigPath "app.ini"), "[storage]`r`nSTORAGE_TYPE = local`r`n", [System.Text.UTF8Encoding]::new($false))
-            [System.IO.File]::WriteAllText((Join-Path $privatePath "postgres-topology.json"), "{}")
+            [System.IO.File]::WriteAllText((Join-Path $privatePath "postgres-topology.json"), (@{
+                schemaVersion = 1
+                containerName = "agent-sdlc-gitea-db"
+                containerId = "b" * 64
+                originalImageReference = "postgres:16"
+                imageId = "sha256:$('f' * 64)"
+                networkMode = "agent-sdlc-gitea-network"
+                networkAliases = @("db")
+                databaseName = "gitea"
+                databaseUser = "gitea"
+                ports = @(@{ containerPort = "5432/tcp"; hostIp = "127.0.0.1"; hostPort = "45432" })
+                mounts = @(@{ type = "bind"; source = "C:\isolated-repo\.agent-sdlc\dev-env\gitea\postgres-data"; destination = "/var/lib/postgresql/data"; readWrite = $true })
+            } | ConvertTo-Json -Depth 10), [System.Text.UTF8Encoding]::new($false))
             $script:restoreRuntime = [pscustomobject]@{
                 containerName = "agent-sdlc-gitea"
                 networkMode = "agent-sdlc-gitea-network"
@@ -1129,7 +1187,7 @@ Describe "Gitea lifecycle operator restore command" {
             }
             $script:selectedBackup = [pscustomobject]@{
                 Path = $script:restorePayloadPath
-                Manifest = [pscustomobject]@{ runnerWasRunning = $false }
+                Manifest = [pscustomobject]@{ schemaVersion = 2; runnerWasRunning = $false }
             }
 
             Mock Assert-NativeWindowsHost {}

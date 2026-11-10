@@ -856,13 +856,14 @@ function Assert-GiteaLocalStorageOnly {
     if (($configItem.Attributes -band [IO.FileAttributes]::ReparsePoint) -ne 0) {
         throw "Gitea's effective app.ini is a reparse point; local-payload storage coverage cannot be proven."
     }
-    if ($Container) {
-        $containerEnvironment = ConvertTo-ContainerEnvironmentMap -Environment @($Environment)
-        foreach ($environmentName in @("GITEA_CONFIG", "GITEA_CONFIG_FILE")) {
-            if ($containerEnvironment[$environmentName] -and $containerEnvironment[$environmentName] -cne "/etc/gitea/app.ini") {
-                throw "Gitea's $environmentName override selects an app.ini outside the captured /etc/gitea payload."
-            }
+    $containerEnvironment = ConvertTo-ContainerEnvironmentMap -Environment @($Environment)
+    foreach ($environmentName in @("GITEA_CONFIG", "GITEA_CONFIG_FILE")) {
+        if ($containerEnvironment[$environmentName] -and $containerEnvironment[$environmentName] -cne "/etc/gitea/app.ini") {
+            throw "Gitea's $environmentName override selects an app.ini outside the captured /etc/gitea payload."
         }
+    }
+    $storagePathSections = @("storage", "attachment", "lfs", "avatar", "picture", "repo-avatar", "repository-avatar", "repository-archive", "packages", "actions", "server", "repository")
+    if ($Container) {
         $arguments = @()
         if ($Container.Args) { $arguments += @($Container.Args) }
         if ($Container.Config -and $Container.Config.Cmd) { $arguments += @($Container.Config.Cmd) }
@@ -901,8 +902,8 @@ function Assert-GiteaLocalStorageOnly {
         $key = $trimmed.Substring(0, $separator).Trim().ToLowerInvariant()
         $value = $trimmed.Substring($separator + 1).Trim()
         if ($sections[$sectionName].ContainsKey($key)) {
-            $storageRelevantSection = $sectionName -in @("storage", "attachment", "lfs", "avatar", "picture", "repo-avatar", "repository-avatar", "repository-archive", "packages", "actions", "server", "repository") -or $sectionName.StartsWith("storage.")
-            if ($storageRelevantSection -and ($key -match '(^|_)storage_type$' -or $key -in @("path", "app_data_path", "root"))) {
+            $storageRelevantSection = $sectionName -in $storagePathSections -or $sectionName.StartsWith("storage.")
+            if ($storageRelevantSection -and ($key -match '(^|_)storage_type$' -or $key -match '(^|_)(path|dir|directory|root)$')) {
                 throw "Gitea's effective app.ini repeats setting '$sectionName.$key'; local-payload storage coverage is ambiguous."
             }
         }
@@ -915,7 +916,7 @@ function Assert-GiteaLocalStorageOnly {
         $name = $item.Substring(0, $separator)
         if ($name -notmatch '^GITEA__(.+)$') { continue }
         $parts = $Matches[1].Split(@('__'), [StringSplitOptions]::None)
-        if ($parts.Count -lt 2 -or -not [Regex]::IsMatch($parts[-1], '^(?:.*storage_type|path|app_data_path|root)$', [RegexOptions]::IgnoreCase)) { continue }
+        if ($parts.Count -lt 2 -or -not [Regex]::IsMatch($parts[-1], '^(?:.*storage_type|.*(?:path|dir|directory|root))$', [RegexOptions]::IgnoreCase)) { continue }
         $key = $parts[-1].ToLowerInvariant()
         $section = ($parts[0..($parts.Count - 2)] -join '.').ToLowerInvariant()
         if (-not $sections.ContainsKey($section)) { $sections[$section] = @{} }
@@ -940,11 +941,10 @@ function Assert-GiteaLocalStorageOnly {
         }
     }
 
-    $pathSections = @("storage", "attachment", "lfs", "avatar", "picture", "repo-avatar", "repository-avatar", "repository-archive", "packages", "actions", "server", "repository")
     foreach ($section in $sections.Keys) {
-        if ($section -notin $pathSections -and -not $section.StartsWith("storage.")) { continue }
+        if ($section -notin $storagePathSections -and -not $section.StartsWith("storage.")) { continue }
         foreach ($key in $sections[$section].Keys) {
-            if ($key -notin @("path", "app_data_path", "root")) { continue }
+            if ($key -notmatch '(^|_)(path|dir|directory|root)$') { continue }
             $storagePath = [string]$sections[$section][$key]
             if (-not $storagePath) { continue }
             if ($storagePath -match '[\x00-\x1f]' -or $storagePath -match '(^|[\\/])\.\.([\\/]|$)' -or
@@ -1447,6 +1447,25 @@ function New-GiteaBackupId {
     return "{0}-{1}" -f [DateTime]::UtcNow.ToString("yyyyMMddTHHmmssZ"), [Guid]::NewGuid().ToString("N")
 }
 
+function Assert-GiteaBackupArtifactSchema {
+    param(
+        [Parameter(Mandatory = $true)][object]$Artifact,
+        [Parameter(Mandatory = $true)][string]$ArtifactName,
+        [Parameter(Mandatory = $true)][object]$Manifest
+    )
+
+    $schemaProperty = $Artifact.PSObject.Properties["schemaVersion"]
+    if ($schemaProperty) {
+        if ([int]$schemaProperty.Value -ne 1) {
+            throw "The backup $ArtifactName uses an unsupported schemaVersion; restore/recovery is blocked."
+        }
+        return
+    }
+    if ([int]$Manifest.schemaVersion -ne 1) {
+        throw "The backup $ArtifactName is missing schemaVersion and is not covered by the schema-1 compatibility rule."
+    }
+}
+
 function Copy-DirectoryTree {
     param(
         [Parameter(Mandatory = $true)][string]$Source,
@@ -1513,6 +1532,7 @@ function Get-RuntimeSnapshot {
     }
 
     return @{
+        schemaVersion = 1
         containerName = [string]$Context.GiteaContainerName
         capturedContainerName = [string]$Container.Name.TrimStart('/')
         containerId = Get-GiteaContainerId -Container $Container
@@ -1558,14 +1578,50 @@ function Get-PostgresTopologySnapshot {
     if ($networkProperty -and $networkProperty.Value.Aliases) {
         $networkAliases = @($networkProperty.Value.Aliases | Sort-Object)
     }
+    $environment = ConvertTo-ContainerEnvironmentMap -Environment @($Container.Config.Env)
     return @{
+        schemaVersion = 1
         containerName = [string]$Container.Name.TrimStart('/')
+        containerId = Get-GiteaContainerId -Container $Container
         originalImageReference = [string]$Container.Config.Image
         imageId = [string]$Container.Image
         networkMode = [string]$Container.HostConfig.NetworkMode
         networkAliases = $networkAliases
+        databaseName = [string]$environment["POSTGRES_DB"]
+        databaseUser = [string]$environment["POSTGRES_USER"]
         ports = $ports
         mounts = $mounts
+    }
+}
+
+function Get-GiteaPostgresTopology {
+    param(
+        [Parameter(Mandatory = $true)][string]$BackupPath,
+        [Parameter(Mandatory = $true)][object]$Manifest
+    )
+
+    try {
+        $topology = Read-LongPathText -Path (Join-Path $BackupPath "payload\private\postgres-topology.json") | ConvertFrom-Json -ErrorAction Stop
+        Assert-GiteaBackupArtifactSchema -Artifact $topology -ArtifactName "PostgreSQL topology" -Manifest $Manifest
+        foreach ($requiredField in @("containerName", "originalImageReference", "imageId", "networkMode", "networkAliases", "ports", "mounts")) {
+            if (-not $topology.PSObject.Properties[$requiredField]) {
+                throw "The backup PostgreSQL topology is missing '$requiredField'."
+            }
+        }
+        if ($topology.PSObject.Properties["schemaVersion"] -and [int]$topology.schemaVersion -eq 1) {
+            foreach ($requiredField in @("containerId", "databaseName", "databaseUser")) {
+                if (-not $topology.PSObject.Properties[$requiredField] -or -not [string]$topology.$requiredField) {
+                    throw "The schema-1 PostgreSQL topology is missing '$requiredField'."
+                }
+            }
+            if ([string]$topology.containerId -cnotmatch '^[a-f0-9]{64}$') {
+                throw "The schema-1 PostgreSQL topology has an invalid full container ID."
+            }
+        }
+        return $topology
+    }
+    catch {
+        throw "The backup PostgreSQL topology is unreadable or incomplete; restore/recovery is blocked. $($_.Exception.Message)"
     }
 }
 
@@ -1573,7 +1629,8 @@ function Assert-PostgresRestoreCompatibility {
     param(
         [Parameter(Mandatory = $true)][object]$BackupTopology,
         [Parameter(Mandatory = $true)][object]$CurrentContainer,
-        [Parameter(Mandatory = $true)][hashtable]$Context
+        [Parameter(Mandatory = $true)][hashtable]$Context,
+        [Parameter(Mandatory = $true)][int]$ManifestSchemaVersion
     )
 
     $current = Get-PostgresTopologySnapshot -Container $CurrentContainer
@@ -1584,6 +1641,18 @@ function Assert-PostgresRestoreCompatibility {
         ((@($BackupTopology.networkAliases | Sort-Object) -join ",") -ne (@($current.networkAliases | Sort-Object) -join ",")) -or
         @($current.networkAliases) -notcontains "db") {
         throw "The selected backup's PostgreSQL identity, image, or network differs from the existing service; restore is blocked."
+    }
+    if ($BackupTopology.PSObject.Properties["schemaVersion"] -and [int]$BackupTopology.schemaVersion -eq 1) {
+        if ([string]$BackupTopology.containerId -cne [string]$current.containerId -or
+            [string]$BackupTopology.databaseName -cne [string]$current.databaseName -or
+            [string]$BackupTopology.databaseUser -cne [string]$current.databaseUser -or
+            [string]$current.databaseName -cne [string]$Context.GiteaPostgresDbName -or
+            [string]$current.databaseUser -cne [string]$Context.GiteaPostgresUser) {
+            throw "The selected backup's PostgreSQL full container ID or database identity differs from the existing service; restore is blocked."
+        }
+    }
+    elseif ($ManifestSchemaVersion -ne 1) {
+        throw "The selected backup's legacy PostgreSQL topology is not covered by the schema-1 compatibility rule."
     }
 
     $expectedMounts = @($BackupTopology.mounts)
@@ -1843,6 +1912,7 @@ function New-GiteaBackupSet {
     Save-BackupJson -Path (Join-Path $privatePath "gitea-runtime.json") -Value $runtime
     Save-BackupJson -Path (Join-Path $privatePath "postgres-topology.json") -Value (Get-PostgresTopologySnapshot -Container $PostgresContainer)
     Save-BackupJson -Path (Join-Path $privatePath "restore-context.json") -Value @{
+        schemaVersion = 1
         configPath = [string]$Context.ConfigPath
         configSource = [string]$Context.ConfigSource
         databaseName = [string]$Context.GiteaPostgresDbName
@@ -1991,10 +2061,14 @@ function Get-GiteaLifecycleStatus {
 }
 
 function Get-BackupRuntime {
-    param([Parameter(Mandatory = $true)][string]$BackupPath)
+    param(
+        [Parameter(Mandatory = $true)][string]$BackupPath,
+        [Parameter(Mandatory = $true)][object]$Manifest
+    )
 
     $runtimePath = Join-Path $BackupPath "payload\private\gitea-runtime.json"
     $runtime = Read-LongPathText -Path $runtimePath | ConvertFrom-Json
+    Assert-GiteaBackupArtifactSchema -Artifact $runtime -ArtifactName "Gitea runtime snapshot" -Manifest $Manifest
     if (-not $runtime -or -not $runtime.imageReference -or -not $runtime.mounts -or -not $runtime.ports) {
         throw "The backup does not contain enough protected runtime metadata to restore the Gitea container."
     }
@@ -2015,6 +2089,7 @@ function Get-GiteaRecoveryRuntime {
     catch {
         throw "The upgrade backup runtime metadata is unreadable; recovery reconciliation is blocked."
     }
+    Assert-GiteaBackupArtifactSchema -Artifact $runtime -ArtifactName "Gitea runtime snapshot" -Manifest $Manifest
     if (-not $runtime -or -not $runtime.imageReference -or -not $runtime.mounts -or -not $runtime.ports -or
         [string]$runtime.imageId -cnotmatch '^sha256:[0-9a-f]{64}$' -or
         [string]$runtime.sourceVersion -cnotmatch '^\d+\.\d+\.\d+$' -or
@@ -2255,8 +2330,18 @@ function Get-GiteaApiHealth {
 }
 
 function Read-GiteaRestoreContext {
-    param([Parameter(Mandatory = $true)][string]$BackupPath)
-    return Read-LongPathText -Path (Join-Path $BackupPath "payload\private\restore-context.json") | ConvertFrom-Json
+    param(
+        [Parameter(Mandatory = $true)][string]$BackupPath,
+        [Parameter(Mandatory = $true)][object]$Manifest
+    )
+    $restoreContext = Read-LongPathText -Path (Join-Path $BackupPath "payload\private\restore-context.json") | ConvertFrom-Json -ErrorAction Stop
+    Assert-GiteaBackupArtifactSchema -Artifact $restoreContext -ArtifactName "Restore Context" -Manifest $Manifest
+    foreach ($requiredField in @("configPath", "configSource", "databaseName", "databaseUser", "runnerWasRunning")) {
+        if (-not $restoreContext.PSObject.Properties[$requiredField]) {
+            throw "The backup Restore Context is missing '$requiredField'; restore is blocked."
+        }
+    }
+    return $restoreContext
 }
 
 function Assert-ConfigRestoreCompatibility {
@@ -2785,8 +2870,8 @@ function Invoke-GiteaRecoveryReconciliation {
     }
 
     if (-not $earlySourceCloseout) {
-        $postgresTopology = Read-LongPathText -Path (Join-Path $selected.Path "payload\private\postgres-topology.json") | ConvertFrom-Json
-        Assert-PostgresRestoreCompatibility -BackupTopology $postgresTopology -CurrentContainer $postgres -Context $Context
+        $postgresTopology = Get-GiteaPostgresTopology -BackupPath $selected.Path -Manifest $selected.Manifest
+        Assert-PostgresRestoreCompatibility -BackupTopology $postgresTopology -CurrentContainer $postgres -Context $Context -ManifestSchemaVersion ([int]$selected.Manifest.schemaVersion)
     }
     Assert-GiteaDatabaseTarget -GiteaContainer $gitea -PostgresContainer $postgres -Context $Context
     Assert-GiteaApiVersion -Context $Context -ExpectedVersion $expectedVersion
@@ -3151,7 +3236,7 @@ function Invoke-GiteaUpgradeAttempt {
     [void](Invoke-GiteaDocker -Arguments @("rename", $Context.GiteaContainerName, $oldContainerName))
     Update-GiteaLifecycleRecoveryMarkerPhase -Context $Context -BackupId $backup.BackupId -OperationId $operationId -Phase "target-start-attempted" -NextAction "create-and-start-target" -LastCompletedStage "source-container-renamed"
     try {
-        $runtime = Get-BackupRuntime -BackupPath $backup.Path
+        $runtime = Get-BackupRuntime -BackupPath $backup.Path -Manifest $backup.Manifest
         New-GiteaContainerFromRuntime -Context $Context -Runtime $runtime -ImageReference $targetImage
         Wait-GiteaHealthy -Context $Context
         Assert-GiteaApiVersion -Context $Context -ExpectedVersion $GiteaVersion
@@ -3267,16 +3352,16 @@ function Invoke-GiteaRestore {
     }
 
     $selected = Get-GiteaBackupById -Context $Context -BackupId $BackupId
-    $runtime = Get-BackupRuntime -BackupPath $selected.Path
+    $runtime = Get-BackupRuntime -BackupPath $selected.Path -Manifest $selected.Manifest
     Assert-BackupRuntimeMatchesContext -Context $Context -Runtime $runtime
-    $restoreContext = Read-GiteaRestoreContext -BackupPath $selected.Path
+    $restoreContext = Read-GiteaRestoreContext -BackupPath $selected.Path -Manifest $selected.Manifest
     Assert-ConfigRestoreCompatibility -Context $Context -RestoreContext $restoreContext
     Assert-GiteaLocalStorageOnly -ConfigFilePath (Join-Path $selected.Path "payload\gitea-config\app.ini") -Environment @($runtime.environment)
     if ([string]$restoreContext.databaseName -ne [string]$Context.GiteaPostgresDbName -or
         [string]$restoreContext.databaseUser -ne [string]$Context.GiteaPostgresUser) {
         throw "The selected backup's PostgreSQL database name or user differs from the configured existing service; restore is blocked."
     }
-    $postgresTopology = Read-LongPathText -Path (Join-Path $selected.Path "payload\private\postgres-topology.json") | ConvertFrom-Json
+    $postgresTopology = Get-GiteaPostgresTopology -BackupPath $selected.Path -Manifest $selected.Manifest
     $gitea = Assert-GiteaContainerIdentity -Context $Context -AllowStopped -AllowMissing
     if ($gitea) {
         Assert-GiteaLocalStorageOnly -ConfigFilePath (Join-Path $Context.GiteaConfigDir "app.ini") -Environment @($gitea.Config.Env) -Container $gitea
@@ -3289,7 +3374,7 @@ function Invoke-GiteaRestore {
     }
 
     $postgres = Assert-PostgresContainerIdentity -Context $Context
-    Assert-PostgresRestoreCompatibility -BackupTopology $postgresTopology -CurrentContainer $postgres -Context $Context
+    Assert-PostgresRestoreCompatibility -BackupTopology $postgresTopology -CurrentContainer $postgres -Context $Context -ManifestSchemaVersion ([int]$selected.Manifest.schemaVersion)
     $capturedGitea = [pscustomobject]@{ Config = [pscustomobject]@{ Env = @($runtime.environment) } }
     Assert-GiteaDatabaseTarget -GiteaContainer $capturedGitea -PostgresContainer $postgres -Context $Context
     $runner = Get-GiteaRunnerInfo -Context $Context
