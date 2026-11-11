@@ -3,7 +3,7 @@
 ## Metadata
 - Test ID: TC-011
 - Status: In Progress
-- Last Updated: 2026-11-10
+- Last Updated: 2026-11-11
 - Owner: Project Maintainer
 - Mode: Windows PowerShell/Pester safety tests, isolated Docker acceptance, and separate manual Windows Host acceptance
 - Related Docs / WBS: GitHub issue #3; WBS `3.12`; `docs/issues/items/I-007-gitea-version-lifecycle-operations.md`
@@ -330,6 +330,21 @@ The latest native Windows PowerShell 5.1 / Pester 6.2.0 report tested exact head
 
 These are the repair mapping and source-level regression checks, not new Windows acceptance evidence. The native 70/7 run predates this repair. This WSL environment has no `pwsh` or `powershell` command available to Pester, and direct Windows launcher interop has previously failed before PowerShell startup; post-repair native Windows results remain **pending**, with no pass claimed. Keep the A0/A1, argv, Restore, ACL, and Bootstrap Pin regression coverage. Do not run Docker E2E, AC-16, or formal Gitea operations; PR #6 remains Draft.
 
+### A2 remaining failures at `a872756`
+
+The latest native Windows PowerShell 5.1 / Pester 6.2.0 report at `a872756e9d042a3874d9dd189debc1f1fb4f3011` is **76 Passed / 2 Failed / 0 Skipped / 0 NotRun; ExitCode 1**. The two failures are:
+
+- `Gitea recovery marker reconciliation.records explicit unchanged-container confirmation before clearing a legacy marker without restoring data`
+- `Gitea recovery marker reconciliation.reconciles the exact schema-1 incident reference through the real runtime topology validator without using it as an image`
+
+Both failed with `PropertyNotFoundException: operationId` because schema-1/2 Recovery Markers may omit that property.
+
+The PR #9 repair keeps the schema-1 Marker fixture minimal (`schemaVersion`, `operationKind`, `backupId`) and adds deterministic legacy reconciliation identity using a domain-separated SHA-256 input containing the validated schema version, operation kind, exact Backup ID, and recovery mode. Schema-3 identity remains tied to its existing immutable Marker Operation ID and keeps the prior identity formula. Legacy Marker clearing rechecks the Marker identity, reloads the immutable reconciliation Record, and compares all evidence against the Record verified by reconciliation before deleting only the Marker. The derived legacy Record ID is never used as a historical Marker Operation ID.
+
+Added regressions cover schema-2 Markers without `operationId`, stable schema-1 replay, conflicting Record evidence, schema-3 identity preservation, and clear-last behavior while retaining the original schema-1 fixture and all prior A0/A1/A2 cases.
+
+The 76/2 report is the last native result and predates this repair. This WSL attempt of `npm run test:gitea-lifecycle` exited 127 before Pester startup (`powershell: not found`), and direct `powershell.exe` startup failed before PowerShell with `UtilBindVsockAnyPort:307: socket failed 1`. Native Windows full non-Docker rerun remains pending; no passing result is claimed. No Docker E2E, AC-16, formal Gitea 43000 operation, existing Recovery Marker/backup access, or #29 work was performed.
+
 ## Cleanup
 
 Use disposable test directories/containers only. Do not delete backup fixtures as part of the tested lifecycle operation; test teardown may remove only the isolated temporary fixture after evidence is captured.
@@ -372,3 +387,4 @@ The preview must identify the expected GUID path, matching ownership marker, cur
 - 2026-11-10: Added A2's 16-slot failure classification and fix map, valid integrity-checked Upgrade fixture, serialized topology fixtures, state/phase corrections, real argv quoting repair, pure-read ACL assertion, and temporary-file cleanup checks. Opened PR #9 for review; native Windows Pester remains pending because PowerShell is unavailable in WSL.
 - 2026-11-10: Recorded the latest PR #9 report at `4d5cdd9` (67/77, 10 failures), mapped all 10 affected test titles, and repaired shared Upgrade/Restore Marker persistence, Reconciliation path/schema fixtures, argv diagnostics, and Bootstrap Pin's legitimate append-only history entry check. This WSL session cannot start native PowerShell (`npm` ExitCode 127; `powershell.exe` interop fails before startup), so the post-repair Windows result remains pending.
 - 2026-11-10: Recorded the native 70/77 report at `1018479` and mapped its seven failures to the fixed Upgrade Backup ID fixture, wrapped-error assertions, and schema-1 Runner-state compatibility. Added identity/safety assertions and a legacy Runner-state mismatch regression. The follow-up native Windows result remains pending; no pass is claimed.
+- 2026-11-11: Recorded the exact 76/2 native report at `a872756` and repaired legacy schema-1/2 reconciliation identity and Marker clearing on PR #9. Added stable schema-2, schema-1 replay/conflict, schema-3 identity, and immutable clear-evidence regressions; native full non-Docker rerun remains pending and no pass is claimed.

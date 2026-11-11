@@ -99,6 +99,54 @@ Describe "Gitea lifecycle append-only operation records" {
             [Convert]::ToBase64String([System.IO.File]::ReadAllBytes($recordPath)) | Should -BeExactly $originalBytes
         }
 
+        It "clears a legacy marker only while its deterministic reconciliation record remains unchanged" {
+            $context = @{ RepoRoot = (Join-Path $TestDrive "legacy-terminal-marker") }
+            $backupId = "20261108T053419Z-a5737137148a41a9bc45d6f7a78485df"
+            $recordId = "b92dd52df319a08fd98c6cba181a75e0"
+            $markerPath = Get-GiteaLifecycleRecoveryMarkerPath -Context $context
+            New-Item -ItemType Directory -Path (Get-LongPathParent -Path $markerPath) -Force | Out-Null
+            [System.IO.File]::WriteAllText(
+                $markerPath,
+                (ConvertTo-Json -InputObject ([pscustomobject]@{
+                    schemaVersion = 1
+                    operationKind = "upgrade"
+                    backupId = $backupId
+                }) -Compress),
+                [System.Text.UTF8Encoding]::new($false)
+            )
+            $record = New-GiteaOperationRecord -Context $context -Record @{
+                schemaVersion = 2
+                operationId = $recordId
+                operationKind = "reconcile-recovery"
+                result = "reconciled-original-source-without-restore"
+                recoveryMode = "original-source"
+                backupId = $backupId
+                markerSchemaVersion = 1
+                databaseRestorePerformed = $false
+                lifecycleTransaction = "complete"
+                integrationAcceptance = "pending"
+                operatorAttestation = "RECONCILE original-source $backupId DATABASE VERIFIED"
+                giteaContainerId = "a" * 64
+                postgresContainerId = "b" * 64
+                runnerContainerId = "c" * 64
+                sourceVersion = "1.26.4"
+            }
+            $recordPath = Get-GiteaOperationRecordPath -Context $context -OperationId $recordId
+            $conflict = ConvertTo-Json -InputObject $record -Depth 100 -Compress | ConvertFrom-Json
+            $conflict.sourceVersion = "1.27.3"
+            [System.IO.File]::WriteAllText($recordPath, (ConvertTo-Json -InputObject $conflict -Depth 100 -Compress), [System.Text.UTF8Encoding]::new($false))
+
+            {
+                Clear-GiteaLifecycleRecoveryMarker -Context $context -ExpectedLegacySchemaVersion 1 -ExpectedLegacyOperationKind "upgrade" -ExpectedLegacyBackupId $backupId -ExpectedLegacyRecoveryMode "original-source" -ExpectedReconciliationRecord $record
+            } | Should -Throw "*changed after verification*"
+            Test-LongPath -Path $markerPath -PathType Leaf | Should -BeTrue
+
+            [System.IO.File]::WriteAllText($recordPath, (ConvertTo-Json -InputObject $record -Depth 100 -Compress), [System.Text.UTF8Encoding]::new($false))
+            Clear-GiteaLifecycleRecoveryMarker -Context $context -ExpectedLegacySchemaVersion 1 -ExpectedLegacyOperationKind "upgrade" -ExpectedLegacyBackupId $backupId -ExpectedLegacyRecoveryMode "original-source" -ExpectedReconciliationRecord $record
+            Test-LongPath -Path $markerPath -PathType Leaf | Should -BeFalse
+            Test-LongPath -Path $recordPath -PathType Leaf | Should -BeTrue
+        }
+
         It "clears a schema-3 marker only after its matching terminal record is reloadable" {
             $context = @{ RepoRoot = (Join-Path $TestDrive "terminal-marker") }
             $operationId = "cccccccccccccccccccccccccccccccc"
@@ -1277,6 +1325,9 @@ Describe "Gitea recovery marker reconciliation" {
             $script:reconcilePostgresId = "b" * 64
             $script:reconcileRunnerId = "c" * 64
             $script:reconcileActions = [System.Collections.Generic.List[string]]::new()
+            $script:reconcileRecord = $null
+            $script:reconcileRecordWriteCount = 0
+            $script:reconcileClearArguments = $null
             $script:reconcileContext = @{
                 RepoRoot = "C:\isolated-repo"
                 GiteaContainerName = "agent-sdlc-gitea"
@@ -1352,6 +1403,10 @@ Describe "Gitea recovery marker reconciliation" {
             Mock Get-GiteaBackupById { return $script:reconcileBackup }
             Mock Test-LongPath {
                 param($Path, $PathType)
+                if ($script:reconcileRecord -and [string]$PathType -ceq "Leaf" -and
+                    [string]$Path -ceq (Get-GiteaOperationRecordPath -Context $script:reconcileContext -OperationId ([string]$script:reconcileRecord.operationId))) {
+                    return $true
+                }
                 if ([string]$Path -ceq (Join-Path $script:reconcileContext.BackupRoot $script:reconcileBackupId) -and [string]$PathType -ceq "Container") { return $true }
                 if ($PathType) { return Test-Path -LiteralPath $Path -PathType $PathType }
                 return Test-Path -LiteralPath $Path
@@ -1362,6 +1417,10 @@ Describe "Gitea recovery marker reconciliation" {
             Mock Get-GiteaRunnerInfo { return $script:reconcileRunner }
             Mock Read-LongPathText {
                 param($Path)
+                if ($script:reconcileRecord -and
+                    [string]$Path -ceq (Get-GiteaOperationRecordPath -Context $script:reconcileContext -OperationId ([string]$script:reconcileRecord.operationId))) {
+                    return (ConvertTo-Json -InputObject $script:reconcileRecord -Depth 100 -Compress)
+                }
                 if ([string]$Path -like "*gitea-runtime.json") {
                     return ($script:reconcileRuntime | ConvertTo-Json -Depth 20)
                 }
@@ -1387,9 +1446,22 @@ Describe "Gitea recovery marker reconciliation" {
             Mock New-GiteaOperationRecord {
                 param($Context, $Record)
                 $script:reconcileActions.Add("write-operation-record")
-                $script:reconcileRecord = $Record
+                $script:reconcileRecordWriteCount += 1
+                $script:reconcileRecord = ConvertTo-Json -InputObject $Record -Depth 100 -Compress | ConvertFrom-Json
+                return $script:reconcileRecord
             }
-            Mock Clear-GiteaLifecycleRecoveryMarker { $script:reconcileActions.Add("clear-recovery-marker") }
+            Mock Clear-GiteaLifecycleRecoveryMarker {
+                param($Context, $OperationId, $ExpectedLegacySchemaVersion, $ExpectedLegacyOperationKind, $ExpectedLegacyBackupId, $ExpectedLegacyRecoveryMode, $ExpectedReconciliationRecord)
+                $script:reconcileActions.Add("clear-recovery-marker")
+                $script:reconcileClearArguments = @{
+                    OperationId = $OperationId
+                    ExpectedLegacySchemaVersion = $ExpectedLegacySchemaVersion
+                    ExpectedLegacyOperationKind = $ExpectedLegacyOperationKind
+                    ExpectedLegacyBackupId = $ExpectedLegacyBackupId
+                    ExpectedLegacyRecoveryMode = $ExpectedLegacyRecoveryMode
+                    ExpectedReconciliationRecord = $ExpectedReconciliationRecord
+                }
+            }
         }
 
         It "records explicit unchanged-container confirmation before clearing a legacy marker without restoring data" {
@@ -1418,6 +1490,78 @@ Describe "Gitea recovery marker reconciliation" {
             $script:reconcileActions | Should -Not -Contain "confirm-with-full-container-ids"
             $script:reconcileActions | Should -Not -Contain "write-operation-record"
             $script:reconcileActions | Should -Not -Contain "clear-recovery-marker"
+        }
+
+        It "derives a stable schema-2 reconciliation identity without adding an Operation ID to the legacy Marker" {
+            $script:reconcileMarker.schemaVersion = 2
+
+            Invoke-GiteaLifecycle -Action reconcile-recovery -Context $script:reconcileContext -BackupId $script:reconcileBackupId -ExpectedGiteaContainerId $script:reconcileGiteaId -ExpectedPostgresContainerId $script:reconcilePostgresId -ExpectedRunnerContainerId $script:reconcileRunnerId
+
+            $script:reconcileMarker.PSObject.Properties.Name | Should -Not -Contain "operationId"
+            $script:reconcileRecord.markerSchemaVersion | Should -Be 2
+            $script:reconcileRecord.operationId | Should -BeExactly "2ac408808019502a2f5293d41af7b59b"
+            $script:reconcileClearArguments.OperationId | Should -BeNullOrEmpty
+            $script:reconcileClearArguments.ExpectedLegacySchemaVersion | Should -Be 2
+        }
+
+        It "replays the same schema-1 reconciliation record and fails closed when its evidence conflicts" {
+            Invoke-GiteaLifecycle -Action reconcile-recovery -Context $script:reconcileContext -BackupId $script:reconcileBackupId -ExpectedGiteaContainerId $script:reconcileGiteaId -ExpectedPostgresContainerId $script:reconcilePostgresId -ExpectedRunnerContainerId $script:reconcileRunnerId
+            $script:reconcileRecord.operationId | Should -BeExactly "b92dd52df319a08fd98c6cba181a75e0"
+            $script:reconcileRecordWriteCount | Should -Be 1
+
+            $script:reconcileActions.Clear()
+            Invoke-GiteaLifecycle -Action reconcile-recovery -Context $script:reconcileContext -BackupId $script:reconcileBackupId -ExpectedGiteaContainerId $script:reconcileGiteaId -ExpectedPostgresContainerId $script:reconcilePostgresId -ExpectedRunnerContainerId $script:reconcileRunnerId
+            $script:reconcileActions | Should -Not -Contain "write-operation-record"
+            $script:reconcileActions | Should -Contain "clear-recovery-marker"
+            $script:reconcileRecordWriteCount | Should -Be 1
+
+            $script:reconcileRecord.operatorAttestation = "conflicting evidence"
+            $script:reconcileActions.Clear()
+            {
+                Invoke-GiteaLifecycle -Action reconcile-recovery -Context $script:reconcileContext -BackupId $script:reconcileBackupId -ExpectedGiteaContainerId $script:reconcileGiteaId -ExpectedPostgresContainerId $script:reconcilePostgresId -ExpectedRunnerContainerId $script:reconcileRunnerId
+            } | Should -Throw "*different evidence*"
+            $script:reconcileActions | Should -Not -Contain "write-operation-record"
+            $script:reconcileActions | Should -Not -Contain "clear-recovery-marker"
+            $script:reconcileRecordWriteCount | Should -Be 1
+        }
+
+        It "keeps schema-3 reconciliation identity tied to the immutable Marker Operation ID" {
+            $markerOperationId = "1" * 32
+            $script:reconcileMarker = [pscustomobject]@{
+                schemaVersion = 3
+                operationId = $markerOperationId
+                operationKind = "upgrade"
+                phase = "backup-verified"
+                backupId = $script:reconcileBackupId
+                diagnosticBackupId = $null
+                revision = 1
+                createdAt = "2026-11-10T00:00:00.0000000Z"
+                updatedAt = "2026-11-10T00:00:00.0000000Z"
+                lastCompletedStage = "backup-verified"
+                nextAction = "rename-source-container"
+                giteaContainerId = $script:reconcileGiteaId
+                targetContainerId = $null
+                postgresContainerId = $script:reconcilePostgresId
+                runnerContainerId = $script:reconcileRunnerId
+                sourceImageId = $script:reconcileRuntime.imageId
+                sourceImageReference = $script:reconcileRuntime.imageReference
+                sourceOriginalImageReference = $script:reconcileRuntime.originalImageReference
+                sourceVersion = $script:reconcileRuntime.sourceVersion
+                targetImageDigest = "docker.gitea.com/gitea@sha256:$('c' * 64)"
+                targetVersion = "1.27.3"
+                giteaState = "running"
+                postgresState = "running"
+                runnerState = "running"
+                supersedesOperationId = $null
+                priorDiagnosticBackupIds = @()
+            }
+            Mock Test-GiteaTerminalOperationRecord { return $true }
+
+            Invoke-GiteaLifecycle -Action reconcile-recovery -Context $script:reconcileContext -BackupId $script:reconcileBackupId -ExpectedGiteaContainerId $script:reconcileGiteaId -ExpectedPostgresContainerId $script:reconcilePostgresId -ExpectedRunnerContainerId $script:reconcileRunnerId
+
+            $script:reconcileRecord.operationId | Should -BeExactly "2a88c5321753b7b36f58a628f9143ee0"
+            $script:reconcileRecord.markerSchemaVersion | Should -Be 3
+            $script:reconcileClearArguments.OperationId | Should -BeExactly $markerOperationId
         }
 
         It "reconciles the exact schema-1 incident reference through the real runtime topology validator without using it as an image" {
