@@ -1158,43 +1158,8 @@ function Show-EnvironmentStatus {
 }
 
 function Show-GiteaLifecycleStatusSummary {
-    if (-not (Test-Path -LiteralPath $GiteaLifecycleRecoveryPath)) {
-        Write-Host "Gitea Lifecycle Recovery: none"
-    }
-    else {
-        try {
-            if (-not (Test-Path -LiteralPath $GiteaLifecycleRecoveryPath -PathType Leaf)) {
-                throw "recovery marker is not a file"
-            }
-            $recoveryMarker = Get-Content -LiteralPath $GiteaLifecycleRecoveryPath -Raw | ConvertFrom-Json -ErrorAction Stop
-            if ([int]$recoveryMarker.schemaVersion -notin @(1, 2, 3) -or
-                [string]$recoveryMarker.operationKind -notin @("upgrade", "restore") -or
-                [string]$recoveryMarker.backupId -notmatch '^\d{8}T\d{6}Z-[0-9a-f]{32}$') {
-                throw "recovery marker schema is unsupported or incomplete"
-            }
-            Write-Host ("Gitea Lifecycle Recovery: pending kind={0} phase={1} backup={2}" -f $recoveryMarker.operationKind, $recoveryMarker.phase, $recoveryMarker.backupId)
-            if ($recoveryMarker.PSObject.Properties["operationId"]) { Write-Host ("Gitea Lifecycle Operation: {0}" -f $recoveryMarker.operationId) }
-            if ($recoveryMarker.PSObject.Properties["nextAction"]) { Write-Host ("Gitea Lifecycle Next Action: {0}" -f $recoveryMarker.nextAction) }
-        }
-        catch {
-            throw "Gitea lifecycle Recovery Marker cannot be read safely; status is incomplete and all write operations remain blocked."
-        }
-    }
-
-    $recordsPath = Join-Path $GiteaRoot "upgrades"
-    if (Test-Path -LiteralPath $recordsPath -PathType Container) {
-        $latestRecord = Get-ChildItem -LiteralPath $recordsPath -File -Filter "*.json" -ErrorAction Stop |
-            Sort-Object LastWriteTimeUtc -Descending | Select-Object -First 1
-        if ($latestRecord) {
-            try {
-                $record = Get-Content -LiteralPath $latestRecord.FullName -Raw | ConvertFrom-Json -ErrorAction Stop
-                Write-Host ("Latest Gitea Lifecycle Operation: id={0} result={1}" -f $record.operationId, $record.result)
-            }
-            catch { Write-Host "Latest Gitea Lifecycle Operation: unreadable record (no changes made)" }
-        }
-        else { Write-Host "Latest Gitea Lifecycle Operation: none" }
-    }
-    else { Write-Host "Latest Gitea Lifecycle Operation: none" }
+    Import-Module (Join-Path $PSScriptRoot "gitea-lifecycle.psm1") -Force
+    $null = Invoke-GiteaLifecycle -Action "status" -Context @{ RepoRoot = $RepoRoot }
 }
 
 if (Test-Path -LiteralPath $GiteaLifecycleRecoveryPath) {

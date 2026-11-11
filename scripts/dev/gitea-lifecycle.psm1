@@ -2084,6 +2084,17 @@ function Get-GiteaLifecycleStatus {
     }
 }
 
+function Protect-GiteaLifecycleStatusFieldForDisplay {
+    param([AllowNull()][string]$Value)
+
+    if ($null -eq $Value) { return "" }
+    $safeValue = [Regex]::Replace([string]$Value, '(?i)(password|token|secret|authorization|credential)(\s*[=:]\s*)[^\s,;]+', '$1$2[REDACTED]')
+    $safeValue = [Regex]::Replace($safeValue, '(?i)\b(Bearer|Basic)\s+[A-Za-z0-9._~+/=-]+', '$1 [REDACTED]')
+    $safeValue = [Regex]::Replace($safeValue, '[\r\n\t]', ' ')
+    if ($safeValue.Length -gt 160) { $safeValue = $safeValue.Substring(0, 160) }
+    return $safeValue
+}
+
 function Get-BackupRuntime {
     param(
         [Parameter(Mandatory = $true)][string]$BackupPath,
@@ -3719,12 +3730,25 @@ function Invoke-GiteaLifecycle {
         "status" {
             $status = Get-GiteaLifecycleStatus -Context $Context
             if ($status.Marker) {
-                Write-Host ("Gitea lifecycle recovery: pending kind={0} phase={1} backup={2} operation={3}" -f $status.Marker.operationKind, $status.Marker.phase, $status.Marker.backupId, $status.Marker.operationId)
-                if ($status.Marker.PSObject.Properties["nextAction"]) { Write-Host ("Next action: {0}" -f $status.Marker.nextAction) }
+                $fields = @("kind=$(Protect-GiteaLifecycleStatusFieldForDisplay -Value ([string]$status.Marker.operationKind))")
+                foreach ($fieldName in @("phase", "backupId", "operationId")) {
+                    $property = $status.Marker.PSObject.Properties[$fieldName]
+                    if ($property) {
+                        $fields += "{0}={1}" -f $fieldName, (Protect-GiteaLifecycleStatusFieldForDisplay -Value ([string]$property.Value))
+                    }
+                }
+                Write-Host ("Gitea lifecycle recovery: pending {0}" -f ($fields -join " "))
+                $nextAction = $status.Marker.PSObject.Properties["nextAction"]
+                if ($nextAction) { Write-Host ("Next action: {0}" -f (Protect-GiteaLifecycleStatusFieldForDisplay -Value ([string]$nextAction.Value))) }
             }
             else { Write-Host "Gitea lifecycle recovery: none" }
             if ($status.LatestOperationRecord) {
-                Write-Host ("Latest Gitea lifecycle operation: id={0} result={1}" -f $status.LatestOperationRecord.operationId, $status.LatestOperationRecord.result)
+                $operationId = $status.LatestOperationRecord.PSObject.Properties["operationId"]
+                $result = $status.LatestOperationRecord.PSObject.Properties["result"]
+                $recordFields = @()
+                if ($operationId) { $recordFields += "id=$(Protect-GiteaLifecycleStatusFieldForDisplay -Value ([string]$operationId.Value))" }
+                if ($result) { $recordFields += "result=$(Protect-GiteaLifecycleStatusFieldForDisplay -Value ([string]$result.Value))" }
+                Write-Host ("Latest Gitea lifecycle operation: {0}" -f ($recordFields -join " "))
             }
             else { Write-Host "Latest Gitea lifecycle operation: none" }
             return $status

@@ -45,6 +45,71 @@ Describe "Native Windows PowerShell 5.1 ProcessStartInfo argv boundary" -Tag "Wi
 Describe "Gitea lifecycle read-only status" {
     InModuleScope gitea-lifecycle -Parameters @{ TestDrive = $TestDrive } {
         param($TestDrive)
+
+        It "displays schema-1/2/3 markers using only recorded fields without changing the marker" {
+            $repoRoot = Join-Path $TestDrive "status-legacy-markers"
+            $markerDirectory = Join-Path $repoRoot ".agent-sdlc\dev-env\gitea"
+            New-Item -ItemType Directory -Path $markerDirectory -Force | Out-Null
+            $markerPath = Join-Path $markerDirectory "lifecycle-recovery.json"
+            $backupId = "20261111T080000Z-aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa"
+            $cases = @(
+                @{ Version = 1; Fields = @{} },
+                @{ Version = 2; Fields = @{ phase = "upgrade-prepared"; operationId = "bbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbb"; nextAction = "stop-runner" } },
+                @{ Version = 3; Fields = @{ phase = "upgrade-prepared"; operationId = "cccccccccccccccccccccccccccccccc"; nextAction = "stop-runner"; revision = 1; lastCompletedStage = "preflight"; createdAt = "2026-11-11T08:00:00.0000000Z"; updatedAt = "2026-11-11T08:00:00.0000000Z" } }
+            )
+
+            foreach ($case in $cases) {
+                $marker = @{
+                    schemaVersion = $case.Version
+                    operationKind = "upgrade"
+                    backupId = $backupId
+                }
+                foreach ($entry in $case.Fields.GetEnumerator()) { $marker[$entry.Key] = $entry.Value }
+                [System.IO.File]::WriteAllText($markerPath, (ConvertTo-Json -InputObject $marker -Depth 5 -Compress), [System.Text.UTF8Encoding]::new($false))
+                $before = [Convert]::ToBase64String([System.IO.File]::ReadAllBytes($markerPath))
+
+                $output = @(Invoke-GiteaLifecycle -Action status -Context @{ RepoRoot = $repoRoot } 6>&1)
+                $status = $output | Where-Object { $_ -isnot [System.Management.Automation.InformationRecord] } | Select-Object -First 1
+                $messages = @($output | Where-Object { $_ -is [System.Management.Automation.InformationRecord] } | ForEach-Object { [string]$_.MessageData })
+                $recoveryLine = [string]($messages | Where-Object { $_ -like "Gitea lifecycle recovery: pending*" } | Select-Object -First 1)
+
+                $status.RecoveryPending | Should -BeTrue
+                ([string[]]($status.Marker.PSObject.Properties | ForEach-Object { $_.Name } | Sort-Object) -join ",") | Should -BeExactly ([string[]]($marker.Keys | Sort-Object) -join ",")
+                $recoveryLine | Should -Match "kind=upgrade"
+                $recoveryLine | Should -Match ([regex]::Escape("backup=$backupId"))
+                if ($case.Fields.ContainsKey("phase")) { $recoveryLine | Should -Match "phase=upgrade-prepared" }
+                else { $recoveryLine | Should -Not -Match "phase=" }
+                if ($case.Fields.ContainsKey("operationId")) { $recoveryLine | Should -Match ([regex]::Escape("operation=$($case.Fields.operationId)")) }
+                else { $recoveryLine | Should -Not -Match "operation=" }
+                if ($case.Fields.ContainsKey("nextAction")) { $messages | Should -Contain "Next action: stop-runner" }
+                else { @($messages | Where-Object { $_ -like "Next action:*" }) | Should -BeNullOrEmpty }
+                [Convert]::ToBase64String([System.IO.File]::ReadAllBytes($markerPath)) | Should -BeExactly $before
+            }
+        }
+
+        It "redacts secret-like text from read-only status output" {
+            $repoRoot = Join-Path $TestDrive "status-redacted-marker"
+            $markerDirectory = Join-Path $repoRoot ".agent-sdlc\dev-env\gitea"
+            New-Item -ItemType Directory -Path $markerDirectory -Force | Out-Null
+            $markerPath = Join-Path $markerDirectory "lifecycle-recovery.json"
+            $marker = @{
+                schemaVersion = 2
+                operationKind = "restore"
+                backupId = "20261111T080000Z-dddddddddddddddddddddddddddddddd"
+                phase = "restore-prepared"
+                operationId = "eeeeeeeeeeeeeeeeeeeeeeeeeeeeeeee"
+                nextAction = "inspect token=status-secret-value"
+            }
+            [System.IO.File]::WriteAllText($markerPath, (ConvertTo-Json -InputObject $marker -Compress), [System.Text.UTF8Encoding]::new($false))
+
+            $output = @(Invoke-GiteaLifecycle -Action status -Context @{ RepoRoot = $repoRoot } 6>&1)
+            $messages = @($output | Where-Object { $_ -is [System.Management.Automation.InformationRecord] } | ForEach-Object { [string]$_.MessageData })
+            $display = $messages -join "`n"
+
+            $display | Should -Match "token=\[REDACTED\]"
+            $display | Should -Not -Match "status-secret-value"
+        }
+
         It "does not create lifecycle state while reading an empty status" {
             $repoRoot = Join-Path $TestDrive "status-read-only"
             New-Item -ItemType Directory -Path $repoRoot -Force | Out-Null
@@ -67,6 +132,20 @@ Describe "Gitea lifecycle read-only status" {
             $before = [Convert]::ToBase64String([System.IO.File]::ReadAllBytes($markerPath))
 
             { Get-GiteaLifecycleStatus -Context @{ RepoRoot = $repoRoot } } | Should -Throw "*unreadable*"
+
+            [Convert]::ToBase64String([System.IO.File]::ReadAllBytes($markerPath)) | Should -BeExactly $before
+        }
+
+        It "fails closed on an unsupported marker schema without changing it" {
+            $repoRoot = Join-Path $TestDrive "status-unsupported-marker"
+            $markerDirectory = Join-Path $repoRoot ".agent-sdlc\dev-env\gitea"
+            New-Item -ItemType Directory -Path $markerDirectory -Force | Out-Null
+            $markerPath = Join-Path $markerDirectory "lifecycle-recovery.json"
+            $marker = @{ schemaVersion = 99; operationKind = "upgrade"; backupId = "20261111T080000Z-ffffffffffffffffffffffffffffffff" }
+            [System.IO.File]::WriteAllText($markerPath, (ConvertTo-Json -InputObject $marker -Compress), [System.Text.UTF8Encoding]::new($false))
+            $before = [Convert]::ToBase64String([System.IO.File]::ReadAllBytes($markerPath))
+
+            { Invoke-GiteaLifecycle -Action status -Context @{ RepoRoot = $repoRoot } } | Should -Throw "*unsupported or incomplete schema*"
 
             [Convert]::ToBase64String([System.IO.File]::ReadAllBytes($markerPath)) | Should -BeExactly $before
         }
