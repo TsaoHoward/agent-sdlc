@@ -1,6 +1,6 @@
 [CmdletBinding()]
 param(
-    [ValidateSet("init", "up", "down", "status", "upgrade", "backup-list", "restore")]
+    [ValidateSet("init", "up", "down", "status", "upgrade", "backup-list", "restore", "reconcile-recovery")]
     [string]$Command = "status",
 
     [string]$ConfigPath,
@@ -10,6 +10,15 @@ param(
     [string]$GiteaVersion,
 
     [string]$BackupId,
+
+    [ValidateSet("original-source", "healthy-target", "restore-complete")]
+    [string]$RecoveryMode = "original-source",
+
+    [string]$ExpectedGiteaContainerId,
+
+    [string]$ExpectedPostgresContainerId,
+
+    [string]$ExpectedRunnerContainerId,
 
     [string]$BackupRoot,
 
@@ -1145,20 +1154,21 @@ function Show-EnvironmentStatus {
     Write-Host "ENV-005 Agent Session State: $(Get-DirectoryState -Path $AgentSessionStateDir)"
     Write-Host "ENV-005 Traceability Path: $(Get-DirectoryState -Path $TraceabilityDir)"
     Write-Host "ENV-006 Secrets: template/local config plus generated local Gitea secrets under $GiteaSecretsPath"
+    Show-GiteaLifecycleStatusSummary
 }
 
-if ($Command -eq "up" -and -not $SkipGitea -and (Test-Path -LiteralPath $GiteaLifecycleRecoveryPath)) {
-    try {
-        if (-not (Test-Path -LiteralPath $GiteaLifecycleRecoveryPath -PathType Leaf)) {
-            throw "recovery marker is not a file"
-        }
-        $recoveryMarker = Get-Content -LiteralPath $GiteaLifecycleRecoveryPath -Raw | ConvertFrom-Json
-        $recoveryBackupId = [string]$recoveryMarker.backupId
+function Show-GiteaLifecycleStatusSummary {
+    Import-Module (Join-Path $PSScriptRoot "gitea-lifecycle.psm1") -Force
+    $null = Invoke-GiteaLifecycle -Action "status" -Context @{ RepoRoot = $RepoRoot }
+}
+
+if (Test-Path -LiteralPath $GiteaLifecycleRecoveryPath) {
+    if ($Command -eq "up") {
+        throw "A Gitea lifecycle Recovery Marker exists. Bootstrap up is blocked, including -SkipGitea, until the exact lifecycle recovery path is completed."
     }
-    catch {
-        throw "A Gitea lifecycle recovery marker is unreadable; automatic bootstrap is blocked until an operator reviews it."
+    if ($Command -eq "down" -and -not $SkipGitea) {
+        throw "A Gitea lifecycle Recovery Marker exists. Ordinary down is blocked so Gitea/PostgreSQL container identities remain available for recovery. Use down -SkipGitea only to stop host listeners."
     }
-    throw "A previous Gitea $($recoveryMarker.operationKind) operation is incomplete. Automatic bootstrap is blocked; use an explicitly confirmed restore. Backup ID: '$recoveryBackupId'."
 }
 
 switch ($Command) {
@@ -1182,6 +1192,10 @@ switch ($Command) {
     "down" {
         if ($SkipGitea) {
             Stop-ControlHostWebhookServices
+            if (Test-Path -LiteralPath $GiteaLifecycleRecoveryPath) {
+                Write-Host "Stopped host webhook listeners only; the pending Gitea lifecycle Recovery Marker and Docker services were not accessed."
+                break
+            }
         }
         if (-not $SkipGitea) {
             Stop-GiteaStack
@@ -1195,7 +1209,7 @@ switch ($Command) {
         break
     }
 
-    { $_ -in @("upgrade", "backup-list", "restore") } {
+    { $_ -in @("upgrade", "backup-list", "restore", "reconcile-recovery") } {
         Import-Module (Join-Path $PSScriptRoot "gitea-lifecycle.psm1") -Force
         $lifecycleContext = @{
             RepoRoot = $RepoRoot
@@ -1225,7 +1239,7 @@ switch ($Command) {
             GiteaAdminUsername = $GiteaAdminUsername
             GiteaAdminPassword = $GiteaAdminPassword
         }
-        Invoke-GiteaLifecycle -Action $Command -Context $lifecycleContext -GiteaVersion $GiteaVersion -BackupId $BackupId
+        Invoke-GiteaLifecycle -Action $Command -Context $lifecycleContext -GiteaVersion $GiteaVersion -BackupId $BackupId -RecoveryMode $RecoveryMode -ExpectedGiteaContainerId $ExpectedGiteaContainerId -ExpectedPostgresContainerId $ExpectedPostgresContainerId -ExpectedRunnerContainerId $ExpectedRunnerContainerId
         break
     }
 }

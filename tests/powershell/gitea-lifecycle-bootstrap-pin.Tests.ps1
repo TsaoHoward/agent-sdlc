@@ -114,27 +114,58 @@ Describe "Gitea bootstrap image pin on real NTFS" -Tag "WindowsBootstrapPin" {
         $entries[0].Name | Should -Be "gitea-bootstrap.json"
     }
 
-    It "replaces an existing recovery marker without leaving replacement files" {
+    It "supersedes a terminal interrupted attempt for the same Backup ID without leaving replacement files" {
         $context = @{ RepoRoot = $script:pinFixtureRoot }
         InModuleScope gitea-lifecycle -Parameters @{ Context = $context } {
             param($Context)
-            Set-GiteaLifecycleRecoveryMarker -Context $Context -OperationKind upgrade -BackupId "backup-first"
-            Set-GiteaLifecycleRecoveryMarker -Context $Context -OperationKind restore -BackupId "backup-second" -DiagnosticBackupId "backup-diagnostic"
+            $backupId = "20261105T000000Z-0123456789abcdef0123456789abcdef"
+            $firstOperationId = "aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa"
+            $secondOperationId = "bbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbb"
+            Set-GiteaLifecycleRecoveryMarker -Context $Context -OperationKind upgrade -BackupId $backupId -OperationId $firstOperationId -Phase "target-start-attempted" -NextAction "verify-source-or-restore"
+            New-GiteaOperationRecord -Context $Context -Record @{
+                schemaVersion = 2
+                operationId = $firstOperationId
+                operationKind = "upgrade"
+                result = "interrupted-target-start-attempted"
+                completedAt = [DateTime]::UtcNow.ToString("o")
+                backupId = $backupId
+            } | Out-Null
+            Set-GiteaLifecycleRecoveryMarker -Context $Context -OperationKind restore -BackupId $backupId -OperationId $secondOperationId -SupersedesOperationId $firstOperationId -Phase "restore-prepared" -NextAction "stop-runner" -ReplaceExisting
         }
 
         $markerDirectory = Join-Path $script:pinFixtureRoot ".agent-sdlc\dev-env\gitea"
         $markerPath = Join-Path $markerDirectory "lifecycle-recovery.json"
         $marker = [System.IO.File]::ReadAllText("\\?\$markerPath") | ConvertFrom-Json
         $marker.operationKind | Should -Be "restore"
-        $marker.backupId | Should -Be "backup-second"
-        $marker.diagnosticBackupId | Should -Be "backup-diagnostic"
+        $marker.backupId | Should -Be "20261105T000000Z-0123456789abcdef0123456789abcdef"
+        $marker.operationId | Should -Be "bbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbb"
+        $marker.supersedesOperationId | Should -Be "aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa"
 
         $entries = @(InModuleScope gitea-lifecycle -Parameters @{ Directory = $markerDirectory } {
             param($Directory)
             Get-LongPathDirectoryEntries -Path $Directory
         })
-        $entries.Count | Should -Be 1
-        $entries[0].Name | Should -Be "lifecycle-recovery.json"
+        @($entries.Name) | Should -Contain "lifecycle-recovery.json"
+        @($entries.Name) | Should -Contain "upgrades"
+        $entries.Count | Should -Be 2 -Because "the schema-3 supersession keeps its append-only upgrades/ history directory"
+        @($entries | Where-Object { $_.Name -match '\.tmp$|replace-backup' }) | Should -BeNullOrEmpty
+
+        $operationDirectory = Join-Path $markerDirectory "upgrades"
+        $operationEntries = @(InModuleScope gitea-lifecycle -Parameters @{ Directory = $operationDirectory } {
+            param($Directory)
+            Get-LongPathDirectoryEntries -Path $Directory
+        })
+        $operationEntries.Count | Should -Be 1
+        $operationEntries[0].Name | Should -Be "aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa.json"
+        $operationRecordPath = Join-Path $operationDirectory $operationEntries[0].Name
+        $operationRecord = InModuleScope gitea-lifecycle -Parameters @{ Path = $operationRecordPath } {
+            param($Path)
+            Read-LongPathText -Path $Path | ConvertFrom-Json -ErrorAction Stop
+        }
+        $operationRecord.operationId | Should -BeExactly "aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa"
+        $operationRecord.operationKind | Should -BeExactly "upgrade"
+        $operationRecord.result | Should -BeExactly "interrupted-target-start-attempted"
+        $operationRecord.backupId | Should -BeExactly "20261105T000000Z-0123456789abcdef0123456789abcdef"
     }
 
     It "keeps the original config and removes temporary files when NTFS rejects replacement" {
