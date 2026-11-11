@@ -169,6 +169,25 @@ function Get-LongPathDirectoryEntries {
     return $entries.ToArray()
 }
 
+function Test-LongPathDirectoryEntry {
+    param(
+        [Parameter(Mandatory = $true)][string]$Directory,
+        [Parameter(Mandatory = $true)][string]$Name
+    )
+
+    $matches = @(
+        Get-LongPathDirectoryEntries -Path $Directory |
+            Where-Object { [string]$_.Name -ceq $Name }
+    )
+    foreach ($match in $matches) {
+        if ($match.PSIsContainer -or
+            (($match.Attributes -band [System.IO.FileAttributes]::ReparsePoint) -ne 0)) {
+            throw "Temporary lifecycle path '$($match.FullName)' is not a regular file."
+        }
+    }
+    return $matches.Count -gt 0
+}
+
 function Get-LongPathTreeEntries {
     param([Parameter(Mandatory = $true)][string]$Path)
 
@@ -308,9 +327,14 @@ function Move-LongPathFile {
         }
         $replacementBackupExtended = ConvertTo-ExtendedLengthPath -Path $replacementBackupPath
         [System.IO.File]::Replace($sourceExtended, $destinationExtended, $replacementBackupExtended)
-        if (Test-LongPath -Path $replacementBackupPath -PathType Leaf) {
+        $replacementBackupDirectory = Get-LongPathParent -Path $replacementBackupPath
+        $replacementBackupName = Get-LongPathLeaf -Path $replacementBackupPath
+        if (Test-LongPathDirectoryEntry -Directory $replacementBackupDirectory -Name $replacementBackupName) {
             try {
                 Remove-LongPathEntry -Path $replacementBackupPath
+                if (Test-LongPathDirectoryEntry -Directory $replacementBackupDirectory -Name $replacementBackupName) {
+                    throw "The temporary previous-file backup remains after cleanup."
+                }
             }
             catch {
                 $cleanupException = Get-GiteaLifecycleRootException -Exception $_.Exception
@@ -611,18 +635,18 @@ function ConvertTo-ProcessArgumentString {
                 continue
             }
             if ($character -eq [char]34) {
-                if ($backslashes -gt 0) { [void]$builder.Append(('\' * ($backslashes * 2))) }
+                if ($backslashes -gt 0) { [void]$builder.Append([string]::new([char]92, $backslashes * 2)) }
                 [void]$builder.Append('\"')
                 $backslashes = 0
                 continue
             }
             if ($backslashes -gt 0) {
-                [void]$builder.Append(('\' * $backslashes))
+                [void]$builder.Append([string]::new([char]92, $backslashes))
                 $backslashes = 0
             }
             [void]$builder.Append($character)
         }
-        if ($backslashes -gt 0) { [void]$builder.Append(('\' * ($backslashes * 2))) }
+        if ($backslashes -gt 0) { [void]$builder.Append([string]::new([char]92, $backslashes * 2)) }
         [void]$builder.Append('"')
         $builder.ToString()
     }
@@ -2718,7 +2742,15 @@ function Update-GiteaLifecycleRecoveryMarkerPhase {
 }
 
 function Clear-GiteaLifecycleRecoveryMarker {
-    param([hashtable]$Context, [string]$OperationId)
+    param(
+        [hashtable]$Context,
+        [string]$OperationId,
+        [int]$ExpectedLegacySchemaVersion,
+        [string]$ExpectedLegacyOperationKind,
+        [string]$ExpectedLegacyBackupId,
+        [string]$ExpectedLegacyRecoveryMode,
+        [object]$ExpectedReconciliationRecord
+    )
 
     $markerPath = Get-GiteaLifecycleRecoveryMarkerPath -Context $Context
     if ((Test-LongPath -Path $markerPath) -and -not (Test-LongPath -Path $markerPath -PathType Leaf)) {
@@ -2726,7 +2758,11 @@ function Clear-GiteaLifecycleRecoveryMarker {
     }
     if (Test-LongPath -Path $markerPath -PathType Leaf) {
         $marker = Get-GiteaLifecycleRecoveryMarker -Context $Context
-        if ([int]$marker.schemaVersion -eq 3) {
+        $markerSchemaVersion = [int]$marker.schemaVersion
+        if ($markerSchemaVersion -eq 3) {
+            if ($ExpectedLegacySchemaVersion -or $ExpectedReconciliationRecord) {
+                throw "A legacy reconciliation record cannot authorize clearing a schema-3 Recovery Marker."
+            }
             $requiredOperationId = if ($OperationId) { $OperationId } else { [string]$marker.operationId }
             if ([string]$marker.operationId -cne $requiredOperationId) {
                 throw "The Recovery Marker operation changed; refusing to clear it."
@@ -2739,6 +2775,75 @@ function Clear-GiteaLifecycleRecoveryMarker {
             if ([string]$record.operationId -cne $requiredOperationId -or [string]$record.result -notmatch '^(complete|healthy-|restored-|reconciled-|superseded-|interrupted-)') {
                 throw "The Operation Record does not match the Recovery Marker terminal attempt; marker remains."
             }
+        }
+        elseif ($markerSchemaVersion -in @(1, 2)) {
+            if ($OperationId -or $ExpectedLegacySchemaVersion -ne $markerSchemaVersion -or
+                [string]$marker.operationKind -cne $ExpectedLegacyOperationKind -or
+                [string]$marker.backupId -cne $ExpectedLegacyBackupId -or
+                [string]$ExpectedLegacyOperationKind -cnotin @("upgrade", "restore") -or
+                [string]$ExpectedLegacyRecoveryMode -cnotin @("original-source", "healthy-target", "restore-complete") -or
+                (($ExpectedLegacyRecoveryMode -in @("original-source", "healthy-target")) -and $ExpectedLegacyOperationKind -cne "upgrade") -or
+                ($ExpectedLegacyRecoveryMode -eq "restore-complete" -and $ExpectedLegacyOperationKind -cne "restore")) {
+                throw "The legacy Recovery Marker identity changed; refusing to clear it."
+            }
+            if (-not $ExpectedReconciliationRecord) {
+                throw "A verified append-only reconciliation Operation Record is required before clearing a legacy Recovery Marker."
+            }
+
+            $expectedRecordOperationIdProperty = $ExpectedReconciliationRecord.PSObject.Properties["operationId"]
+            if (-not $expectedRecordOperationIdProperty -or
+                [string]$expectedRecordOperationIdProperty.Value -cnotmatch '^[0-9a-f]{32}$') {
+                throw "The legacy reconciliation Operation Record identity is missing or invalid; the marker remains."
+            }
+            $reconciliationRecordId = [string]$expectedRecordOperationIdProperty.Value
+            $recordPath = Get-GiteaOperationRecordPath -Context $Context -OperationId $reconciliationRecordId
+            if (-not (Test-LongPath -Path $recordPath -PathType Leaf)) {
+                throw "A reloadable reconciliation Operation Record is required before clearing the legacy Recovery Marker."
+            }
+            try {
+                $record = Read-LongPathText -Path $recordPath | ConvertFrom-Json -ErrorAction Stop
+            }
+            catch {
+                throw "The legacy reconciliation Operation Record is unreadable; the Recovery Marker remains."
+            }
+
+            $requiredRecordFields = @(
+                "schemaVersion", "operationId", "operationKind", "result", "recoveryMode", "backupId",
+                "markerSchemaVersion", "databaseRestorePerformed", "lifecycleTransaction",
+                "integrationAcceptance", "operatorAttestation", "giteaContainerId",
+                "postgresContainerId", "runnerContainerId"
+            )
+            foreach ($field in $requiredRecordFields) {
+                if (-not $record.PSObject.Properties[$field] -or
+                    -not $ExpectedReconciliationRecord.PSObject.Properties[$field]) {
+                    throw "The legacy reconciliation Operation Record is incomplete; the Recovery Marker remains."
+                }
+            }
+            if ([int]$record.schemaVersion -ne 2 -or
+                [string]$record.operationId -cne $reconciliationRecordId -or
+                [string]$record.operationKind -cne "reconcile-recovery" -or
+                [string]$record.result -cne "reconciled-$ExpectedLegacyRecoveryMode-without-restore" -or
+                [string]$record.recoveryMode -cne $ExpectedLegacyRecoveryMode -or
+                [string]$record.backupId -cne $ExpectedLegacyBackupId -or
+                [int]$record.markerSchemaVersion -ne $ExpectedLegacySchemaVersion -or
+                [bool]$record.databaseRestorePerformed -or
+                [string]$record.lifecycleTransaction -cne "complete" -or
+                [string]$record.integrationAcceptance -cne "pending" -or
+                -not [string]$record.operatorAttestation -or
+                [string]$record.giteaContainerId -notmatch '^[0-9a-f]{64}$' -or
+                [string]$record.postgresContainerId -notmatch '^[0-9a-f]{64}$' -or
+                [string]$record.runnerContainerId -notmatch '^[0-9a-f]{64}$') {
+                throw "The legacy reconciliation Operation Record does not prove the verified closeout; the Recovery Marker remains."
+            }
+
+            $expectedRecordJson = ConvertTo-Json -InputObject $ExpectedReconciliationRecord -Depth 100 -Compress
+            $savedRecordJson = ConvertTo-Json -InputObject $record -Depth 100 -Compress
+            if ($savedRecordJson -cne $expectedRecordJson) {
+                throw "The legacy reconciliation Operation Record changed after verification; the Recovery Marker remains."
+            }
+        }
+        else {
+            throw "The Recovery Marker schema is unsupported; refusing to clear it."
         }
         Remove-LongPathEntry -Path $markerPath
     }
@@ -2757,7 +2862,7 @@ function Invoke-GiteaRecoveryReconciliation {
     Assert-NativeWindowsHost
     $Context.DockerHost = Assert-DockerDesktopReady
     $marker = Get-GiteaLifecycleRecoveryMarker -Context $Context
-    if (-not $marker -or [string]$marker.backupId -ne $BackupId) {
+    if (-not $marker -or [string]$marker.backupId -cne $BackupId) {
         throw "Recovery reconciliation requires the matching retained Recovery Marker and Backup ID."
     }
     if (($Mode -in @("original-source", "healthy-target") -and [string]$marker.operationKind -ne "upgrade") -or
@@ -2841,7 +2946,28 @@ function Invoke-GiteaRecoveryReconciliation {
             throw "The current $($identity.Name) container ID does not match the explicitly confirmed original ID; recovery marker remains."
         }
     }
-    $expectedVersion = if ($Mode -eq "original-source") { [string]$runtime.sourceVersion } elseif ($Mode -eq "healthy-target") { [string]$marker.targetVersion } else { [string]$runtime.sourceVersion }
+    if ($Mode -eq "healthy-target") {
+        if ([int]$marker.schemaVersion -ne 3) {
+            throw "Healthy-target closeout requires a schema-3 Recovery Marker; recovery marker remains."
+        }
+        foreach ($requiredField in @("targetVersion", "targetImageDigest", "runnerState")) {
+            $property = $marker.PSObject.Properties[$requiredField]
+            if (-not $property -or -not $property.Value) {
+                throw "Healthy-target closeout requires the Recovery Marker '$requiredField' value; recovery marker remains."
+            }
+        }
+    }
+    $diagnosticBackupIdProperty = $marker.PSObject.Properties["diagnosticBackupId"]
+    if ($Mode -eq "restore-complete" -and
+        ([int]$marker.schemaVersion -ne 3 -or
+         -not $diagnosticBackupIdProperty -or
+         -not $diagnosticBackupIdProperty.Value)) {
+        throw "Restore closeout requires a schema-3 Recovery Marker with a retained diagnostic Backup ID; the marker remains."
+    }
+
+    $markerRunnerStateProperty = $marker.PSObject.Properties["runnerState"]
+    $markerRunnerState = if ($markerRunnerStateProperty) { [string]$markerRunnerStateProperty.Value } else { "" }
+    $expectedVersion = if ($Mode -eq "original-source") { [string]$runtime.sourceVersion } elseif ($Mode -eq "healthy-target") { [string]$marker.PSObject.Properties["targetVersion"].Value } else { [string]$runtime.sourceVersion }
     if ($Mode -eq "original-source") {
         if ([string]$gitea.State.Status -ne "running" -or [string]$gitea.Image -ne [string]$runtime.imageId -or
             [string]$gitea.Config.Image -ne [string]$runtime.originalImageReference) {
@@ -2853,14 +2979,14 @@ function Invoke-GiteaRecoveryReconciliation {
         [string]$gitea.Config.Image -cne $(if ($Mode -eq "healthy-target") { [string]$marker.targetImageDigest } else { [string]$runtime.imageReference })) {
         throw "The current Gitea container is not the verified $Mode target image in a running state; recovery marker remains."
     }
-    $expectedRunnerStatus = if ($Mode -eq "original-source" -and $marker.runnerState) {
-        [string]$marker.runnerState
+    $expectedRunnerStatus = if ($Mode -eq "original-source" -and $markerRunnerState) {
+        $markerRunnerState
     }
     elseif ($selected -and [bool]$selected.Manifest.runnerWasRunning) { "running" }
     else { "exited" }
     if ($Mode -eq "healthy-target") {
-        $expectedRunnerStatus = if ([string]$marker.runnerState -eq "running") { "running" } else { "exited" }
-        Assert-GiteaBootstrapImagePin -Context $Context -ExpectedImageReference ([string]$marker.targetImageDigest)
+        $expectedRunnerStatus = if ($markerRunnerState -eq "running") { "running" } else { "exited" }
+        Assert-GiteaBootstrapImagePin -Context $Context -ExpectedImageReference ([string]$marker.PSObject.Properties["targetImageDigest"].Value)
     }
     elseif ($Mode -eq "restore-complete") {
         Assert-GiteaBootstrapImagePin -Context $Context -ExpectedImageReference ([string]$runtime.imageReference)
@@ -2880,7 +3006,7 @@ function Invoke-GiteaRecoveryReconciliation {
         if (-not $marker.diagnosticBackupId) {
             throw "Restore closeout requires the retained diagnostic Backup ID; the marker remains."
         }
-        $diagnostic = Get-GiteaBackupById -Context $Context -BackupId ([string]$marker.diagnosticBackupId)
+        $diagnostic = Get-GiteaBackupById -Context $Context -BackupId ([string]$diagnosticBackupIdProperty.Value)
         if ([string]$diagnostic.Manifest.kind -cne "pre-restore-diagnostic") {
             throw "Restore closeout's diagnostic Backup ID does not identify a valid pre-restore diagnostic backup."
         }
@@ -2897,7 +3023,28 @@ function Invoke-GiteaRecoveryReconciliation {
         Write-GiteaInterruptedOperationRecord -Context $Context -Marker $marker -ErrorMessage "The lifecycle attempt ended before writing its terminal operation record; the operator verified the selected reconciliation mode."
     }
 
-    $reconciliationIdentity = "reconcile|$([string]$marker.operationId)|$Mode|$BackupId"
+    $markerSchemaVersion = [int]$marker.schemaVersion
+    $markerOperationKind = [string]$marker.operationKind
+    $markerBackupId = [string]$marker.backupId
+    if ($markerSchemaVersion -eq 3) {
+        $markerOperationId = [string]$marker.operationId
+        if ($markerOperationId -notmatch '^[0-9a-f]{32}$') {
+            throw "The schema-3 Recovery Marker Operation ID is invalid; the marker remains."
+        }
+        # Keep the schema-3 reconciliation identity stable across existing retries.
+        $reconciliationIdentity = "reconcile|$markerOperationId|$Mode|$BackupId"
+    }
+    elseif ($markerSchemaVersion -in @(1, 2)) {
+        if ($markerOperationKind -cnotin @("upgrade", "restore") -or $markerBackupId -cne $BackupId) {
+            throw "The legacy Recovery Marker is missing trusted reconciliation identity fields; the marker remains."
+        }
+        # Legacy markers predate operationId. Hash only their validated, stable identity.
+        $reconciliationIdentity = "reconcile-legacy|$markerSchemaVersion|$markerOperationKind|$markerBackupId|$Mode"
+    }
+    else {
+        throw "The Recovery Marker schema is unsupported; reconciliation is blocked."
+    }
+
     $sha256 = [System.Security.Cryptography.SHA256]::Create()
     try {
         $reconciliationOperationId = [System.BitConverter]::ToString($sha256.ComputeHash([System.Text.Encoding]::UTF8.GetBytes($reconciliationIdentity))).Replace('-', '').ToLowerInvariant().Substring(0, 32)
@@ -2905,9 +3052,11 @@ function Invoke-GiteaRecoveryReconciliation {
     finally { $sha256.Dispose() }
     $reconciliationRecordPath = Get-GiteaOperationRecordPath -Context $Context -OperationId $reconciliationOperationId
     $expectedSourceDigest = if ([bool]$runtime.recoveryUsedLegacyDigestCompatibility) { $null } else { [string]$runtime.imageReference }
+    $reconciliationRecord = $null
     if (Test-LongPath -Path $reconciliationRecordPath -PathType Leaf) {
         $existingCloseout = Read-LongPathText -Path $reconciliationRecordPath | ConvertFrom-Json -ErrorAction Stop
-        if ([string]$existingCloseout.operationId -cne $reconciliationOperationId -or
+        if ([int]$existingCloseout.schemaVersion -ne 2 -or
+            [string]$existingCloseout.operationId -cne $reconciliationOperationId -or
             [string]$existingCloseout.operationKind -cne "reconcile-recovery" -or
             [string]$existingCloseout.result -cne "reconciled-$Mode-without-restore" -or
             [string]$existingCloseout.recoveryMode -cne $Mode -or
@@ -2919,40 +3068,49 @@ function Invoke-GiteaRecoveryReconciliation {
             [string]$existingCloseout.sourceVersion -cne [string]$runtime.sourceVersion -or
             [string]$existingCloseout.sourceImageId -cne [string]$runtime.imageId -or
             [string]$existingCloseout.originalImageReference -cne [string]$runtime.originalImageReference -or
+            [bool]$existingCloseout.legacyImageReferenceReconciled -ne [bool]$runtime.recoveryUsedLegacyDigestCompatibility -or
+            [int]$existingCloseout.legacyRepoDigestCount -ne [int]$runtime.recoveryLegacyDigestCount -or
+            [int]$existingCloseout.markerSchemaVersion -ne $markerSchemaVersion -or
             [bool]$existingCloseout.databaseRestorePerformed -or
             [string]$existingCloseout.lifecycleTransaction -cne "complete" -or
             [string]$existingCloseout.integrationAcceptance -cne "pending" -or
             [string]$existingCloseout.operatorAttestation -cne $expectedConfirmation) {
             throw "A deterministic recovery closeout ID exists with different evidence; refusing to overwrite it or clear the Recovery Marker."
         }
+        $reconciliationRecord = $existingCloseout
     }
     else {
-        New-GiteaOperationRecord -Context $Context -Record @{
-        schemaVersion = 2
-        operationId = $reconciliationOperationId
-        operationKind = "reconcile-recovery"
-        startedAt = if ($marker.PSObject.Properties["createdAt"]) { [string]$marker.createdAt } else { [DateTime]::UtcNow.ToString("o") }
-        result = "reconciled-$Mode-without-restore"
-        completedAt = [DateTime]::UtcNow.ToString("o")
-        backupId = $BackupId
-        sourceVersion = [string]$runtime.sourceVersion
-        sourceImageDigest = $expectedSourceDigest
-        sourceImageId = [string]$runtime.imageId
-        originalImageReference = [string]$runtime.originalImageReference
-        legacyImageReferenceReconciled = [bool]$runtime.recoveryUsedLegacyDigestCompatibility
-        legacyRepoDigestCount = [int]$runtime.recoveryLegacyDigestCount
-        giteaContainerId = $ExpectedGiteaContainerId
-        postgresContainerId = $ExpectedPostgresContainerId
-        runnerContainerId = $ExpectedRunnerContainerId
-        operatorAttestation = $expectedConfirmation
-        recoveryMode = $Mode
-        databaseRestorePerformed = $false
-        lifecycleTransaction = "complete"
-        integrationAcceptance = "pending"
-        markerSchemaVersion = [int]$marker.schemaVersion
-        } | Out-Null
+        $reconciliationRecord = New-GiteaOperationRecord -Context $Context -Record @{
+            schemaVersion = 2
+            operationId = $reconciliationOperationId
+            operationKind = "reconcile-recovery"
+            startedAt = if ($marker.PSObject.Properties["createdAt"]) { [string]$marker.createdAt } else { [DateTime]::UtcNow.ToString("o") }
+            result = "reconciled-$Mode-without-restore"
+            completedAt = [DateTime]::UtcNow.ToString("o")
+            backupId = $BackupId
+            sourceVersion = [string]$runtime.sourceVersion
+            sourceImageDigest = $expectedSourceDigest
+            sourceImageId = [string]$runtime.imageId
+            originalImageReference = [string]$runtime.originalImageReference
+            legacyImageReferenceReconciled = [bool]$runtime.recoveryUsedLegacyDigestCompatibility
+            legacyRepoDigestCount = [int]$runtime.recoveryLegacyDigestCount
+            giteaContainerId = $ExpectedGiteaContainerId
+            postgresContainerId = $ExpectedPostgresContainerId
+            runnerContainerId = $ExpectedRunnerContainerId
+            operatorAttestation = $expectedConfirmation
+            recoveryMode = $Mode
+            databaseRestorePerformed = $false
+            lifecycleTransaction = "complete"
+            integrationAcceptance = "pending"
+            markerSchemaVersion = $markerSchemaVersion
+        }
     }
-    Clear-GiteaLifecycleRecoveryMarker -Context $Context -OperationId ([string]$marker.operationId)
+    if ($markerSchemaVersion -eq 3) {
+        Clear-GiteaLifecycleRecoveryMarker -Context $Context -OperationId $markerOperationId
+    }
+    else {
+        Clear-GiteaLifecycleRecoveryMarker -Context $Context -ExpectedLegacySchemaVersion $markerSchemaVersion -ExpectedLegacyOperationKind $markerOperationKind -ExpectedLegacyBackupId $BackupId -ExpectedLegacyRecoveryMode $Mode -ExpectedReconciliationRecord $reconciliationRecord
+    }
     Write-Host "Recovery marker reconciled in '$Mode' mode after verifying Gitea, PostgreSQL, Runner and database state. No database restore or service restart was performed. Backup '$BackupId' was retained."
 }
 
@@ -3131,7 +3289,10 @@ function Set-GiteaBootstrapImagePin {
         $failure = New-GiteaBootstrapImagePinFailure -ErrorRecord $_ -Stage $stage -SensitiveValues $sensitiveValues
     }
     finally {
-        if ($temporaryPath -and (Test-LongPath -Path $temporaryPath -PathType Leaf)) {
+        if ($temporaryPath -and (
+            (Test-LongPath -Path $temporaryPath -PathType Leaf) -or
+            (Test-LongPathDirectoryEntry -Directory (Get-LongPathParent -Path $temporaryPath) -Name (Get-LongPathLeaf -Path $temporaryPath))
+        )) {
             try {
                 Remove-LongPathEntry -Path $temporaryPath
             }

@@ -3,7 +3,7 @@
 ## Metadata
 - Test ID: TC-011
 - Status: In Progress
-- Last Updated: 2026-11-10
+- Last Updated: 2026-11-11
 - Owner: Project Maintainer
 - Mode: Windows PowerShell/Pester safety tests, isolated Docker acceptance, and separate manual Windows Host acceptance
 - Related Docs / WBS: GitHub issue #3; WBS `3.12`; `docs/issues/items/I-007-gitea-version-lifecycle-operations.md`
@@ -253,6 +253,98 @@ No current post-A1 failure count is available. The last exact report is the pre-
 
 Run the focused A1 cases and full non-Docker suite from a native Windows checkout with PowerShell 5.1/Pester 5 or 6.2.0. Do not treat the frozen pre-A1 counts as results for the A1 head.
 
+## A2 — Fixture/Contract Alignment and Remaining Failures
+
+The native Windows handoff at PR #8 head `b0e57bb` reports **61 passed / 16 failed / 0 skipped; npm ExitCode 1**. It gives the category counts and problem descriptions below, but not the individual failing Pester `It` names. The 16 rows therefore classify the reported failure slots from that handoff; they are not a claim that each row maps one-to-one to a known test name.
+
+| # | Reported failure | Classification | Disposition in A2 |
+|---:|---|---|---|
+| 1 | Upgrade fixture has no `RepoRoot` for post-Marker Operation Record | Stale fixture | Added an isolated repo root and kept the append-only record path intact. |
+| 2 | Upgrade backup mock omits `Manifest` | Stale fixture | Added a schema-2 upgrade manifest to the shared backup fixture. |
+| 3 | Upgrade `Get-BackupRuntime` mock returns an empty object | Stale fixture | Replaced it with a runtime snapshot carrying the immutable image, source version, mounts, ports, and config metadata consumed by the flow. |
+| 4 | Shared Upgrade container/runtime mock omits consumed identity/state fields | Stale fixture | Completed the Gitea, PostgreSQL, Runner, and runtime snapshot shapes while keeping the injected failure order after Marker creation. |
+| 5 | Upgrade stage/error handling expectation | Contract/behavior needs native failure detail | The handoff does not identify the exact failing assertion. Existing fail-closed wrapping and A1 pre-/post-Marker behavior are unchanged; keep this item pending native rerun rather than weakening the error contract. |
+| 6 | Reconciliation's effective `app.ini` precondition | Fixture/path precondition | The isolated Reconciliation fixture creates local-storage `app.ini` under the configured effective `GiteaConfigDir`. This is present in the A2 baseline; verify it on native rerun and preserve rejection when it is missing or redirects storage. |
+| 7 | Schema-3 Marker phase case | Stale fixture | The target-start refusal case now supplies the schema-3 revision/timestamp/action fields before setting the post-start phase. |
+| 8 | Restore-marker refusal expects different error text | Stale assertion | Updated the assertion to the current contract message that the requested mode does not match an active restore marker. |
+| 9 | Reconciliation schema-1 PostgreSQL topology lacks full ID/database identity | Stale fixture | Added schema version, full container ID, database name/user, and the captured topology fields to the serialized fixture. |
+| 10 | Reconciliation artifact's property shape differs from the JSON reader contract | Fixture/contract mismatch | The fixture is serialized and read as a `PSCustomObject`, matching the production `ConvertFrom-Json` consumer. |
+| 11 | Restore's mocked PostgreSQL container omits `State` | Stale fixture | Added a running PostgreSQL state and stable full container ID. |
+| 12 | Restore's Runner/container state fixture is incomplete | Stale fixture | Added a stable Runner ID/state and completed the PostgreSQL identity shape; no lifecycle assertion was relaxed. |
+| 13 | PostgreSQL ID mismatch test takes the legacy schema compatibility branch | Fixture representation mismatch | Round-tripped `Get-PostgresTopologySnapshot` through JSON so `PSObject.Properties` sees the same schema-versioned object shape as the real reader; the full-ID mismatch assertion remains. |
+| 14 | Native ProcessStartInfo expects 9 argv values but observes 1 | Functional defect confirmed by code inspection | Replaced PowerShell's repeated-string array expression with an explicit `System.String` constructor for Windows CRT backslash runs. The real child-process test remains unchanged. Native proof is pending. |
+| 15 | ACL test expects `backup-list` to create a missing backup root | Stale fixture; product contract is pure-read | The isolated test now provisions its own root through `Ensure-BackupRoot`, then compares entries and owner/DACL metadata around `backup-list`. The command remains non-mutating. |
+| 16 | Bootstrap pin operation leaves a second directory entry | Temporary-file cleanup defect under investigation | Replacement and caller-temp cleanup now check directory entries and verify removal, retaining the existing rollback path if the previous file cannot be safely cleaned. The exact leftover filename and fix require native NTFS rerun evidence. |
+
+The code and fixtures were changed without relaxing fail-closed checks, storage coverage, full container-ID validation, Recovery Marker phase rules, terminal Operation Record append-only behavior, or the 9-argument integration assertion. A2 does not claim these 16 failures are now passing: native Windows acceptance is required to confirm the fixtures and argv/temp cleanup behavior. This WSL session has neither `powershell` nor `pwsh`; `npm run test:gitea-lifecycle` exits **127** before Pester starts. The static `git diff --check` succeeds.
+
+### A2 failure-to-change summary
+
+| Failure group | Change |
+|---|---|
+| Upgrade (5) | Complete isolated context, Manifest, runtime and container mocks; retain stage/error behavior pending exact native failure detail. |
+| Recovery reconciliation (5) | Keep effective local `app.ini`, complete schema-3 phase fixture, align error assertion, and use full schema-1 topology serialized in the production object shape. |
+| Restore (2) | Supply PostgreSQL ID/State and stable Runner identity/state. |
+| PostgreSQL (1) | Round-trip the topology to the serialized reader shape and retain full-ID/database identity assertions. |
+| Process argv (1) | Fix repeated backslash construction; real Windows child-process test remains unchanged. |
+| NTFS ACL (1) | Provision the root in the test, then verify `backup-list` preserves the directory entries and owner/DACL. |
+| Bootstrap pin (1) | Check actual directory entries for replacement/source temp cleanup and verify removal; native confirmation remains open. |
+
+## A2 Verification Status
+
+- PR: [#9](https://github.com/TsaoHoward/agent-sdlc/pull/9) is open for review from `codex/issue-3-a2-lifecycle-fixtures` into `codex/issue-3-repodigest-recovery`; base is PR #6 source-branch head `49d19f7702ce9cf5ce08e29531767f24f2122170`.
+- Native full non-Docker Pester 6.2.0: **pending**. Do not report 0 failures until run from native Windows PowerShell 5.1.
+- Local `npm run test:gitea-lifecycle`: **ExitCode 127**, `powershell: not found`; no Pester process started.
+- `git diff --check`: passed.
+- A0/A1 regression coverage stays present. Docker E2E and AC-16 were not run; formal Gitea 43000, any existing Recovery Marker/backup, and #29 were not accessed.
+- Review: Standards found no documented-rule violations. Spec review found no scope expansion or safety-contract relaxation; exact Upgrade error-test attribution and native argv/ACL/bootstrap-pin acceptance remain open.
+
+### A2 follow-up — native report at `4d5cdd9`
+
+The latest PR #9 review reports a native Windows PowerShell 5.1 / Pester 6.2.0 run at `4d5cdd983468132a1375b00ac6092c6f6bfac023`: **67 Passed / 10 Failed / 0 Skipped / 0 NotRun; ExitCode 1**. The report groups failures by cause and does not include individual Pester result names. The exact `It` titles below are mapped from the affected source paths; they are not claimed as names copied from the native result artifact.
+
+| # | Affected Pester test title | Reported root cause | Repair on PR #9 |
+|---:|---|---|---|
+| 1 | `round-trips empty, spaced, Unicode, quote, and leading/trailing slash arguments through a real child process` | Reported 1 parsed argument instead of 9; raw process arguments, child command line/stdout, and JSON array shape needed inspection. | Child output now wraps command line and argument array in a JSON object; failure diagnostics include raw `ProcessStartInfo.Arguments`, child command line, and stdout. Exact count and all 9 value assertions remain. Native round-trip is pending. |
+| 2 | `retains the Recovery Marker and does not auto-resume when Actions work appears after Runner stop` | Shared Upgrade Marker mock logged creation but did not persist a schema-3 Marker that matched the attempt ID. | Shared mock now creates and reads back a full schema-3 Marker; phase updates verify Operation ID and Backup ID. |
+| 3 | `fails closed without auto-resuming the source service or Runner when stopping Gitea fails` | Same missing Marker persistence caused the ownership guard to mask the injected stop error. | Same stateful Marker mock; failure behavior and no-auto-resume assertions remain. |
+| 4 | `creates a valid backup before recreating only the Gitea container` | The captured terminal Operation Record lacked `startedAt` because the mock did not return the persisted Marker timestamp. | Marker mock persists `createdAt`; the test now verifies the captured terminal record timestamp and matching operation metadata. |
+| 5 | `records explicit unchanged-container confirmation before clearing a legacy marker without restoring data` | Shared `Test-LongPath` mock returned false for the fixture's real effective `app.ini`. | The mock now delegates non-backup paths to real `Test-Path`; local storage validation remains active. |
+| 6 | `reconciles the exact schema-1 incident reference through the real runtime topology validator without using it as an image` | Same over-broad path mock hid the fixture `app.ini`. | Same path-mock correction; runtime validation and no-image-use assertions remain. |
+| 7 | `retains the marker when any live container ID differs from the operator's verified original ID` | Same over-broad path mock prevented the identity assertion from being reached. | Same path-mock correction; full container-ID rejection and marker-retention assertions remain. |
+| 8 | `forbids original-source closeout once target startup may have begun` | Test added `.phase` to a schema-1 fixture that did not define the property, so it was not a valid schema-3 Marker. | The fixture now starts with the complete schema-3 Marker shape and target-start phase. |
+| 9 | `retains the recovery marker and diagnostic backup when PostgreSQL restore fails` | Restore catch could not reload a matching persisted Marker, so no interrupted Operation Record was captured. | Restore mock now persists/reads a full schema-3 Marker and checks identity on updates; the test verifies terminal record/Marker identity and retained failure evidence. |
+| 10 | `supersedes a terminal interrupted attempt for the same Backup ID without leaving replacement files` (`gitea-lifecycle-bootstrap-pin.Tests.ps1`) | Second directory entry is the legitimate append-only `upgrades/` Operation Record directory, not a temporary leak. | The test inspects the marker and history entries, validates the retained immutable record, and rejects `.tmp` / `replace-backup` remnants without deleting history. |
+
+The repairs preserve the append-only Operation Record contract, fail-closed ownership checks, and the required 9-argument assertion. The current WSL run of `npm run test:gitea-lifecycle` exits **127** (`powershell: not found`). Direct `powershell.exe` startup also fails before PowerShell starts with `UtilBindVsockAnyPort:307: socket failed 1`. Therefore there is no post-repair native count or pass claim; Windows PowerShell 5.1/Pester 6.2.0 full non-Docker acceptance remains pending. `git diff --check` passes. Docker E2E, AC-16, and formal Gitea/Marker/backup operations were not run.
+
+### A2 remaining failures at `1018479`
+
+The latest native Windows PowerShell 5.1 / Pester 6.2.0 report tested exact head `1018479fd5c15a2284d14e881cef4283fe6c617c`: **70 Passed / 7 Failed / 0 Skipped / 0 NotRun; ExitCode 1**. Process argv, Restore, NTFS ACL, and Bootstrap Pin passed in that run. The remaining failures map to three root causes:
+
+| Root cause | Affected Pester tests | Repair |
+|---|---|---|
+| Upgrade generated a Backup ID different from the ID in the fixed backup fixture. | `creates a valid backup before recreating only the Gitea container`; `surfaces the safe image-pin stage, exception type, and masked cause after health checks`; `retains the backup and does not automatically roll back after a health failure` | Mock `New-GiteaBackupId` to return the fixture ID and make the backup mock verify the caller-supplied ID. The successful Upgrade test checks the same Backup ID across Marker, backup, and terminal Operation Record, and keeps the Operation ID ownership check. |
+| Two injected Upgrade failures were preserved inside the wrapped error message, while `Should -Throw` expected a whole-message match. | `retains the Recovery Marker and does not auto-resume when Actions work appears after Runner stop`; `fails closed without auto-resuming the source service or Runner when stopping Gitea fails` | Match the injected cause in the contextualized message. Both tests also verify the retained schema-3 Marker and interrupted Operation Record have matching Operation/Backup IDs, and that no marker clear, Gitea start, Runner start, backup, or target creation occurs. |
+| Schema-1 Recovery Markers accepted by the reader do not contain `runnerState`; original-source reconciliation read that property directly under strict mode. | `records explicit unchanged-container confirmation before clearing a legacy marker without restoring data`; `reconciles the exact schema-1 incident reference through the real runtime topology validator without using it as an image` | Read `runnerState` only when the Marker has the property. For legacy original-source reconciliation, retain the existing fallback to the selected, integrity-verified upgrade Manifest's `runnerWasRunning`. Healthy-target and restore-complete modes still require their newer Marker fields. The schema-1 fixture remains minimal; a regression also rejects a live Runner state that disagrees with the Manifest. |
+
+These are the repair mapping and source-level regression checks, not new Windows acceptance evidence. The native 70/7 run predates this repair. This WSL environment has no `pwsh` or `powershell` command available to Pester, and direct Windows launcher interop has previously failed before PowerShell startup; post-repair native Windows results remain **pending**, with no pass claimed. Keep the A0/A1, argv, Restore, ACL, and Bootstrap Pin regression coverage. Do not run Docker E2E, AC-16, or formal Gitea operations; PR #6 remains Draft.
+
+### A2 remaining failures at `a872756`
+
+The latest native Windows PowerShell 5.1 / Pester 6.2.0 report at `a872756e9d042a3874d9dd189debc1f1fb4f3011` is **76 Passed / 2 Failed / 0 Skipped / 0 NotRun; ExitCode 1**. The two failures are:
+
+- `Gitea recovery marker reconciliation.records explicit unchanged-container confirmation before clearing a legacy marker without restoring data`
+- `Gitea recovery marker reconciliation.reconciles the exact schema-1 incident reference through the real runtime topology validator without using it as an image`
+
+Both failed with `PropertyNotFoundException: operationId` because schema-1/2 Recovery Markers may omit that property.
+
+The PR #9 repair keeps the schema-1 Marker fixture minimal (`schemaVersion`, `operationKind`, `backupId`) and adds deterministic legacy reconciliation identity using a domain-separated SHA-256 input containing the validated schema version, operation kind, exact Backup ID, and recovery mode. Schema-3 identity remains tied to its existing immutable Marker Operation ID and keeps the prior identity formula. Legacy Marker clearing rechecks the Marker identity, reloads the immutable reconciliation Record, and compares all evidence against the Record verified by reconciliation before deleting only the Marker. The derived legacy Record ID is never used as a historical Marker Operation ID.
+
+Added regressions cover schema-2 Markers without `operationId`, stable schema-1 replay, conflicting Record evidence, schema-3 identity preservation, and clear-last behavior while retaining the original schema-1 fixture and all prior A0/A1/A2 cases.
+
+The 76/2 report is the last native result and predates this repair. This WSL attempt of `npm run test:gitea-lifecycle` exited 127 before Pester startup (`powershell: not found`), and direct `powershell.exe` startup failed before PowerShell with `UtilBindVsockAnyPort:307: socket failed 1`. Native Windows full non-Docker rerun remains pending; no passing result is claimed. No Docker E2E, AC-16, formal Gitea 43000 operation, existing Recovery Marker/backup access, or #29 work was performed.
+
 ## Cleanup
 
 Use disposable test directories/containers only. Do not delete backup fixtures as part of the tested lifecycle operation; test teardown may remove only the isolated temporary fixture after evidence is captured.
@@ -292,3 +384,7 @@ The preview must identify the expected GUID path, matching ownership marker, cur
 - 2026-11-08: Added schema-1 triple-digest reconciliation compatibility, a strict Restore rejection assertion, and an isolated E2E that mutates only its owned backup fixture. Updated-head native Pester and Docker E2E remain pending per maintainer direction.
 - 2026-11-10: Added the A1 PowerShell 5.1 Runtime/error-handling repair and four regression cases from `ab14c9d`. The WSL Pester run could not start (`powershell` missing; Windows launcher interop fails before startup); retained the pre-A1 failure counts and categorized known unresolved A2/argv/ACL/Bootstrap-pin checks without claiming current-head results.
 - 2026-11-10: Recorded native Windows focused A1 results of 3/4 on head `788b9b0`, traced the sole failure to incomplete shared Runtime Snapshot/container mocks, and corrected the fixture and assertion ordering. Current WSL cannot rerun Pester; post-correction native acceptance remains pending.
+- 2026-11-10: Added A2's 16-slot failure classification and fix map, valid integrity-checked Upgrade fixture, serialized topology fixtures, state/phase corrections, real argv quoting repair, pure-read ACL assertion, and temporary-file cleanup checks. Opened PR #9 for review; native Windows Pester remains pending because PowerShell is unavailable in WSL.
+- 2026-11-10: Recorded the latest PR #9 report at `4d5cdd9` (67/77, 10 failures), mapped all 10 affected test titles, and repaired shared Upgrade/Restore Marker persistence, Reconciliation path/schema fixtures, argv diagnostics, and Bootstrap Pin's legitimate append-only history entry check. This WSL session cannot start native PowerShell (`npm` ExitCode 127; `powershell.exe` interop fails before startup), so the post-repair Windows result remains pending.
+- 2026-11-10: Recorded the native 70/77 report at `1018479` and mapped its seven failures to the fixed Upgrade Backup ID fixture, wrapped-error assertions, and schema-1 Runner-state compatibility. Added identity/safety assertions and a legacy Runner-state mismatch regression. The follow-up native Windows result remains pending; no pass is claimed.
+- 2026-11-11: Recorded the exact 76/2 native report at `a872756` and repaired legacy schema-1/2 reconciliation identity and Marker clearing on PR #9. Added stable schema-2, schema-1 replay/conflict, schema-3 identity, and immutable clear-evidence regressions; native full non-Docker rerun remains pending and no pass is claimed.

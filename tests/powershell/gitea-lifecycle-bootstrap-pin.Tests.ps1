@@ -145,8 +145,27 @@ Describe "Gitea bootstrap image pin on real NTFS" -Tag "WindowsBootstrapPin" {
             param($Directory)
             Get-LongPathDirectoryEntries -Path $Directory
         })
-        $entries.Count | Should -Be 1
-        $entries[0].Name | Should -Be "lifecycle-recovery.json"
+        @($entries.Name) | Should -Contain "lifecycle-recovery.json"
+        @($entries.Name) | Should -Contain "upgrades"
+        $entries.Count | Should -Be 2 -Because "the schema-3 supersession keeps its append-only upgrades/ history directory"
+        @($entries | Where-Object { $_.Name -match '\.tmp$|replace-backup' }) | Should -BeNullOrEmpty
+
+        $operationDirectory = Join-Path $markerDirectory "upgrades"
+        $operationEntries = @(InModuleScope gitea-lifecycle -Parameters @{ Directory = $operationDirectory } {
+            param($Directory)
+            Get-LongPathDirectoryEntries -Path $Directory
+        })
+        $operationEntries.Count | Should -Be 1
+        $operationEntries[0].Name | Should -Be "aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa.json"
+        $operationRecordPath = Join-Path $operationDirectory $operationEntries[0].Name
+        $operationRecord = InModuleScope gitea-lifecycle -Parameters @{ Path = $operationRecordPath } {
+            param($Path)
+            Read-LongPathText -Path $Path | ConvertFrom-Json -ErrorAction Stop
+        }
+        $operationRecord.operationId | Should -BeExactly "aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa"
+        $operationRecord.operationKind | Should -BeExactly "upgrade"
+        $operationRecord.result | Should -BeExactly "interrupted-target-start-attempted"
+        $operationRecord.backupId | Should -BeExactly "20261105T000000Z-0123456789abcdef0123456789abcdef"
     }
 
     It "keeps the original config and removes temporary files when NTFS rejects replacement" {
