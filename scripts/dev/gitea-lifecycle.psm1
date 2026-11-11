@@ -3734,7 +3734,12 @@ function Invoke-GiteaLifecycle {
                 foreach ($fieldName in @("phase", "backupId", "operationId")) {
                     $property = $status.Marker.PSObject.Properties[$fieldName]
                     if ($property) {
-                        $fields += "{0}={1}" -f $fieldName, (Protect-GiteaLifecycleStatusFieldForDisplay -Value ([string]$property.Value))
+                        $displayFieldName = switch ($fieldName) {
+                            "backupId" { "backup" }
+                            "operationId" { "operation" }
+                            default { $fieldName }
+                        }
+                        $fields += "{0}={1}" -f $displayFieldName, (Protect-GiteaLifecycleStatusFieldForDisplay -Value ([string]$property.Value))
                     }
                 }
                 Write-Host ("Gitea lifecycle recovery: pending {0}" -f ($fields -join " "))

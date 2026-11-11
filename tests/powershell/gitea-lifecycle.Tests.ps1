@@ -77,9 +77,13 @@ Describe "Gitea lifecycle read-only status" {
                 ([string[]]($status.Marker.PSObject.Properties | ForEach-Object { $_.Name } | Sort-Object) -join ",") | Should -BeExactly ([string[]]($marker.Keys | Sort-Object) -join ",")
                 $recoveryLine | Should -Match "kind=upgrade"
                 $recoveryLine | Should -Match ([regex]::Escape("backup=$backupId"))
+                $recoveryLine | Should -Not -Match "backupId="
                 if ($case.Fields.ContainsKey("phase")) { $recoveryLine | Should -Match "phase=upgrade-prepared" }
                 else { $recoveryLine | Should -Not -Match "phase=" }
-                if ($case.Fields.ContainsKey("operationId")) { $recoveryLine | Should -Match ([regex]::Escape("operation=$($case.Fields.operationId)")) }
+                if ($case.Fields.ContainsKey("operationId")) {
+                    $recoveryLine | Should -Match ([regex]::Escape("operation=$($case.Fields.operationId)"))
+                    $recoveryLine | Should -Not -Match "operationId="
+                }
                 else { $recoveryLine | Should -Not -Match "operation=" }
                 if ($case.Fields.ContainsKey("nextAction")) { $messages | Should -Contain "Next action: stop-runner" }
                 else { @($messages | Where-Object { $_ -like "Next action:*" }) | Should -BeNullOrEmpty }
