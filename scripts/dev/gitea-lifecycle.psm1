@@ -2088,8 +2088,8 @@ function Protect-GiteaLifecycleStatusFieldForDisplay {
     param([AllowNull()][string]$Value)
 
     if ($null -eq $Value) { return "" }
-    $safeValue = [Regex]::Replace([string]$Value, '(?i)(password|token|secret|authorization|credential)(\s*[=:]\s*)[^\s,;]+', '$1$2[REDACTED]')
-    $safeValue = [Regex]::Replace($safeValue, '(?i)\b(Bearer|Basic)\s+[A-Za-z0-9._~+/=-]+', '$1 [REDACTED]')
+    if ([string]::IsNullOrWhiteSpace($Value)) { return $Value }
+    $safeValue = Protect-GiteaLifecycleDiagnosticMessage -Message $Value
     $safeValue = [Regex]::Replace($safeValue, '[\r\n\t]', ' ')
     if ($safeValue.Length -gt 160) { $safeValue = $safeValue.Substring(0, 160) }
     return $safeValue
