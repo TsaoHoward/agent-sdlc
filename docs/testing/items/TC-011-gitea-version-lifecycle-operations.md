@@ -3,7 +3,7 @@
 ## Metadata
 - Test ID: TC-011
 - Status: In Progress
-- Last Updated: 2026-11-11
+- Last Updated: 2026-11-12
 - Owner: Project Maintainer
 - Mode: Windows PowerShell/Pester safety tests, isolated Docker acceptance, and separate manual Windows Host acceptance
 - Related Docs / WBS: GitHub issue #3; WBS `3.12`; `docs/issues/items/I-007-gitea-version-lifecycle-operations.md`
@@ -102,6 +102,27 @@ Live acceptance for the real 43000 instance is a separate, authorized Windows Ho
 - for authorized live acceptance only: before/after topology, health/API result, and the API/Git/Registry/Actions/Runner/Run Attempt smoke results
 
 ## Current Execution Result
+
+### Stage B Runner image volume and cleanup — 2026-11-12
+
+The pinned `gitea/act_runner:0.2.13` image declares `/var/run/docker.sock` as a Docker volume. The prior fixture only supplied the `/data` bind, so the existing fail-closed volume check correctly rejected initialization and cleanup. PR #6's discussion records that the resulting anonymous volume and the exact isolated Run ID `671f763bb72c4b7d8597baa843a9f784` were subsequently removed by the operator after ownership preflight; no formal service or Recovery Marker operation was performed.
+
+The independent Stage B repair creates an empty directory inside the GUID-owned fixture and bind-mounts it read-only at `/var/run/docker.sock`; the real host Docker socket is never mounted. The existing guard still requires exactly one bind for every image-declared volume and rejects Docker volumes. Runner identity verification now requires exactly the two expected fixture binds. Cleanup validates every registered container before deleting any container, and an unknown run-labeled container blocks cleanup.
+
+New regressions cover the expected Runner mount list, rejection of a socket source outside the fixture, positive and negative image-volume validation, successful verified cleanup, and fail-closed cleanup before any container removal when one owned container has an anonymous volume. The isolated acceptance file contains 8 Docker E2E cases.
+
+Current-head execution is pending. The WSL launch of Windows PowerShell fails before process startup with `UtilBindVsockAnyPort:307: socket failed 1`, and `docker --context desktop-linux info` fails with `protocol not available`. The new Pester regressions and all 8 Docker E2E cases have not run here; no WSL result is substituted for native Windows PowerShell 5.1 and Docker Desktop acceptance. No formal Gitea, PostgreSQL, Runner, backup, or Recovery Marker was accessed.
+
+Run from native Windows PowerShell 5.1 with Docker Desktop after bringing this branch into the Windows workspace:
+
+```powershell
+npm run test:gitea-lifecycle
+$env:AGENT_SDLC_GITEA_DOCKER_E2E = "1"
+npm run test:gitea-lifecycle:docker-e2e
+Remove-Item Env:AGENT_SDLC_GITEA_DOCKER_E2E
+```
+
+The E2E teardown verifies the run-scoped containers/network, owned temp tree, and the before/after identity/state snapshot of all pre-existing containers. Keep formal port `43000` services and any formal Recovery Marker outside this isolated run.
 
 - Latest Windows Host report before the ACL correction: `npm ci`, `npm run typecheck`, and Pester passed (32/32). Docker E2E passed PostgreSQL readiness, fixture initialization, and the real Actions API preflight, then failed while setting the backup ACL with `PrivilegeNotHeldException: SeSecurityPrivilege`. The test volume was healthy NTFS and the shell was non-elevated. Root cause: PowerShell `Set-Acl` first persists `AccessControlSections.All`, which includes Audit/SACL; after a privilege failure it retries with a reduced section set only when its audit-rule/protection heuristic permits it. The SACL requires `SeSecurityPrivilege`; the observed path still requested it. The direct .NET `FileSystemSecurity` persistence now changes only DACL rules. References: [PowerShell Set-Acl provider source](https://github.com/PowerShell/PowerShell/blob/master/src/System.Management.Automation/namespaces/FileSystemSecurity.cs), [Microsoft SACL privilege requirements](https://learn.microsoft.com/en-us/windows/win32/secauthz/sacl-access-right), [.NET Framework changed-section persistence](https://github.com/Microsoft/referencesource/blob/main/mscorlib/system/security/accesscontrol/filesecurity.cs). No service operation was authorized or performed.
 - The ACL implementation now reads only the DACL and owner, preserves the existing current-user owner, modifies only access rules through .NET `FileSystemSecurity`, then reads back and validates the protected DACL and exact allowed ACEs. SACL data is not read or written. Any owner, inheritance, or rule mismatch throws before backup/upgrade proceeds.
@@ -390,3 +411,4 @@ The preview must identify the expected GUID path, matching ownership marker, cur
 - 2026-11-11: Recorded the exact 76/2 native report at `a872756` and repaired legacy schema-1/2 reconciliation identity and Marker clearing on PR #9. Added stable schema-2, schema-1 replay/conflict, schema-3 identity, and immutable clear-evidence regressions; native full non-Docker rerun remains pending and no pass is claimed.
 - 2026-11-11: Recorded A2's accepted native 82/82 non-Docker baseline at `c281d6c`, then added strict-mode read-only status coverage for valid schema-1/2/3 Markers, exact field preservation, secret-like output redaction, unchanged Marker bytes, and unsupported-schema refusal. The current Pester attempt is blocked before PowerShell startup by WSL interop (`UtilBindVsockAnyPort:307: socket failed 1`), so this change remains unverified on Windows. No existing Recovery Marker was read or modified; no formal Gitea operation, Docker E2E, AC-16, or #29 write test was run.
 - 2026-11-11: Fixed the status label mismatch by rendering raw `backupId`/`operationId` values as `backup=`/`operation=` and asserting the raw field labels are absent. `npm run validate:platform` and `git diff --check` pass. Native Windows PowerShell 5.1/Pester 6.2.0 focused and full non-Docker acceptance remains pending on the new PR #6 head; no formal Recovery Marker or lifecycle operation was touched.
+- 2026-11-12: Added the Stage B Runner image-volume mount and cleanup preflight regressions on an independent PR targeting PR #6. Native regression and 8-case Docker E2E acceptance remain pending because this WSL session cannot start PowerShell or Docker Desktop; no formal services or Recovery Marker were accessed.

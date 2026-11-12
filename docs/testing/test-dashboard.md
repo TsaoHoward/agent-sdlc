@@ -3,7 +3,7 @@
 ## Document Metadata
 - Version: 0.1
 - Status: Active
-- Last Updated: 2026-11-11
+- Last Updated: 2026-11-12
 - Owner: Project Maintainer
 - Source Template: docs/templates/test-dashboard.template.md
 
@@ -41,7 +41,7 @@ It does not replace CI run history, forge issue or PR history, roadmap/WBS plann
 | Test ID | Title | Status | Mode | Related Docs / WBS | Next Action | Exit Path |
 |---|---|---|---|---|---|---|
 | TC-001 | CLI Replay Intake And Session Smoke | Ready | CLI replay | `docs/roadmap.md` Phase 1; WBS `3.1`, `3.2`, `3.3` | Re-run when intake or session-start behavior changes and keep the case note current if task/session fields or evidence paths move | Move out after the current validation window once the case no longer needs active dashboard attention; keep the canonical case note as the long-lived procedure |
-| TC-011 | Local Gitea Version Lifecycle Operations | In Progress | Windows PowerShell/Pester plus isolated Docker acceptance | `docs/testing/items/TC-011-gitea-version-lifecycle-operations.md`; WBS `3.12` | Run focused schema-1/2/3 status regressions and full non-Docker Pester on the new PR #6 head with `backup=`/`operation=` output; prior A2 baseline at `c281d6c` passed 82/82. Docker E2E and AC-16 remain separate gates | Move out after implementation acceptance and separately authorized Windows Host acceptance; keep the canonical case note as the long-lived procedure |
+| TC-011 | Local Gitea Version Lifecycle Operations | In Progress | Windows PowerShell/Pester plus isolated Docker acceptance | `docs/testing/items/TC-011-gitea-version-lifecycle-operations.md`; WBS `3.12` | Run the new Runner Volume/Cleanup regressions and all 8 isolated Docker E2E cases from native Windows PowerShell 5.1 + Docker Desktop; current WSL cannot start either runtime. Confirm fixture teardown and pre-existing container identities | Move out after implementation acceptance and separately authorized Windows Host acceptance; keep the canonical case note as the long-lived procedure |
 
 ## Test Items
 
@@ -109,5 +109,6 @@ It does not replace CI run history, forge issue or PR history, roadmap/WBS plann
 - 2026-11-10: Recorded native focused A1 acceptance at 3/4 on `788b9b0`; the sole failure stopped before Marker creation because Runtime Snapshot and container fixture fields were incomplete. The Pester fixture now supplies those fields and verifies Marker → injected fault → terminal record ordering and root-cause retention. The corrected native rerun and full non-Docker suite remain pending because this WSL session cannot start Windows PowerShell.
 - 2026-11-10: Recorded the latest PR #9 native report at `4d5cdd9` (67 Passed / 10 Failed / 0 Skipped / 0 NotRun; ExitCode 1) and mapped all ten affected test titles. Updated Recovery Marker mock persistence/identity, Reconciliation path/schema fixtures, argv JSON diagnostics with the nine-value assertion intact, and Bootstrap Pin append-only history inspection. Post-repair native Pester remains pending: npm exits 127 (`powershell: not found`) and `powershell.exe` interop fails before startup. No pass is claimed.
 - 2026-11-11: Recorded the 76/2 native report at `a872756` and updated TC-011 for the schema-1/2 Recovery Marker identity and clear-evidence repair. Full native non-Docker acceptance at the repaired PR #9 head remains pending; no pass is claimed.
+- 2026-11-12: Added the Stage B Runner image-volume and cleanup regressions. The 0.2.13 socket-path image volume now uses an owned read-only placeholder bind, and cleanup preflights all run-labeled containers before removal. WSL interop and Docker Desktop are unavailable here; new Pester tests and all 8 native Docker E2E cases remain pending.
 - 2026-11-11: Recorded A2's accepted 82/82 native non-Docker baseline at `c281d6c`; added schema-1/2/3 read-only status presentation regressions and fail-closed invalid-marker coverage. Current changes need a native PowerShell rerun; WSL interop fails before startup, and no formal Gitea state was accessed.
 - 2026-11-11: Fixed status output labels to preserve the existing `backup=`/`operation=` CLI contract while reading the raw marker properties; tests now reject raw `backupId=`/`operationId=` output. Offline platform validation and diff checks pass; native Pester remains for acceptance of the new PR #6 head.

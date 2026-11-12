@@ -223,6 +223,22 @@ function Get-GiteaLifecycleE2EContainer {
     return ($json | ConvertFrom-Json)
 }
 
+function Get-GiteaLifecycleE2ERunnerFixtureMounts {
+    param([Parameter(Mandatory = $true)][hashtable]$State)
+
+    $expectedRunnerDataPath = Join-Path $State.TestRoot "volumes\runner-data"
+    $expectedSocketPlaceholderPath = Join-Path $State.TestRoot "volumes\runner-docker-socket"
+    if (-not (Test-GiteaLifecycleE2EPathEqual -Left ([string]$State.RunnerDataPath) -Right $expectedRunnerDataPath) -or
+        -not (Test-GiteaLifecycleE2EPathEqual -Left ([string]$State.RunnerSocketPlaceholderPath) -Right $expectedSocketPlaceholderPath)) {
+        throw "Runner bind mounts must stay under this GUID-owned fixture's exact volume paths."
+    }
+
+    return [string[]]@(
+        "type=bind,source=$($State.RunnerDataPath),target=/data",
+        "type=bind,source=$($State.RunnerSocketPlaceholderPath),target=/var/run/docker.sock,readonly"
+    )
+}
+
 function Assert-GiteaLifecycleE2ENoAnonymousVolumes {
     param([Parameter(Mandatory = $true)][string]$ContainerName)
 
@@ -234,6 +250,13 @@ function Assert-GiteaLifecycleE2ENoAnonymousVolumes {
         $matchingMounts = @($mounts | Where-Object { [string]$_.Destination -ceq [string]$declaredPath })
         if ($matchingMounts.Count -ne 1 -or [string]$matchingMounts[0].Type -cne "bind") {
             throw "Fixture container '$ContainerName' has an image-declared volume without exactly one owned bind mount at '$declaredPath'; fixture cleanup is blocked."
+        }
+        if ([string]$declaredPath -ceq "/var/run/docker.sock" -and
+            (-not $script:dockerE2EState -or
+                [string]::IsNullOrWhiteSpace([string]$script:dockerE2EState.RunnerSocketPlaceholderPath) -or
+                [bool]$matchingMounts[0].RW -or
+                -not (Test-GiteaLifecycleE2EPathEqual -Left ([string]$matchingMounts[0].Source) -Right ([string]$script:dockerE2EState.RunnerSocketPlaceholderPath)))) {
+            throw "Fixture Runner Docker socket volume is not bound to its GUID-owned placeholder; fixture cleanup is blocked."
         }
     }
     if (@($mounts | Where-Object { [string]$_.Type -ceq "volume" }).Count -gt 0) {
@@ -465,8 +488,13 @@ function Get-GiteaLifecycleE2EOwnedContainerKind {
     }
 
     if ($name -eq $state.RunnerName -and $isOnFixtureNetwork -and $runIdLabel -eq [string]$state.RunId) {
-        $runnerMount = @($Container.Mounts | Where-Object { [string]$_.Destination -eq "/data" -and [string]$_.Type -eq "bind" })
-        if ($runnerMount.Count -eq 1 -and (Test-GiteaLifecycleE2EPathEqual -Left ([string]$runnerMount[0].Source) -Right ([string]$state.RunnerDataPath))) {
+        $runnerMounts = @($Container.Mounts)
+        $runnerDataMount = @($runnerMounts | Where-Object { [string]$_.Destination -ceq "/data" -and [string]$_.Type -ceq "bind" })
+        $runnerSocketMount = @($runnerMounts | Where-Object { [string]$_.Destination -ceq "/var/run/docker.sock" -and [string]$_.Type -ceq "bind" })
+        if ($runnerMounts.Count -eq 2 -and $runnerDataMount.Count -eq 1 -and $runnerSocketMount.Count -eq 1 -and
+            (Test-GiteaLifecycleE2EPathEqual -Left ([string]$runnerDataMount[0].Source) -Right ([string]$state.RunnerDataPath)) -and
+            -not [bool]$runnerSocketMount[0].RW -and
+            (Test-GiteaLifecycleE2EPathEqual -Left ([string]$runnerSocketMount[0].Source) -Right ([string]$state.RunnerSocketPlaceholderPath))) {
             return "runner"
         }
         return $null
@@ -516,6 +544,10 @@ function Register-GiteaLifecycleE2EOwnedContainers {
                 name = [string]$container.Name.TrimStart("/")
                 kind = [string]$kind
             }
+        }
+        elseif ($container.Config.Labels -and
+            [string]$container.Config.Labels.'agent-sdlc.lifecycle-e2e.run-id' -ceq [string]$state.RunId) {
+            throw "A run-labeled Docker E2E container does not match a verified fixture identity; refusing cleanup."
         }
     }
 }
@@ -652,6 +684,7 @@ function Initialize-GiteaLifecycleE2EFixture {
     $configPath = Join-Path $testRoot "volumes\gitea-config"
     $postgresPath = Join-Path $testRoot "volumes\postgres-data"
     $runnerDataPath = Join-Path $testRoot "volumes\runner-data"
+    $runnerSocketPlaceholderPath = Join-Path $testRoot "volumes\runner-docker-socket"
     $backupRoot = Join-Path $testRoot "backups"
     $networkName = "$prefix-network"
     $giteaName = "$prefix-gitea"
@@ -688,6 +721,7 @@ function Initialize-GiteaLifecycleE2EFixture {
         PostgresName = $postgresName
         RunnerName = $runnerName
         RunnerDataPath = $runnerDataPath
+        RunnerSocketPlaceholderPath = $runnerSocketPlaceholderPath
         DataPath = $dataPath
         ConfigPath = $configPath
         PostgresPath = $postgresPath
@@ -710,7 +744,7 @@ function Initialize-GiteaLifecycleE2EFixture {
         (@{ runId = $runId; prefix = $prefix } | ConvertTo-Json -Compress),
         [System.Text.UTF8Encoding]::new($false)
     )
-    New-Item -ItemType Directory -Path @($repoRoot, $dataPath, $configPath, $postgresPath, $runnerDataPath, $backupRoot) -Force -ErrorAction Stop | Out-Null
+    New-Item -ItemType Directory -Path @($repoRoot, $dataPath, $configPath, $postgresPath, $runnerDataPath, $runnerSocketPlaceholderPath, $backupRoot) -Force -ErrorAction Stop | Out-Null
     $configDirectory = Join-Path $repoRoot "config\dev"
     $operatorDirectory = Join-Path $repoRoot ".agent-sdlc\dev-env\gitea"
     New-Item -ItemType Directory -Path @($configDirectory, $operatorDirectory) -Force -ErrorAction Stop | Out-Null
@@ -804,16 +838,22 @@ function Initialize-GiteaLifecycleE2EFixture {
     if (-not $runnerToken -or $runnerToken -match "\s") {
         throw "Gitea did not return one valid Runner registration token; fixture setup stopped before starting the Runner."
     }
-    Invoke-GiteaLifecycleE2EDocker -Stage "start real host-label disposable Runner fixture" -Arguments @(
+    $runnerMounts = @(Get-GiteaLifecycleE2ERunnerFixtureMounts -State $script:dockerE2EState)
+    $runnerArguments = @(
         "run", "-d", "--name", $runnerName, "--network", $networkName, "--restart", "unless-stopped",
-        "--label", "agent-sdlc.lifecycle-e2e.run-id=$runId",
-        "--mount", "type=bind,source=$runnerDataPath,target=/data",
+        "--label", "agent-sdlc.lifecycle-e2e.run-id=$runId"
+    )
+    foreach ($runnerMount in $runnerMounts) {
+        $runnerArguments += @("--mount", $runnerMount)
+    }
+    $runnerArguments += @(
         "-e", "GITEA_INSTANCE_URL=http://$giteaName:3000/",
         "-e", "GITEA_RUNNER_REGISTRATION_TOKEN=$runnerToken",
         "-e", "GITEA_RUNNER_NAME=$runnerName",
         "-e", "GITEA_RUNNER_LABELS=agent-sdlc-host:host",
         $runnerImage
-    ) | Out-Null
+    )
+    Invoke-GiteaLifecycleE2EDocker -Stage "start real host-label disposable Runner fixture" -Arguments $runnerArguments | Out-Null
     [void](Assert-GiteaLifecycleE2ENoAnonymousVolumes -ContainerName $runnerName)
     $script:dockerE2EState.RunnerContainerId = Invoke-GiteaLifecycleE2EDocker -Arguments @("inspect", $runnerName, "--format", "{{.Id}}")
     $runnerApi = $null
@@ -840,6 +880,7 @@ function Remove-GiteaLifecycleE2EFixture {
     $cleanupError = $null
     try {
         Register-GiteaLifecycleE2EOwnedContainers
+        $verifiedContainers = @()
         foreach ($containerId in @($state.OwnedContainers.Keys)) {
             $expected = $state.OwnedContainers[$containerId]
             $container = Get-GiteaLifecycleE2EContainer -ContainerId ([string]$containerId)
@@ -848,7 +889,12 @@ function Remove-GiteaLifecycleE2EFixture {
                 throw "A fixture container no longer matches its recorded test-owned identity; refusing to remove it."
             }
             [void](Assert-GiteaLifecycleE2ENoAnonymousVolumes -ContainerName ([string]$container.Name).TrimStart('/'))
-            Invoke-GiteaLifecycleE2EDocker -Arguments @("rm", "-f", [string]$expected.id) -Stage "remove verified disposable fixture container" | Out-Null
+            $verifiedContainers += [pscustomobject]@{ ContainerId = [string]$expected.id }
+        }
+
+        foreach ($verifiedContainer in $verifiedContainers) {
+            Invoke-GiteaLifecycleE2EDocker -Arguments @("rm", "-f", [string]$verifiedContainer.ContainerId) -Stage "remove verified disposable fixture container" | Out-Null
+            $containerId = [string]$verifiedContainer.ContainerId
             $state.OwnedContainers.Remove([string]$containerId)
         }
 

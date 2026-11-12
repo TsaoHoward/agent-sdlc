@@ -3,7 +3,7 @@
 ## Metadata
 - Issue ID: I-007
 - Status: In Progress
-- Last Updated: 2026-11-10
+- Last Updated: 2026-11-12
 - Owner: Project Maintainer
 - Related Docs / WBS: GitHub issue #3; `docs/roadmap.md` Phase 1 follow-up; WBS `3.12`; `docs/testing/items/TC-011-gitea-version-lifecycle-operations.md`
 - Source Dashboard: docs/issues/issue-dashboard.md
@@ -49,6 +49,12 @@ No post-repair native result is available. `npm run test:gitea-lifecycle` exits 
 
 An independent repair branch from frozen commit `a1ebbe9` routes each `test:gitea-lifecycle*` npm script through a shared PowerShell runner. It requires Pester result counts and returns nonzero for failed tests, failed setup/discovery, zero tests, or a run that did not execute. Four focused npm cases cover one passing test, one intentional failure, zero tests, and a missing test path. Pester's existing console output and statistics are retained. Windows PowerShell 5.1/Pester 6.2.0 are visible through WSL interop, but Pester cannot discover the repository root from the WSL UNC workspace path; the baseline invocation failed before discovery and returned 0. A subsequent npm-launched interop attempt failed before PowerShell startup. Native Windows execution remains pending, so this A0 change is reviewable but not Windows-accepted.
 
+### Stage B Runner fixture volume repair — 2026-11-12
+
+The prior Windows Docker E2E failed during initialization and guarded cleanup because `gitea/act_runner:0.2.13` declares `/var/run/docker.sock` as an image volume while the fixture only bound `/data`. The existing guard correctly rejected the resulting anonymous Docker volume. PR #6 discussion records that the exact orphaned Run ID `671f763bb72c4b7d8597baa843a9f784` was later cleaned up after ownership checks; no formal Gitea/PostgreSQL/Runner or Recovery Marker was operated.
+
+The independent repair adds a read-only bind from a GUID-owned empty fixture directory at the declared socket target, never mounts the host Docker socket, keeps the anonymous-volume guard, strengthens Runner mount identity checks, and preflights all run-labeled containers before any deletion. Positive/negative Pester cases cover mount construction, volume validation, successful cleanup, and refusal before partial cleanup. Native Windows PowerShell and Docker Desktop are unavailable from this WSL session, so the new regressions and 8 E2E cases remain pending; the branch targets the PR #6 development branch.
+
 ## Dependencies And Constraints
 
 - Preserve the Gitea/PostgreSQL/Runner identities, configured mounts, host port, network, and local settings.
@@ -67,6 +73,7 @@ Archive after implementation review and authorized Windows Host acceptance are c
 ## Next Actions
 
 - Run focused schema-1/2/3 status regressions and the full non-Docker suite on the new PR #6 head using native Windows PowerShell 5.1/Pester 6.2.0; record the exact results in TC-011 and the PR discussion. Keep Docker E2E, AC-16, formal operations, and #29 outside this repair scope.
+- Run the Stage B Volume/Cleanup regressions and all 8 Docker E2E cases from native Windows PowerShell 5.1 with Docker Desktop. Confirm every fixture resource is removed and the pre-existing Gitea/PostgreSQL/Runner identities and states are unchanged.
 - The latest failure is explained by a direct Windows PowerShell 5.1/.NET Framework NTFS probe: `File.Replace` with a null backup path fails with `ArgumentException` / HRESULT `0x80070057`, including for extended-length paths; a unique same-directory backup path succeeds. `Move-LongPathFile -Force` now supplies that backup and rolls the replacement back if backup cleanup fails. Direct image-pin and Recovery Marker coverage was added under `WindowsBootstrapPin`; the upgrade catch preserves sanitized stage/type/cause details. Focused real-NTFS Pester passed 5/5. Combined non-Docker Pester was 43/44; the sole failure was `whoami.exe /priv` returning no output in this WSL Windows-interop session, so native-host full-suite status remains to be confirmed. The post-fix Docker E2E has not been rerun.
 - Next verification: Native Windows bootstrap-pin 5/5, full Pester 44/44 and isolated Docker E2E 3/3 have passed on commit `071cb08`. Only the separately authorized real 43000 upgrade and API/Git/Registry/Actions/Runner/Run Attempt smoke acceptance remain; retain Issue #3 active until that evidence is recorded.
 - Actions preflight compatibility follow-up (2026-11-08): Windows PowerShell 5.1/Pester 6.2.0 ran 45/46 tests; the only failure was the existing WSL interop `WindowsAcl` precondition because `whoami.exe /priv` returned no output. The same suite excluding that tag passed 45/45. Coverage includes the reported `completed` / `failure` / RFC 3339 timestamp shape plus valid/invalid conclusions, timestamps, missing fields, legacy terminal values, active/unknown states and incomplete pagination. The GUID-owned Windows temp copy was removed. The formal Gitea, PostgreSQL, Runner, backup and upgrade surfaces were not accessed.
@@ -95,3 +102,4 @@ Archive after implementation review and authorized Windows Host acceptance are c
 - 2026-11-10: Added schema-version validation for persisted runtime, PostgreSQL topology, and Restore Context, including full PostgreSQL container/database identity for new snapshots; expanded D1 path coverage to Gitea picture upload settings.
 - 2026-11-10: Recorded the A1 Runtime repair branch from PR #6 checkpoint `ab14c9d`, its four Pester regressions, the unavailable WSL PowerShell runner, and the outstanding native Windows verification gate.
 - 2026-11-11: Fixed the PR #6 read-only status label mismatch: raw `backupId`/`operationId` Marker properties now render as `backup=`/`operation=` per the existing CLI contract. Offline platform validation and diff checks pass; native Windows Pester at the new head remains pending.
+- 2026-11-12: Added the Stage B Runner image-volume repair and positive/negative Volume/Cleanup regressions on an independent branch targeting PR #6. The previous orphaned fixture cleanup was reported complete; current native regression/E2E acceptance remains pending because WSL cannot start PowerShell or Docker Desktop. Formal services remain untouched.

@@ -3,7 +3,7 @@
 ## Document Metadata
 - Version: 0.1
 - Status: Draft
-- Last Updated: 2026-11-10
+- Last Updated: 2026-11-12
 - Owner: Project Maintainer
 - Source Template: docs/templates/wbs.template.md
 
@@ -333,6 +333,7 @@
 
 - Follow-up evidence (2026-11-11, PR #9 legacy reconciliation repair): The last native Windows PowerShell 5.1/Pester 6.2.0 report at `a872756` is 76 Passed / 2 Failed / 0 Skipped / 0 NotRun (ExitCode 1), both caused by schema-1 Marker `operationId` reads. PR #9 now derives a deterministic domain-separated reconciliation Record ID for schema-1/2 from schema, operation kind, exact Backup ID, and mode; schema-3 keeps the prior Marker Operation ID identity and checks. Legacy closeout reloads and compares the append-only Record before clearing only an unchanged Marker. TC-011 retains the minimal schema-1 fixture and adds schema-2, replay/conflict, schema-3 identity, and clear-evidence cases. Native full non-Docker rerun at the repaired head remains pending; no pass or merge is claimed. No Docker E2E, AC-16, formal Gitea 43000 operation, or #29 work was performed.
 - Follow-up evidence (2026-11-11, PR #6 read-only status label repair): Preserved schema-1/2/3 field-presence handling and sanitizer while mapping raw Marker `backupId`/`operationId` fields to the existing `backup=`/`operation=` status labels; added test assertions rejecting raw-name output. `npm run validate:platform` and `git diff --check` pass. Native Windows PowerShell 5.1/Pester 6.2.0 acceptance is reserved for the new PR #6 head. No formal Recovery Marker, lifecycle operation, Docker E2E, or merge was performed.
+- Follow-up evidence (2026-11-12, Stage B Runner fixture): The pinned Runner's declared `/var/run/docker.sock` volume now receives a read-only bind from an empty GUID-owned fixture directory; the host socket is not mounted. Positive/negative volume and cleanup regressions preflight all run-labeled containers before deletion. WBS 3.12 remains In Progress. Native Pester and the full 8-case Docker Desktop E2E could not start in this WSL session; no acceptance is claimed and formal services were not accessed.
 
 ### WBS 4 — Controlled Expansion
 - Parent:
