@@ -2718,3 +2718,178 @@ Describe "Gitea isolated Docker fixture cleanup on real NTFS" -Tag "WindowsLongP
         }
     }
 }
+
+Describe "Gitea isolated Docker fixture image volumes and cleanup" {
+    BeforeAll {
+        . (Join-Path $PSScriptRoot "gitea-lifecycle.DockerE2E.Helpers.ps1")
+    }
+
+    BeforeEach {
+        $runId = [Guid]::NewGuid().ToString("N")
+        $testRoot = Join-Path $TestDrive "agent-sdlc-life-e2e-$runId"
+        $script:dockerE2EState = @{
+            RunId = $runId
+            TestRoot = $testRoot
+            NetworkName = "fixture-network"
+            NetworkId = "fixture-network-id"
+            NetworkCreated = $true
+            TestRootCreated = $false
+            RunnerName = "fixture-runner"
+            RunnerDataPath = Join-Path $testRoot "volumes\runner-data"
+            RunnerSocketPlaceholderPath = Join-Path $testRoot "volumes\runner-docker-socket"
+            OwnedContainers = @{}
+            ExistingContainers = @{}
+        }
+        $script:dockerE2ECleanupCalls = @()
+    }
+
+    AfterAll {
+        $script:dockerE2EState = $null
+    }
+
+    It "builds both Runner mounts from the exact GUID-owned fixture paths" {
+        $mounts = @(Get-GiteaLifecycleE2ERunnerFixtureMounts -State $script:dockerE2EState)
+
+        $mounts.Count | Should -Be 2
+        $mounts[0] | Should -BeExactly "type=bind,source=$($script:dockerE2EState.RunnerDataPath),target=/data"
+        $mounts[1] | Should -BeExactly "type=bind,source=$($script:dockerE2EState.RunnerSocketPlaceholderPath),target=/var/run/docker.sock,readonly"
+        ($mounts[1] -split ",target=", 2)[0] | Should -Not -Match "source=.*(?:/|\\)docker\.sock(?:,|$)"
+    }
+
+    It "rejects a Runner socket mount path outside the owned fixture tree" {
+        $script:dockerE2EState.RunnerSocketPlaceholderPath = "C:\ProgramData\Docker\docker.sock"
+
+        { Get-GiteaLifecycleE2ERunnerFixtureMounts -State $script:dockerE2EState } |
+            Should -Throw "*GUID-owned fixture's exact volume paths*"
+    }
+
+    It "accepts declared image volumes only when each has exactly one bind mount" {
+        $script:dockerE2ETestContainer = @{
+            Id = "runner-container-id"
+            Name = "/fixture-runner"
+            Config = @{ Volumes = @{ "/data" = $null; "/var/run/docker.sock" = $null } }
+            Mounts = @(
+                @{ Type = "bind"; Source = $script:dockerE2EState.RunnerDataPath; Destination = "/data"; RW = $true },
+                @{ Type = "bind"; Source = $script:dockerE2EState.RunnerSocketPlaceholderPath; Destination = "/var/run/docker.sock"; RW = $false }
+            )
+        } | ConvertTo-Json -Depth 8 -Compress | ConvertFrom-Json
+        Mock Get-GiteaLifecycleE2EContainer { return $script:dockerE2ETestContainer }
+
+        { Assert-GiteaLifecycleE2ENoAnonymousVolumes -ContainerName "fixture-runner" } |
+            Should -Not -Throw
+    }
+
+    It "rejects an image-declared Runner volume that Docker left anonymous" {
+        $script:dockerE2ETestContainer = @{
+            Id = "runner-container-id"
+            Name = "/fixture-runner"
+            Config = @{ Volumes = @{ "/data" = $null; "/var/run/docker.sock" = $null } }
+            Mounts = @(
+                @{ Type = "bind"; Source = $script:dockerE2EState.RunnerDataPath; Destination = "/data"; RW = $true },
+                @{ Type = "volume"; Source = "anonymous-volume-id"; Destination = "/var/run/docker.sock" }
+            )
+        } | ConvertTo-Json -Depth 8 -Compress | ConvertFrom-Json
+        Mock Get-GiteaLifecycleE2EContainer { return $script:dockerE2ETestContainer }
+
+        { Assert-GiteaLifecycleE2ENoAnonymousVolumes -ContainerName "fixture-runner" } |
+            Should -Throw "*exactly one owned bind mount*"
+    }
+
+    It "accepts fixture cleanup when the declared Runner volumes use owned bind mounts" {
+        $script:dockerE2EState.OwnedContainers["runner-container-id"] = @{
+            id = "runner-container-id"
+            name = "fixture-runner"
+            kind = "runner"
+        }
+        $script:dockerE2ETestContainer = @{
+            Id = "runner-container-id"
+            Name = "/fixture-runner"
+            Config = @{
+                Labels = @{ "agent-sdlc.lifecycle-e2e.run-id" = $script:dockerE2EState.RunId }
+                Volumes = @{ "/data" = $null; "/var/run/docker.sock" = $null }
+            }
+            NetworkSettings = @{ Networks = @{ "fixture-network" = @{} } }
+            Mounts = @(
+                @{ Type = "bind"; Source = $script:dockerE2EState.RunnerDataPath; Destination = "/data"; RW = $true },
+                @{ Type = "bind"; Source = $script:dockerE2EState.RunnerSocketPlaceholderPath; Destination = "/var/run/docker.sock"; RW = $false }
+            )
+        } | ConvertTo-Json -Depth 8 -Compress | ConvertFrom-Json
+        Mock Register-GiteaLifecycleE2EOwnedContainers {}
+        Mock Get-GiteaLifecycleE2EContainer { return $script:dockerE2ETestContainer }
+        Mock Invoke-GiteaLifecycleE2EDocker {
+            param($Arguments)
+            $script:dockerE2ECleanupCalls += ,@($Arguments)
+            $script:dockerE2ELastExitCode = 0
+            if ($Arguments.Count -gt 1 -and $Arguments[0] -ceq "network" -and $Arguments[1] -ceq "inspect") {
+                return @{
+                    Id = $script:dockerE2EState.NetworkId
+                    Labels = @{ "agent-sdlc.lifecycle-e2e.run-id" = $script:dockerE2EState.RunId }
+                    Containers = @{}
+                } | ConvertTo-Json -Compress
+            }
+        }
+        Mock Assert-GiteaLifecycleE2EContainerSnapshot {}
+
+        { Remove-GiteaLifecycleE2EFixture } | Should -Not -Throw
+
+        $script:dockerE2EState.CleanupComplete | Should -BeTrue
+        $script:dockerE2EState.OwnedContainers.Count | Should -Be 0
+        $calls = @($script:dockerE2ECleanupCalls | ForEach-Object { $_ -join " " })
+        $calls | Should -Contain "rm -f runner-container-id"
+        $calls | Should -Contain "network rm fixture-network-id"
+        ($calls -join "`n") | Should -Not -Match "volume|prune"
+    }
+
+    It "blocks cleanup before deleting any fixture container when one has an anonymous volume" {
+        $script:dockerE2EState.OwnedContainers["gitea-container-id"] = @{
+            id = "gitea-container-id"
+            name = "fixture-gitea"
+            kind = "gitea"
+        }
+        $script:dockerE2EState.OwnedContainers["runner-container-id"] = @{
+            id = "runner-container-id"
+            name = "fixture-runner"
+            kind = "runner"
+        }
+        $script:dockerE2ETestContainers = @{
+            "gitea-container-id" = @{
+                Id = "gitea-container-id"
+                Name = "/fixture-gitea"
+                Config = @{ Volumes = @{} }
+                Mounts = @()
+            } | ConvertTo-Json -Depth 8 -Compress | ConvertFrom-Json
+            "runner-container-id" = @{
+                Id = "runner-container-id"
+                Name = "/fixture-runner"
+                Config = @{ Volumes = @{ "/data" = $null; "/var/run/docker.sock" = $null } }
+                Mounts = @(
+                    @{ Type = "bind"; Source = $script:dockerE2EState.RunnerDataPath; Destination = "/data"; RW = $true },
+                    @{ Type = "volume"; Source = "anonymous-volume-id"; Destination = "/var/run/docker.sock" }
+                )
+            } | ConvertTo-Json -Depth 8 -Compress | ConvertFrom-Json
+        }
+        Mock Register-GiteaLifecycleE2EOwnedContainers {}
+        Mock Get-GiteaLifecycleE2EContainer {
+            param($ContainerId)
+            return $script:dockerE2ETestContainers[$ContainerId]
+        }
+        Mock Get-GiteaLifecycleE2EOwnedContainerKind {
+            param($Container)
+            if ($Container.Name -ceq "/fixture-gitea") { return "gitea" }
+            return "runner"
+        }
+        Mock Invoke-GiteaLifecycleE2EDocker {
+            param($Arguments)
+            $script:dockerE2ECleanupCalls += ,@($Arguments)
+            $script:dockerE2ELastExitCode = 0
+        }
+        Mock Assert-GiteaLifecycleE2EContainerSnapshot {}
+
+        { Remove-GiteaLifecycleE2EFixture } |
+            Should -Throw "*exactly one owned bind mount*"
+
+        $script:dockerE2EState.CleanupComplete | Should -BeFalse
+        $script:dockerE2EState.OwnedContainers.Count | Should -Be 2
+        $script:dockerE2ECleanupCalls.Count | Should -Be 0
+    }
+}
